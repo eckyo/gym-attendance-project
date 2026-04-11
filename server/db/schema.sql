@@ -52,3 +52,21 @@ CREATE INDEX IF NOT EXISTS idx_attendance_open
 
 -- Add admin PIN support (idempotent for existing databases)
 ALTER TABLE gyms ADD COLUMN IF NOT EXISTS admin_pin_hash TEXT;
+
+-- Sequential GYM ID counter per gym
+ALTER TABLE gyms ADD COLUMN IF NOT EXISTS member_id_counter INTEGER NOT NULL DEFAULT 0;
+
+-- Member expiry date
+ALTER TABLE members ADD COLUMN IF NOT EXISTS expiry_date DATE;
+
+-- Convert scan_token from UUID type to TEXT (idempotent)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'members' AND column_name = 'scan_token' AND data_type = 'uuid'
+  ) THEN
+    ALTER TABLE members ALTER COLUMN scan_token TYPE TEXT USING scan_token::text;
+    ALTER TABLE members ALTER COLUMN scan_token DROP DEFAULT;
+  END IF;
+END $$;

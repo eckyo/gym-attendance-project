@@ -280,8 +280,15 @@ function ChangePinModal({ token, onClose }) {
 
 // ─── Add Member Modal ─────────────────────────────────────────────────────────
 
+const defaultExpiryDate = () => {
+  const d = new Date();
+  d.setDate(d.getDate() + 30);
+  return d.toISOString().slice(0, 10);
+};
+
 function AddMemberModal({ token, onAdded, onClose }) {
   const [name, setName] = useState('');
+  const [expiryDate, setExpiryDate] = useState(defaultExpiryDate);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -290,7 +297,7 @@ function AddMemberModal({ token, onAdded, onClose }) {
     setError('');
     setLoading(true);
     try {
-      const member = await addMember(token, name);
+      const member = await addMember(token, name, expiryDate);
       onAdded(member);
     } catch (err) {
       setError(err.message);
@@ -308,6 +315,10 @@ function AddMemberModal({ token, onAdded, onClose }) {
           <input style={s.modalInput} type="text"
             value={name} onChange={(e) => setName(e.target.value)}
             placeholder="Full name" required autoFocus />
+          <label style={s.modalLabel}>Expiry Date</label>
+          <input style={s.modalInput} type="date"
+            value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)}
+            required />
           <button style={{ ...s.modalBtn, background: '#3b82f6', color: '#fff', opacity: loading ? 0.6 : 1 }}
             type="submit" disabled={loading}>
             {loading ? 'Adding...' : 'Add Member'}
@@ -403,6 +414,7 @@ function MembersTab({ token }) {
   const [error, setError] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState('');
+  const [editExpiry, setEditExpiry] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [qrMember, setQrMember] = useState(null);
 
@@ -424,13 +436,14 @@ function MembersTab({ token }) {
   const startEdit = (member) => {
     setEditingId(member.id);
     setEditName(member.name);
+    setEditExpiry(member.expiry_date ? member.expiry_date.slice(0, 10) : '');
   };
 
-  const cancelEdit = () => { setEditingId(null); setEditName(''); };
+  const cancelEdit = () => { setEditingId(null); setEditName(''); setEditExpiry(''); };
 
   const saveEdit = async (id) => {
     try {
-      const updated = await updateMember(token, id, editName);
+      const updated = await updateMember(token, id, editName, editExpiry);
       setMembers((prev) => prev.map((m) => m.id === id ? updated : m));
       setEditingId(null);
     } catch (err) {
@@ -472,47 +485,66 @@ function MembersTab({ token }) {
         <thead>
           <tr>
             <th style={s.th}>Name</th>
-            <th style={s.th}>Scan Token</th>
+            <th style={s.th}>GYM ID</th>
+            <th style={s.th}>Expiry Date</th>
             <th style={s.th}>Joined</th>
             <th style={s.th}>Actions</th>
           </tr>
         </thead>
         <tbody>
           {loading ? (
-            <tr><td colSpan={4} style={s.empty}>Loading...</td></tr>
+            <tr><td colSpan={5} style={s.empty}>Loading...</td></tr>
           ) : members.length === 0 ? (
-            <tr><td colSpan={4} style={s.empty}>No members found.</td></tr>
-          ) : members.map((member) => (
-            <tr key={member.id}>
-              <td style={s.td}>
-                {editingId === member.id ? (
-                  <input
-                    style={s.inlineInput}
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(member.id); if (e.key === 'Escape') cancelEdit(); }}
-                    autoFocus
-                  />
-                ) : member.name}
-              </td>
-              <td style={s.tdMono}>{member.scan_token}</td>
-              <td style={s.td}>{new Date(member.created_at).toLocaleDateString('en-US')}</td>
-              <td style={s.td}>
-                {editingId === member.id ? (
-                  <>
-                    <button style={{ ...s.actionBtn, ...s.saveBtn }} onClick={() => saveEdit(member.id)}>Save</button>
-                    <button style={{ ...s.actionBtn, ...s.cancelBtn }} onClick={cancelEdit}>Cancel</button>
-                  </>
-                ) : (
-                  <>
-                    <button style={{ ...s.actionBtn, ...s.qrBtn }} onClick={() => setQrMember(member)}>QR Code</button>
-                    <button style={{ ...s.actionBtn, ...s.editBtn }} onClick={() => startEdit(member)}>Edit</button>
-                    <button style={{ ...s.actionBtn, ...s.deleteBtn }} onClick={() => handleDelete(member.id, member.name)}>Remove</button>
-                  </>
-                )}
-              </td>
-            </tr>
-          ))}
+            <tr><td colSpan={5} style={s.empty}>No members found.</td></tr>
+          ) : members.map((member) => {
+            const isExpired = member.expiry_date && new Date(member.expiry_date) < new Date();
+            return (
+              <tr key={member.id}>
+                <td style={s.td}>
+                  {editingId === member.id ? (
+                    <input
+                      style={s.inlineInput}
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(member.id); if (e.key === 'Escape') cancelEdit(); }}
+                      autoFocus
+                    />
+                  ) : member.name}
+                </td>
+                <td style={s.tdMono}>{member.scan_token}</td>
+                <td style={{ ...s.td, color: isExpired ? '#dc2626' : '#1e293b', fontWeight: isExpired ? 600 : 400 }}>
+                  {editingId === member.id ? (
+                    <input
+                      style={{ ...s.inlineInput, maxWidth: 160 }}
+                      type="date"
+                      value={editExpiry}
+                      onChange={(e) => setEditExpiry(e.target.value)}
+                    />
+                  ) : member.expiry_date ? (
+                    <>
+                      {new Date(member.expiry_date).toLocaleDateString('en-US')}
+                      {isExpired && <span style={{ marginLeft: 6, fontSize: 11 }}>(Expired)</span>}
+                    </>
+                  ) : '—'}
+                </td>
+                <td style={s.td}>{new Date(member.created_at).toLocaleDateString('en-US')}</td>
+                <td style={s.td}>
+                  {editingId === member.id ? (
+                    <>
+                      <button style={{ ...s.actionBtn, ...s.saveBtn }} onClick={() => saveEdit(member.id)}>Save</button>
+                      <button style={{ ...s.actionBtn, ...s.cancelBtn }} onClick={cancelEdit}>Cancel</button>
+                    </>
+                  ) : (
+                    <>
+                      <button style={{ ...s.actionBtn, ...s.qrBtn }} onClick={() => setQrMember(member)}>QR Code</button>
+                      <button style={{ ...s.actionBtn, ...s.editBtn }} onClick={() => startEdit(member)}>Edit</button>
+                      <button style={{ ...s.actionBtn, ...s.deleteBtn }} onClick={() => handleDelete(member.id, member.name)}>Remove</button>
+                    </>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
 

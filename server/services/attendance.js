@@ -7,12 +7,13 @@ import pool from '../db/pool.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = join(__dirname, '../../data');
 const XLSX_PATH = join(DATA_DIR, 'attendance.xlsx');
-const HEADERS = ['Member Name', 'Gym ID', 'Clock In Date & Time'];
+const HEADERS = ['Member Name', 'GYM ID', 'Clock In Date & Time'];
 
 export class MemberNotFoundError extends Error {}
 export class DuplicateCheckInError extends Error {}
+export class MemberExpiredError extends Error {}
 
-const appendToXlsx = ({ memberName, gymId, checkedInAt }) => {
+const appendToXlsx = ({ memberName, gymMemberId, checkedInAt }) => {
   mkdirSync(DATA_DIR, { recursive: true });
 
   let workbook;
@@ -29,7 +30,7 @@ const appendToXlsx = ({ memberName, gymId, checkedInAt }) => {
 
   const newRow = [
     memberName,
-    gymId,
+    gymMemberId,
     new Date(checkedInAt).toLocaleString('en-US', { timeZone: 'UTC', hour12: false }),
   ];
 
@@ -45,9 +46,9 @@ export const processScan = async (gymId, scanToken) => {
   try {
     await client.query('BEGIN');
 
-    // 1. Resolve member by scan token, scoped to gym
+    // 1. Resolve member by scan token (GYM ID), scoped to gym
     const memberResult = await client.query(
-      `SELECT id, name
+      `SELECT id, name, expiry_date
        FROM members
        WHERE gym_id = $1 AND scan_token = $2 AND deleted_at IS NULL`,
       [gymId, scanToken]
@@ -59,7 +60,15 @@ export const processScan = async (gymId, scanToken) => {
 
     member = memberResult.rows[0];
 
-    // 2. Check for open check-in
+    // 2. Check membership expiry
+    if (member.expiry_date && new Date(member.expiry_date) < new Date()) {
+      const expiredOn = new Date(member.expiry_date).toLocaleDateString('en-US', {
+        year: 'numeric', month: 'long', day: 'numeric',
+      });
+      throw new MemberExpiredError(`Membership expired on ${expiredOn}`);
+    }
+
+    // 3. Check for open check-in
     const openCheckIn = await client.query(
       `SELECT id
        FROM attendance_logs
@@ -72,7 +81,7 @@ export const processScan = async (gymId, scanToken) => {
       throw new DuplicateCheckInError('Member is already checked in');
     }
 
-    // 3. Insert attendance log (append-only)
+    // 4. Insert attendance log (append-only)
     const logResult = await client.query(
       `INSERT INTO attendance_logs (gym_id, member_id, checked_in_at)
        VALUES ($1, $2, NOW())
@@ -89,8 +98,8 @@ export const processScan = async (gymId, scanToken) => {
     client.release();
   }
 
-  // 4. Write to XLSX after DB commit — failure here won't roll back the DB record
-  appendToXlsx({ memberName: member.name, gymId: scanToken, checkedInAt: log.checked_in_at });
+  // 5. Write to XLSX after DB commit — failure here won't roll back the DB record
+  appendToXlsx({ memberName: member.name, gymMemberId: scanToken, checkedInAt: log.checked_in_at });
 
   return { memberName: member.name, checkedInAt: log.checked_in_at };
 };

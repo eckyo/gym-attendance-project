@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.js';
 import { injectGymId } from '../middleware/tenant.js';
 import { requireRole } from '../middleware/roles.js';
-import { processScan, MemberNotFoundError, DuplicateCheckInError } from '../services/attendance.js';
+import { processScan, MemberNotFoundError, DuplicateCheckInError, MemberExpiredError } from '../services/attendance.js';
 
 const router = Router();
 
@@ -22,6 +22,9 @@ router.post('/', requireAuth, injectGymId, requireRole('admin', 'staff'), async 
     }
     if (err instanceof DuplicateCheckInError) {
       return res.status(409).json({ error: err.message });
+    }
+    if (err instanceof MemberExpiredError) {
+      return res.status(403).json({ error: err.message });
     }
     next(err);
   }

@@ -35,18 +35,18 @@ export const getMembers = (token, { search } = {}) => {
   }).then(handleResponse);
 };
 
-export const addMember = (token, name) =>
+export const addMember = (token, name, expiryDate) =>
   fetch(`${API_BASE}/api/admin/members`, {
     method: 'POST',
     headers: authHeaders(token),
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, expiryDate }),
   }).then(handleResponse);
 
-export const updateMember = (token, id, name) =>
+export const updateMember = (token, id, name, expiryDate) =>
   fetch(`${API_BASE}/api/admin/members/${id}`, {
     method: 'PUT',
     headers: authHeaders(token),
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, expiryDate }),
   }).then(handleResponse);
 
 export const deleteMember = (token, id) =>

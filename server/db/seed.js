@@ -39,21 +39,28 @@ const seed = async () => {
       ON CONFLICT (gym_id, email) DO NOTHING
     `, [gymId, passwordHash]);
 
-    // Insert members with known scan tokens for QR generation
-    const member1Token = '11111111-1111-1111-1111-111111111111';
-    const member2Token = '22222222-2222-2222-2222-222222222222';
+    // Seed members with short GYM IDs — only insert if not already present
+    const oneYearFromNow = new Date();
+    oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
+    const expiryDate = oneYearFromNow.toISOString().slice(0, 10);
 
     await client.query(`
-      INSERT INTO members (gym_id, name, scan_token)
-      VALUES ($1, 'Alice Johnson', $2)
+      INSERT INTO members (gym_id, name, scan_token, expiry_date)
+      VALUES ($1, 'Alice Johnson', 'A0001', $2)
       ON CONFLICT (gym_id, scan_token) DO NOTHING
-    `, [gymId, member1Token]);
+    `, [gymId, expiryDate]);
 
     await client.query(`
-      INSERT INTO members (gym_id, name, scan_token)
-      VALUES ($1, 'Bob Smith', $2)
+      INSERT INTO members (gym_id, name, scan_token, expiry_date)
+      VALUES ($1, 'Bob Smith', 'A0002', $2)
       ON CONFLICT (gym_id, scan_token) DO NOTHING
-    `, [gymId, member2Token]);
+    `, [gymId, expiryDate]);
+
+    // Ensure counter is at least 2 (don't lower it if already higher)
+    await client.query(
+      `UPDATE gyms SET member_id_counter = GREATEST(member_id_counter, 2) WHERE id = $1`,
+      [gymId]
+    );
 
     await client.query('COMMIT');
 
@@ -61,9 +68,9 @@ const seed = async () => {
     console.log('Login credentials:');
     console.log('  admin@gym1.test  / password123  (role: admin)');
     console.log('  staff@gym1.test  / password123  (role: staff)\n');
-    console.log('Member scan tokens (encode these as QR codes):');
-    console.log(`  Alice Johnson  →  ${member1Token}`);
-    console.log(`  Bob Smith      →  ${member2Token}`);
+    console.log('Member GYM IDs (encode these as QR codes):');
+    console.log('  Alice Johnson  →  A0001');
+    console.log('  Bob Smith      →  A0002');
     console.log('\nGenerate QR codes at: https://www.qr-code-generator.com');
     console.log('\nAdmin dashboard PIN: 0000');
   } catch (err) {
