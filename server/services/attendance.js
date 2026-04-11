@@ -68,11 +68,13 @@ export const processScan = async (gymId, scanToken) => {
       throw new MemberExpiredError(`Membership expired on ${expiredOn}`);
     }
 
-    // 3. Check for open check-in
+    // 3. Check for open check-in today
     const openCheckIn = await client.query(
       `SELECT id
        FROM attendance_logs
-       WHERE member_id = $1 AND gym_id = $2 AND checked_out_at IS NULL
+       WHERE member_id = $1 AND gym_id = $2
+         AND checked_out_at IS NULL
+         AND checked_in_at::date = CURRENT_DATE
        LIMIT 1`,
       [member.id, gymId]
     );
@@ -101,5 +103,5 @@ export const processScan = async (gymId, scanToken) => {
   // 5. Write to XLSX after DB commit — failure here won't roll back the DB record
   appendToXlsx({ memberName: member.name, gymMemberId: scanToken, checkedInAt: log.checked_in_at });
 
-  return { memberName: member.name, checkedInAt: log.checked_in_at };
+  return { memberName: member.name, checkedInAt: log.checked_in_at, scanToken };
 };

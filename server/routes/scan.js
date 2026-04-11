@@ -15,7 +15,7 @@ router.post('/', requireAuth, injectGymId, requireRole('admin', 'staff'), async 
     }
 
     const result = await processScan(req.gymId, scanToken.trim());
-    res.json({ success: true, memberName: result.memberName, checkedInAt: result.checkedInAt });
+    res.json({ success: true, memberName: result.memberName, checkedInAt: result.checkedInAt, gymId: result.scanToken });
   } catch (err) {
     if (err instanceof MemberNotFoundError) {
       return res.status(404).json({ error: err.message });

@@ -49,10 +49,11 @@ export const updateMember = (token, id, name, expiryDate) =>
     body: JSON.stringify({ name, expiryDate }),
   }).then(handleResponse);
 
-export const deleteMember = (token, id) =>
+export const deleteMember = (token, id, pin) =>
   fetch(`${API_BASE}/api/admin/members/${id}`, {
     method: 'DELETE',
     headers: authHeaders(token),
+    body: JSON.stringify({ pin }),
   }).then(handleResponse);
 
 export const changePin = (token, currentPin, newPin) =>
@@ -60,4 +61,31 @@ export const changePin = (token, currentPin, newPin) =>
     method: 'PUT',
     headers: authHeaders(token),
     body: JSON.stringify({ currentPin, newPin }),
+  }).then(handleResponse);
+
+export const exportMembers = (token) =>
+  fetch(`${API_BASE}/api/admin/members/export`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+export const downloadTemplate = (token) =>
+  fetch(`${API_BASE}/api/admin/members/template`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+export const previewImport = (token, file) => {
+  const form = new FormData();
+  form.append('file', file);
+  return fetch(`${API_BASE}/api/admin/members/import`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  }).then(handleResponse);
+};
+
+export const confirmImport = (token, rows) =>
+  fetch(`${API_BASE}/api/admin/members/import/confirm`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify({ rows }),
   }).then(handleResponse);

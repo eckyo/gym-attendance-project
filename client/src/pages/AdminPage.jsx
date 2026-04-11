@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import QRCode from 'qrcode';
 import {
   getAttendance, getMembers, addMember, updateMember,
-  deleteMember, changePin,
+  deleteMember, changePin, exportMembers, downloadTemplate,
+  previewImport, confirmImport,
 } from '../api/admin.js';
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
@@ -80,6 +81,17 @@ const s = {
     cursor: 'pointer',
     whiteSpace: 'nowrap',
   },
+  outlineBtn: {
+    padding: '9px 18px',
+    background: '#fff',
+    color: '#475569',
+    border: '1.5px solid #e2e8f0',
+    borderRadius: 8,
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+  },
   table: { width: '100%', borderCollapse: 'collapse', background: '#fff', borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 6px rgba(0,0,0,0.07)' },
   th: { padding: '12px 16px', background: '#f8fafc', textAlign: 'left', fontSize: 12, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5, borderBottom: '1px solid #e2e8f0' },
   td: { padding: '12px 16px', fontSize: 14, color: '#1e293b', borderBottom: '1px solid #f1f5f9' },
@@ -126,6 +138,7 @@ const s = {
     width: '100%', padding: '10px 14px',
     border: '1.5px solid #e2e8f0', borderRadius: 8,
     fontSize: 15, marginBottom: 14, outline: 'none',
+    boxSizing: 'border-box',
   },
   modalBtn: {
     width: '100%', padding: '11px', borderRadius: 8,
@@ -162,6 +175,49 @@ const s = {
     cursor: 'pointer', background: '#7c3aed', color: '#fff',
     marginBottom: 10,
   },
+  // Import modal
+  importModal: {
+    background: '#fff', borderRadius: 16, padding: '32px 28px',
+    width: '100%', maxWidth: 720,
+    boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+    maxHeight: '85vh', overflowY: 'auto',
+  },
+  importSummary: {
+    background: '#f8fafc', borderRadius: 8, padding: '10px 14px',
+    fontSize: 13, color: '#475569', marginBottom: 16,
+  },
+  importRowValid: { background: '#fff' },
+  importRowError: { background: '#fef2f2' },
+  badge: {
+    display: 'inline-block', padding: '2px 8px',
+    borderRadius: 99, fontSize: 11, fontWeight: 600,
+  },
+  badgeReady: { background: '#dcfce7', color: '#166534' },
+  badgeError: { background: '#fee2e2', color: '#991b1b' },
+  fileInput: {
+    display: 'block', width: '100%',
+    padding: '10px 14px',
+    border: '1.5px dashed #cbd5e1', borderRadius: 8,
+    fontSize: 14, cursor: 'pointer', marginBottom: 14,
+    boxSizing: 'border-box',
+  },
+};
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const triggerDownload = async (fetchFn, filename) => {
+  const res = await fetchFn();
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || 'Download failed');
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 };
 
 // ─── QR Code Modal ───────────────────────────────────────────────────────────
@@ -214,6 +270,209 @@ function QrCodeModal({ member, onClose }) {
         >
           Close
         </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Delete PIN Modal ─────────────────────────────────────────────────────────
+
+function DeletePinModal({ token, member, onDeleted, onClose }) {
+  const [pin, setPin] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      await deleteMember(token, member.id, pin);
+      onDeleted(member.id);
+    } catch (err) {
+      setError(err.message);
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={s.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={s.modal}>
+        <div style={s.modalTitle}>Remove Member</div>
+        <p style={{ fontSize: 14, color: '#475569', marginBottom: 16, marginTop: -8 }}>
+          You are about to remove <strong>{member.name}</strong>. Enter your admin PIN to confirm.
+        </p>
+        {error && <div style={s.error}>{error}</div>}
+        <form onSubmit={handleSubmit}>
+          <label style={s.modalLabel}>Admin PIN</label>
+          <input
+            style={s.modalInput}
+            type="password"
+            inputMode="numeric"
+            value={pin}
+            onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            placeholder="Enter your PIN"
+            required
+            autoFocus
+          />
+          <button
+            style={{ ...s.modalBtn, background: '#dc2626', color: '#fff', opacity: loading ? 0.6 : 1 }}
+            type="submit"
+            disabled={loading}
+          >
+            {loading ? 'Removing...' : 'Remove Member'}
+          </button>
+          <button
+            type="button"
+            style={{ ...s.modalBtn, background: '#e2e8f0', color: '#475569', marginTop: 10 }}
+            onClick={onClose}
+          >
+            Cancel
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Import Modal ─────────────────────────────────────────────────────────────
+
+function ImportModal({ token, onImported, onClose }) {
+  const [step, setStep] = useState('upload'); // 'upload' | 'preview'
+  const [previewRows, setPreviewRows] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const fileRef = useRef(null);
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setError('');
+    setLoading(true);
+    try {
+      const result = await previewImport(token, file);
+      setPreviewRows(result.rows);
+      setStep('preview');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const validRows = previewRows.filter((r) => r.errors.length === 0);
+  const errorCount = previewRows.length - validRows.length;
+
+  const handleConfirm = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      const result = await confirmImport(token, validRows.map((r) => ({
+        name: r.name,
+        gymId: r.gymId,
+        expiryDate: r.expiryDate,
+        joinedDate: r.joinedDate,
+      })));
+      onImported(result.members);
+    } catch (err) {
+      setError(err.message);
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={s.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={s.importModal}>
+        <div style={s.modalTitle}>
+          {step === 'upload' ? 'Import Members' : 'Preview Import'}
+        </div>
+
+        {error && <div style={s.error}>{error}</div>}
+
+        {step === 'upload' && (
+          <>
+            <p style={{ fontSize: 14, color: '#475569', marginBottom: 16, marginTop: -8 }}>
+              Upload a filled template file (.xlsx or .xls). Each row should have: Name, GYM ID, Expiry Date, and Joined Date.
+            </p>
+            <input
+              ref={fileRef}
+              style={s.fileInput}
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={handleFileChange}
+              disabled={loading}
+            />
+            {loading && <p style={{ textAlign: 'center', color: '#64748b', fontSize: 14 }}>Parsing file...</p>}
+            <button
+              type="button"
+              style={{ ...s.modalBtn, background: '#e2e8f0', color: '#475569', marginTop: 6 }}
+              onClick={onClose}
+            >
+              Cancel
+            </button>
+          </>
+        )}
+
+        {step === 'preview' && (
+          <>
+            <div style={s.importSummary}>
+              {validRows.length} of {previewRows.length} rows will be imported.
+              {errorCount > 0 && ` ${errorCount} row${errorCount > 1 ? 's' : ''} with errors will be skipped.`}
+            </div>
+
+            <div style={{ overflowX: 'auto', marginBottom: 20 }}>
+              <table style={{ ...s.table, marginBottom: 0 }}>
+                <thead>
+                  <tr>
+                    <th style={s.th}>#</th>
+                    <th style={s.th}>Name</th>
+                    <th style={s.th}>GYM ID</th>
+                    <th style={s.th}>Expiry Date</th>
+                    <th style={s.th}>Joined Date</th>
+                    <th style={s.th}>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {previewRows.map((row) => (
+                    <tr key={row.rowIndex} style={row.errors.length > 0 ? s.importRowError : s.importRowValid}>
+                      <td style={s.td}>{row.rowIndex}</td>
+                      <td style={s.td}>{row.name || <span style={{ color: '#94a3b8' }}>—</span>}</td>
+                      <td style={s.tdMono}>{row.gymId || <span style={{ color: '#94a3b8' }}>—</span>}</td>
+                      <td style={s.td}>{row.expiryDate || <span style={{ color: '#94a3b8' }}>—</span>}</td>
+                      <td style={s.td}>{row.joinedDate}</td>
+                      <td style={s.td}>
+                        {row.errors.length === 0 ? (
+                          <span style={{ ...s.badge, ...s.badgeReady }}>Ready</span>
+                        ) : (
+                          <span style={{ ...s.badge, ...s.badgeError }} title={row.errors.join('; ')}>
+                            {row.errors[0]}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {validRows.length > 0 && (
+              <button
+                style={{ ...s.modalBtn, background: '#3b82f6', color: '#fff', opacity: loading ? 0.6 : 1, marginBottom: 10 }}
+                onClick={handleConfirm}
+                disabled={loading}
+              >
+                {loading ? 'Importing...' : `Import ${validRows.length} Member${validRows.length > 1 ? 's' : ''}`}
+              </button>
+            )}
+            <button
+              type="button"
+              style={{ ...s.modalBtn, background: '#e2e8f0', color: '#475569' }}
+              onClick={() => { setStep('upload'); setPreviewRows([]); setError(''); if (fileRef.current) fileRef.current.value = ''; }}
+            >
+              Back
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -416,6 +675,8 @@ function MembersTab({ token }) {
   const [editName, setEditName] = useState('');
   const [editExpiry, setEditExpiry] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [deletingMember, setDeletingMember] = useState(null);
   const [qrMember, setQrMember] = useState(null);
 
   const load = useCallback(async () => {
@@ -451,19 +712,37 @@ function MembersTab({ token }) {
     }
   };
 
-  const handleDelete = async (id, name) => {
-    if (!window.confirm(`Remove "${name}"? This cannot be undone.`)) return;
+  const handleDeleted = (id) => {
+    setMembers((prev) => prev.filter((m) => m.id !== id));
+    setDeletingMember(null);
+  };
+
+  const handleAdded = (member) => {
+    setMembers((prev) => [...prev, member].sort((a, b) => a.scan_token.localeCompare(b.scan_token)));
+    setShowAddModal(false);
+  };
+
+  const handleImported = (newMembers) => {
+    setMembers((prev) =>
+      [...prev, ...newMembers].sort((a, b) => a.scan_token.localeCompare(b.scan_token))
+    );
+    setShowImportModal(false);
+  };
+
+  const handleExport = async () => {
     try {
-      await deleteMember(token, id);
-      setMembers((prev) => prev.filter((m) => m.id !== id));
+      await triggerDownload(() => exportMembers(token), 'members.xlsx');
     } catch (err) {
       setError(err.message);
     }
   };
 
-  const handleAdded = (member) => {
-    setMembers((prev) => [member, ...prev]);
-    setShowAddModal(false);
+  const handleTemplate = async () => {
+    try {
+      await triggerDownload(() => downloadTemplate(token), 'members-template.xlsx');
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
   return (
@@ -472,10 +751,13 @@ function MembersTab({ token }) {
         <input
           style={s.searchInput}
           type="text"
-          placeholder="Search by name or scan token..."
+          placeholder="Search by name or GYM ID..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
+        <button style={s.outlineBtn} onClick={handleTemplate}>↓ Template</button>
+        <button style={s.outlineBtn} onClick={handleExport}>↑ Export</button>
+        <button style={s.outlineBtn} onClick={() => setShowImportModal(true)}>↑ Import</button>
         <button style={s.addBtn} onClick={() => setShowAddModal(true)}>+ Add Member</button>
       </div>
 
@@ -538,7 +820,7 @@ function MembersTab({ token }) {
                     <>
                       <button style={{ ...s.actionBtn, ...s.qrBtn }} onClick={() => setQrMember(member)}>QR Code</button>
                       <button style={{ ...s.actionBtn, ...s.editBtn }} onClick={() => startEdit(member)}>Edit</button>
-                      <button style={{ ...s.actionBtn, ...s.deleteBtn }} onClick={() => handleDelete(member.id, member.name)}>Remove</button>
+                      <button style={{ ...s.actionBtn, ...s.deleteBtn }} onClick={() => setDeletingMember(member)}>Remove</button>
                     </>
                   )}
                 </td>
@@ -550,6 +832,12 @@ function MembersTab({ token }) {
 
       {showAddModal && (
         <AddMemberModal token={token} onAdded={handleAdded} onClose={() => setShowAddModal(false)} />
+      )}
+      {showImportModal && (
+        <ImportModal token={token} onImported={handleImported} onClose={() => setShowImportModal(false)} />
+      )}
+      {deletingMember && (
+        <DeletePinModal token={token} member={deletingMember} onDeleted={handleDeleted} onClose={() => setDeletingMember(null)} />
       )}
       {qrMember && (
         <QrCodeModal member={qrMember} onClose={() => setQrMember(null)} />

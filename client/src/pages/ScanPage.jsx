@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
+import Lottie from 'lottie-react';
+import successAnimation from '../assets/success.json';
+import errorAnimation from '../assets/error.json';
 import { postScan } from '../api/scan.js';
 
 const DEBOUNCE_MS = 5000;
@@ -58,16 +61,6 @@ const styles = {
     padding: 12,
     fontSize: 15,
   },
-  feedbackSuccess: {
-    background: '#dcfce7',
-    border: '1px solid #86efac',
-    color: '#166534',
-    borderRadius: 10,
-    padding: '16px 20px',
-    fontSize: 16,
-    fontWeight: 600,
-    textAlign: 'center',
-  },
   feedbackError: {
     background: '#fee2e2',
     border: '1px solid #fca5a5',
@@ -76,6 +69,75 @@ const styles = {
     padding: '16px 20px',
     fontSize: 15,
     textAlign: 'center',
+  },
+  overlay: {
+    position: 'fixed',
+    inset: 0,
+    background: 'rgba(0,0,0,0.6)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+  },
+  card: {
+    background: '#fff',
+    borderRadius: 20,
+    padding: '32px 40px',
+    textAlign: 'center',
+    width: 360,
+    boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+  },
+  cardHeading: {
+    fontSize: 20,
+    fontWeight: 700,
+    color: '#166534',
+    marginBottom: 16,
+    marginTop: 0,
+  },
+  cardName: {
+    fontSize: 26,
+    fontWeight: 700,
+    color: '#1a1a2e',
+    marginBottom: 6,
+  },
+  cardGymId: {
+    fontSize: 15,
+    color: '#64748b',
+    marginBottom: 6,
+    letterSpacing: '0.05em',
+  },
+  cardTime: {
+    fontSize: 14,
+    color: '#94a3b8',
+  },
+  errorHeading: {
+    fontSize: 20,
+    fontWeight: 700,
+    color: '#991b1b',
+    marginBottom: 8,
+    marginTop: 0,
+  },
+  errorMessage: {
+    fontSize: 15,
+    color: '#475569',
+    marginBottom: 6,
+    lineHeight: 1.5,
+  },
+  errorHint: {
+    fontSize: 14,
+    color: '#94a3b8',
+    marginBottom: 24,
+    lineHeight: 1.5,
+  },
+  returnBtn: {
+    padding: '12px 32px',
+    background: '#1a1a2e',
+    color: '#fff',
+    border: 'none',
+    borderRadius: 10,
+    fontSize: 15,
+    fontWeight: 600,
+    cursor: 'pointer',
   },
 };
 
@@ -86,7 +148,6 @@ export default function ScanPage({ token, role, onLogout, onAdminAccess }) {
   const scannerRef = useRef(null);
 
   useEffect(() => {
-    // Clear any leftover DOM from a previous scanner instance (StrictMode / remount)
     const readerEl = document.getElementById('qr-reader');
     if (readerEl) readerEl.innerHTML = '';
 
@@ -110,14 +171,16 @@ export default function ScanPage({ token, role, onLogout, onAdminAccess }) {
 
       try {
         const result = await postScan(token, decodedText);
-        const time = new Date(result.checkedInAt).toLocaleTimeString('en-US', { hour12: false });
         setFeedback({
           type: 'success',
-          message: `Welcome, ${result.memberName}! Checked in at ${time}`,
+          memberName: result.memberName,
+          gymId: result.gymId,
+          checkedInAt: result.checkedInAt,
         });
-        setTimeout(() => setFeedback(null), 4000);
+        setTimeout(() => setFeedback(null), 5000);
       } catch (err) {
-        setFeedback({ type: 'error', message: err.message });
+        const isExpired = err.message?.toLowerCase().includes('expired');
+        setFeedback({ type: isExpired ? 'expired' : 'error', message: err.message });
       } finally {
         setIsProcessing(false);
       }
@@ -131,6 +194,9 @@ export default function ScanPage({ token, role, onLogout, onAdminAccess }) {
       scanner.clear().catch(() => {});
     };
   }, [token]);
+
+  const formatTime = (iso) =>
+    new Date(iso).toLocaleTimeString('en-US', { hour12: false });
 
   return (
     <div style={styles.page}>
@@ -150,9 +216,43 @@ export default function ScanPage({ token, role, onLogout, onAdminAccess }) {
 
       {isProcessing && <p style={styles.processing}>Processing scan...</p>}
 
-      {feedback && (
-        <div style={feedback.type === 'success' ? styles.feedbackSuccess : styles.feedbackError}>
-          {feedback.message}
+      {feedback?.type === 'error' && (
+        <div style={styles.feedbackError}>{feedback.message}</div>
+      )}
+
+      {feedback?.type === 'expired' && (
+        <div style={styles.overlay}>
+          <div style={styles.card}>
+            <Lottie
+              animationData={errorAnimation}
+              loop={false}
+              style={{ width: 180, height: 180, margin: '0 auto' }}
+            />
+            <p style={styles.errorHeading}>Membership Expired</p>
+            <p style={styles.errorMessage}>{feedback.message}</p>
+            <p style={styles.errorHint}>
+              Please visit the front desk or contact the gym admin to renew your membership before checking in.
+            </p>
+            <button style={styles.returnBtn} onClick={() => setFeedback(null)}>
+              Return to Scan
+            </button>
+          </div>
+        </div>
+      )}
+
+      {feedback?.type === 'success' && (
+        <div style={styles.overlay}>
+          <div style={styles.card}>
+            <Lottie
+              animationData={successAnimation}
+              loop={false}
+              style={{ width: 180, height: 180, margin: '0 auto' }}
+            />
+            <p style={styles.cardHeading}>Check-in Successful!</p>
+            <div style={styles.cardName}>{feedback.memberName}</div>
+            <div style={styles.cardGymId}>GYM ID: {feedback.gymId}</div>
+            <div style={styles.cardTime}>Clocked in at {formatTime(feedback.checkedInAt)}</div>
+          </div>
         </div>
       )}
     </div>
