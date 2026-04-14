@@ -1,9 +1,14 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import { fileURLToPath } from 'url';
+import path from 'path';
 import authRouter from './routes/auth.js';
 import scanRouter from './routes/scan.js';
 import adminRouter from './routes/admin.js';
+import superadminRouter from './routes/superadmin.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -17,10 +22,18 @@ app.use(express.json());
 app.use('/api/auth', authRouter);
 app.use('/api/scan', scanRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/superadmin', superadminRouter);
 
 app.use((err, req, res, next) => {
   console.error(err);
   res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
 });
+
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(path.join(__dirname, '../client/dist')));
+  app.get('*', (_req, res) =>
+    res.sendFile(path.join(__dirname, '../client/dist/index.html'))
+  );
+}
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

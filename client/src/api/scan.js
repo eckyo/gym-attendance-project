@@ -11,6 +11,17 @@ export const login = async (email, password) => {
   return data;
 };
 
+export const verifyScanPin = async (token, pin) => {
+  const res = await fetch(`${API_BASE}/api/scan/verify-pin`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ pin }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Invalid PIN');
+  return data;
+};
+
 export const postScan = async (token, scanToken) => {
   const res = await fetch(`${API_BASE}/api/scan`, {
     method: 'POST',

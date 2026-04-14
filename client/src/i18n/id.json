@@ -1,0 +1,188 @@
+{
+  "common": {
+    "cancel": "Batal",
+    "loading": "Memuat..."
+  },
+  "login": {
+    "title": "Absensi Gym",
+    "subtitle": "Login staf untuk mengakses pemindai",
+    "emailLabel": "Email",
+    "emailPlaceholder": "staff@gym1.test",
+    "passwordLabel": "Kata Sandi",
+    "signingIn": "Sedang masuk...",
+    "signIn": "Masuk"
+  },
+  "pin": {
+    "title": "Dasbor Admin",
+    "subtitle": "Masukkan PIN admin Anda untuk melanjutkan",
+    "label": "PIN",
+    "verifying": "Memverifikasi...",
+    "unlock": "Buka"
+  },
+  "scan": {
+    "title": "Kios Absensi",
+    "adminDashboard": "Dasbor Admin",
+    "logout": "Keluar",
+    "processing": "Memproses pemindaian...",
+    "membershipExpired": "Keanggotaan Kedaluwarsa",
+    "expiredHint": "Silakan kunjungi meja depan atau hubungi admin gym untuk memperbarui keanggotaan Anda sebelum check-in.",
+    "returnToScan": "Kembali ke Pindai",
+    "checkinSuccess": "Check-in Berhasil!",
+    "gymId": "ID GYM",
+    "clockedIn": "Masuk pada {time}",
+    "scanImage": "Pindai File Gambar",
+    "pinForImage": "Masukkan PIN admin untuk memindai file gambar",
+    "noQrFound": "Tidak ada kode QR dalam gambar",
+    "cameraError": "Kamera tidak tersedia — gunakan pindai gambar di bawah"
+  },
+  "admin": {
+    "title": "Dasbor Admin",
+    "changePin": "Ubah PIN",
+    "backToScanner": "← Kembali ke Pemindai",
+    "tabs": {
+      "attendance": "Absensi",
+      "members": "Anggota",
+      "staff": "Staf"
+    },
+    "attendance": {
+      "searchPlaceholder": "Cari nama atau ID gym...",
+      "colMember": "Nama Anggota",
+      "colGymId": "ID Gym",
+      "colClockIn": "Jam Masuk",
+      "noRecords": "Tidak ada catatan absensi."
+    },
+    "members": {
+      "searchPlaceholder": "Cari nama atau ID GYM...",
+      "template": "↓ Template",
+      "export": "↑ Ekspor",
+      "import": "↑ Impor",
+      "addMember": "+ Tambah Anggota",
+      "colName": "Nama",
+      "colGymId": "ID GYM",
+      "colExpiry": "Tanggal Kedaluwarsa",
+      "colJoined": "Bergabung",
+      "colActions": "Aksi",
+      "noMembers": "Tidak ada anggota.",
+      "expired": "(Kedaluwarsa)",
+      "save": "Simpan",
+      "edit": "Edit",
+      "remove": "Hapus",
+      "qrCode": "Kode QR"
+    },
+    "qr": {
+      "howToShare": "📋 Cara berbagi kode QR ini",
+      "step1pre": "Klik ",
+      "step1bold": "Simpan Kode QR",
+      "step1post": " untuk mengunduh gambar.",
+      "step2pre": "Kirim gambar kepada ",
+      "step2post": " melalui WhatsApp, email, atau cetak.",
+      "step3": "Anggota memindai kode ini di kios untuk check-in.",
+      "step4": "Jaga kerahasiaan kode ini — kode ini unik untuk anggota ini.",
+      "saveQrCode": "↓ Simpan Kode QR",
+      "close": "Tutup"
+    },
+    "delete": {
+      "title": "Hapus Anggota",
+      "confirmPre": "Anda akan menghapus ",
+      "confirmPost": ". Masukkan PIN admin untuk konfirmasi.",
+      "pinLabel": "PIN Admin",
+      "pinPlaceholder": "Masukkan PIN Anda",
+      "removing": "Menghapus...",
+      "remove": "Hapus Anggota"
+    },
+    "import": {
+      "title": "Impor Anggota",
+      "previewTitle": "Pratinjau Impor",
+      "description": "Unggah file template yang sudah diisi (.xlsx atau .xls). Setiap baris harus memiliki: Nama, ID GYM, Tanggal Kedaluwarsa, dan Tanggal Bergabung.",
+      "parsing": "Memproses file...",
+      "summary": "{valid} dari {total} baris akan diimpor.",
+      "errorRows": " {count} baris dengan kesalahan akan dilewati.",
+      "colNum": "#",
+      "colName": "Nama",
+      "colGymId": "ID GYM",
+      "colExpiry": "Tanggal Kedaluwarsa",
+      "colJoined": "Tanggal Bergabung",
+      "colStatus": "Status",
+      "badgeReady": "Siap",
+      "importing": "Mengimpor...",
+      "importBtn": "Impor {count} Anggota",
+      "back": "Kembali"
+    },
+    "changepin": {
+      "title": "Ubah PIN Admin",
+      "currentPin": "PIN Saat Ini",
+      "newPin": "PIN Baru",
+      "confirmPin": "Konfirmasi PIN Baru",
+      "saving": "Menyimpan...",
+      "savePin": "Simpan PIN",
+      "mismatch": "PIN baru tidak cocok",
+      "format": "PIN harus 4–6 digit",
+      "success": "PIN berhasil diubah!"
+    },
+    "staff": {
+      "addStaff": "+ Tambah Staf",
+      "colEmail": "Email",
+      "colCreated": "Dibuat",
+      "colActions": "Aksi",
+      "noStaff": "Belum ada akun staf.",
+      "remove": "Hapus",
+      "addTitle": "Tambah Akun Staf",
+      "emailLabel": "Email",
+      "emailPlaceholder": "staff@gym.com",
+      "passwordLabel": "Kata Sandi",
+      "passwordPlaceholder": "Min. 6 karakter",
+      "adding": "Menambahkan...",
+      "deleteTitle": "Hapus Staf",
+      "deleteConfirmPre": "Anda akan menghapus ",
+      "deleteConfirmPost": ". Masukkan PIN admin untuk konfirmasi.",
+      "pinLabel": "PIN Admin",
+      "pinPlaceholder": "Masukkan PIN Anda",
+      "removing": "Menghapus..."
+    },
+    "add": {
+      "title": "Tambah Anggota Baru",
+      "nameLabel": "Nama",
+      "namePlaceholder": "Nama lengkap",
+      "expiryLabel": "Tanggal Kedaluwarsa",
+      "adding": "Menambahkan...",
+      "addMember": "Tambah Anggota"
+    }
+  },
+  "superadmin": {
+    "title": "Dasbor Superadmin",
+    "logout": "Keluar",
+    "createKiosk": "+ Buat Kios",
+    "colGym": "Nama Gym",
+    "colAdmin": "Email Admin",
+    "colStatus": "Status",
+    "colCreated": "Dibuat",
+    "colActions": "Aksi",
+    "statusActive": "Aktif",
+    "statusDisabled": "Nonaktif",
+    "enable": "Aktifkan",
+    "disable": "Nonaktifkan",
+    "resetPassword": "Reset Kata Sandi",
+    "noGyms": "Belum ada kios.",
+    "create": {
+      "title": "Buat Kios Baru",
+      "gymNameLabel": "Nama Gym",
+      "gymNamePlaceholder": "cth. FitZone Bandung",
+      "adminEmailLabel": "Email Admin",
+      "adminEmailPlaceholder": "admin@gym.com",
+      "passwordLabel": "Kata Sandi Admin",
+      "passwordPlaceholder": "Min. 6 karakter",
+      "creating": "Membuat...",
+      "submit": "Buat Kios",
+      "hint": "PIN admin default 0000 akan disetel. Admin dapat mengubahnya setelah login pertama."
+    },
+    "reset": {
+      "title": "Reset Kata Sandi Admin",
+      "forGym": "Gym",
+      "adminEmail": "Admin",
+      "newPasswordLabel": "Kata Sandi Baru",
+      "newPasswordPlaceholder": "Min. 6 karakter",
+      "saving": "Menyimpan...",
+      "submit": "Reset Kata Sandi"
+    }
+  }
+}

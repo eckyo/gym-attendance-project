@@ -98,6 +98,17 @@ Role hierarchy (descending permission level): admin → staff → member
 - Scan events (QR/RFID) go through `/api/scan` — validate token, resolve member, log attendance
 - `attendance_logs` is append-only — do not update existing rows, insert new events
 
+## Planning Workflow
+
+Before executing any non-trivial task, always enter plan mode and ask the user
+clarifying questions first. This is required — do not skip it.
+
+- Use `AskUserQuestion` to gather requirements, resolve ambiguity, and surface
+  design choices before writing any code.
+- Ask 2–4 focused questions covering scope, UI/UX preferences, edge cases, and
+  any decisions that would be hard to reverse later.
+- Only proceed to implementation after the user has reviewed and approved the plan.
+
 ## Important Notes
 
 - NEVER commit `.env` files — use `.env.example` as the template

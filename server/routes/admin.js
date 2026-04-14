@@ -363,6 +363,72 @@ router.delete('/members/:id', async (req, res, next) => {
   }
 });
 
+// GET /api/admin/staff
+router.get('/staff', async (req, res, next) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, email, created_at FROM users
+       WHERE gym_id = $1 AND role = 'staff'
+       ORDER BY created_at ASC`,
+      [req.gymId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/admin/staff
+router.post('/staff', async (req, res, next) => {
+  try {
+    const { email, password } = req.body;
+    if (!email?.trim()) return res.status(400).json({ error: 'Email is required' });
+    if (!password || password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const result = await pool.query(
+      `INSERT INTO users (gym_id, email, password_hash, role)
+       VALUES ($1, $2, $3, 'staff')
+       RETURNING id, email, created_at`,
+      [req.gymId, email.trim().toLowerCase(), passwordHash]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({ error: 'A staff account with this email already exists' });
+    }
+    next(err);
+  }
+});
+
+// DELETE /api/admin/staff/:id (requires PIN)
+router.delete('/staff/:id', async (req, res, next) => {
+  try {
+    const { pin } = req.body;
+    if (!pin) return res.status(400).json({ error: 'PIN is required' });
+
+    const gymResult = await pool.query(
+      'SELECT admin_pin_hash FROM gyms WHERE id = $1',
+      [req.gymId]
+    );
+    const isValid = await bcrypt.compare(String(pin), gymResult.rows[0].admin_pin_hash);
+    if (!isValid) return res.status(401).json({ error: 'Invalid PIN' });
+
+    const result = await pool.query(
+      `DELETE FROM users WHERE id = $1 AND gym_id = $2 AND role = 'staff' RETURNING id`,
+      [req.params.id, req.gymId]
+    );
+
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Staff not found' });
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // PUT /api/admin/pin
 router.put('/pin', async (req, res, next) => {
   try {

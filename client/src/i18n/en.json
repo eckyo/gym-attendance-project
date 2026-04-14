@@ -1,0 +1,188 @@
+{
+  "common": {
+    "cancel": "Cancel",
+    "loading": "Loading..."
+  },
+  "login": {
+    "title": "Gym Attendance",
+    "subtitle": "Staff login to access the scanner",
+    "emailLabel": "Email",
+    "emailPlaceholder": "staff@gym1.test",
+    "passwordLabel": "Password",
+    "signingIn": "Signing in...",
+    "signIn": "Sign In"
+  },
+  "pin": {
+    "title": "Admin Dashboard",
+    "subtitle": "Enter your admin PIN to continue",
+    "label": "PIN",
+    "verifying": "Verifying...",
+    "unlock": "Unlock"
+  },
+  "scan": {
+    "title": "Attendance Kiosk",
+    "adminDashboard": "Admin Dashboard",
+    "logout": "Logout",
+    "processing": "Processing scan...",
+    "membershipExpired": "Membership Expired",
+    "expiredHint": "Please visit the front desk or contact the gym admin to renew your membership before checking in.",
+    "returnToScan": "Return to Scan",
+    "checkinSuccess": "Check-in Successful!",
+    "gymId": "GYM ID",
+    "clockedIn": "Clocked in at {time}",
+    "scanImage": "Scan Image File",
+    "pinForImage": "Enter admin PIN to use image scanning",
+    "noQrFound": "No QR code found in image",
+    "cameraError": "Camera unavailable — use image scan below"
+  },
+  "admin": {
+    "title": "Admin Dashboard",
+    "changePin": "Change PIN",
+    "backToScanner": "← Back to Scanner",
+    "tabs": {
+      "attendance": "Attendance",
+      "members": "Members",
+      "staff": "Staff"
+    },
+    "attendance": {
+      "searchPlaceholder": "Search by name or gym ID...",
+      "colMember": "Member Name",
+      "colGymId": "Gym ID",
+      "colClockIn": "Clock In",
+      "noRecords": "No attendance records found."
+    },
+    "members": {
+      "searchPlaceholder": "Search by name or GYM ID...",
+      "template": "↓ Template",
+      "export": "↑ Export",
+      "import": "↑ Import",
+      "addMember": "+ Add Member",
+      "colName": "Name",
+      "colGymId": "GYM ID",
+      "colExpiry": "Expiry Date",
+      "colJoined": "Joined",
+      "colActions": "Actions",
+      "noMembers": "No members found.",
+      "expired": "(Expired)",
+      "save": "Save",
+      "edit": "Edit",
+      "remove": "Remove",
+      "qrCode": "QR Code"
+    },
+    "qr": {
+      "howToShare": "📋 How to share this QR code",
+      "step1pre": "Click ",
+      "step1bold": "Save QR Code",
+      "step1post": " to download the image.",
+      "step2pre": "Send the image to ",
+      "step2post": " via WhatsApp, email, or print it out.",
+      "step3": "The member scans this code at the kiosk to check in.",
+      "step4": "Keep this code private — it is unique to this member.",
+      "saveQrCode": "↓ Save QR Code",
+      "close": "Close"
+    },
+    "delete": {
+      "title": "Remove Member",
+      "confirmPre": "You are about to remove ",
+      "confirmPost": ". Enter your admin PIN to confirm.",
+      "pinLabel": "Admin PIN",
+      "pinPlaceholder": "Enter your PIN",
+      "removing": "Removing...",
+      "remove": "Remove Member"
+    },
+    "import": {
+      "title": "Import Members",
+      "previewTitle": "Preview Import",
+      "description": "Upload a filled template file (.xlsx or .xls). Each row should have: Name, GYM ID, Expiry Date, and Joined Date.",
+      "parsing": "Parsing file...",
+      "summary": "{valid} of {total} rows will be imported.",
+      "errorRows": " {count} row{s} with errors will be skipped.",
+      "colNum": "#",
+      "colName": "Name",
+      "colGymId": "GYM ID",
+      "colExpiry": "Expiry Date",
+      "colJoined": "Joined Date",
+      "colStatus": "Status",
+      "badgeReady": "Ready",
+      "importing": "Importing...",
+      "importBtn": "Import {count} Member{s}",
+      "back": "Back"
+    },
+    "changepin": {
+      "title": "Change Admin PIN",
+      "currentPin": "Current PIN",
+      "newPin": "New PIN",
+      "confirmPin": "Confirm New PIN",
+      "saving": "Saving...",
+      "savePin": "Save PIN",
+      "mismatch": "New PINs do not match",
+      "format": "PIN must be 4–6 digits",
+      "success": "PIN changed successfully!"
+    },
+    "staff": {
+      "addStaff": "+ Add Staff",
+      "colEmail": "Email",
+      "colCreated": "Created",
+      "colActions": "Actions",
+      "noStaff": "No staff accounts yet.",
+      "remove": "Remove",
+      "addTitle": "Add Staff Account",
+      "emailLabel": "Email",
+      "emailPlaceholder": "staff@gym.com",
+      "passwordLabel": "Password",
+      "passwordPlaceholder": "Min. 6 characters",
+      "adding": "Adding...",
+      "deleteTitle": "Remove Staff",
+      "deleteConfirmPre": "You are about to remove ",
+      "deleteConfirmPost": ". Enter your admin PIN to confirm.",
+      "pinLabel": "Admin PIN",
+      "pinPlaceholder": "Enter your PIN",
+      "removing": "Removing..."
+    },
+    "add": {
+      "title": "Add New Member",
+      "nameLabel": "Name",
+      "namePlaceholder": "Full name",
+      "expiryLabel": "Expiry Date",
+      "adding": "Adding...",
+      "addMember": "Add Member"
+    }
+  },
+  "superadmin": {
+    "title": "Superadmin Dashboard",
+    "logout": "Logout",
+    "createKiosk": "+ Create Kiosk",
+    "colGym": "Gym Name",
+    "colAdmin": "Admin Email",
+    "colStatus": "Status",
+    "colCreated": "Created",
+    "colActions": "Actions",
+    "statusActive": "Active",
+    "statusDisabled": "Disabled",
+    "enable": "Enable",
+    "disable": "Disable",
+    "resetPassword": "Reset Password",
+    "noGyms": "No kiosks yet.",
+    "create": {
+      "title": "Create New Kiosk",
+      "gymNameLabel": "Gym Name",
+      "gymNamePlaceholder": "e.g. FitZone Bandung",
+      "adminEmailLabel": "Admin Email",
+      "adminEmailPlaceholder": "admin@gym.com",
+      "passwordLabel": "Admin Password",
+      "passwordPlaceholder": "Min. 6 characters",
+      "creating": "Creating...",
+      "submit": "Create Kiosk",
+      "hint": "A default admin PIN of 0000 will be set. The admin can change it after first login."
+    },
+    "reset": {
+      "title": "Reset Admin Password",
+      "forGym": "Gym",
+      "adminEmail": "Admin",
+      "newPasswordLabel": "New Password",
+      "newPasswordPlaceholder": "Min. 6 characters",
+      "saving": "Saving...",
+      "submit": "Reset Password"
+    }
+  }
+}

@@ -3,8 +3,9 @@ import QRCode from 'qrcode';
 import {
   getAttendance, getMembers, addMember, updateMember,
   deleteMember, changePin, exportMembers, downloadTemplate,
-  previewImport, confirmImport,
+  previewImport, confirmImport, getStaff, addStaff, removeStaff,
 } from '../api/admin.js';
+import { useTranslation, LanguageSwitcher } from '../i18n/LanguageContext.jsx';
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
@@ -224,6 +225,7 @@ const triggerDownload = async (fetchFn, filename) => {
 
 function QrCodeModal({ member, onClose }) {
   const canvasRef = useRef(null);
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (canvasRef.current) {
@@ -252,23 +254,23 @@ function QrCodeModal({ member, onClose }) {
         <canvas ref={canvasRef} style={s.qrCanvas} />
 
         <div style={s.qrInstruction}>
-          <div style={s.qrInstructionTitle}>📋 How to share this QR code</div>
+          <div style={s.qrInstructionTitle}>{t('admin.qr.howToShare')}</div>
           <ol style={{ paddingLeft: 18, margin: 0 }}>
-            <li>Click <strong>Save QR Code</strong> to download the image.</li>
-            <li>Send the image to <strong>{member.name}</strong> via WhatsApp, email, or print it out.</li>
-            <li>The member scans this code at the kiosk to check in.</li>
-            <li>Keep this code private — it is unique to this member.</li>
+            <li>{t('admin.qr.step1pre')}<strong>{t('admin.qr.step1bold')}</strong>{t('admin.qr.step1post')}</li>
+            <li>{t('admin.qr.step2pre')}<strong>{member.name}</strong>{t('admin.qr.step2post')}</li>
+            <li>{t('admin.qr.step3')}</li>
+            <li>{t('admin.qr.step4')}</li>
           </ol>
         </div>
 
         <button style={s.saveQrBtn} onClick={handleSave}>
-          ↓ Save QR Code
+          {t('admin.qr.saveQrCode')}
         </button>
         <button
           style={{ ...s.modalBtn, background: '#e2e8f0', color: '#475569' }}
           onClick={onClose}
         >
-          Close
+          {t('admin.qr.close')}
         </button>
       </div>
     </div>
@@ -281,6 +283,7 @@ function DeletePinModal({ token, member, onDeleted, onClose }) {
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const { t } = useTranslation();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -298,20 +301,20 @@ function DeletePinModal({ token, member, onDeleted, onClose }) {
   return (
     <div style={s.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div style={s.modal}>
-        <div style={s.modalTitle}>Remove Member</div>
+        <div style={s.modalTitle}>{t('admin.delete.title')}</div>
         <p style={{ fontSize: 14, color: '#475569', marginBottom: 16, marginTop: -8 }}>
-          You are about to remove <strong>{member.name}</strong>. Enter your admin PIN to confirm.
+          {t('admin.delete.confirmPre')}<strong>{member.name}</strong>{t('admin.delete.confirmPost')}
         </p>
         {error && <div style={s.error}>{error}</div>}
         <form onSubmit={handleSubmit}>
-          <label style={s.modalLabel}>Admin PIN</label>
+          <label style={s.modalLabel}>{t('admin.delete.pinLabel')}</label>
           <input
             style={s.modalInput}
             type="password"
             inputMode="numeric"
             value={pin}
             onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-            placeholder="Enter your PIN"
+            placeholder={t('admin.delete.pinPlaceholder')}
             required
             autoFocus
           />
@@ -320,14 +323,14 @@ function DeletePinModal({ token, member, onDeleted, onClose }) {
             type="submit"
             disabled={loading}
           >
-            {loading ? 'Removing...' : 'Remove Member'}
+            {loading ? t('admin.delete.removing') : t('admin.delete.remove')}
           </button>
           <button
             type="button"
             style={{ ...s.modalBtn, background: '#e2e8f0', color: '#475569', marginTop: 10 }}
             onClick={onClose}
           >
-            Cancel
+            {t('common.cancel')}
           </button>
         </form>
       </div>
@@ -343,6 +346,7 @@ function ImportModal({ token, onImported, onClose }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const fileRef = useRef(null);
+  const { t } = useTranslation();
 
   const handleFileChange = async (e) => {
     const file = e.target.files[0];
@@ -384,7 +388,7 @@ function ImportModal({ token, onImported, onClose }) {
     <div style={s.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div style={s.importModal}>
         <div style={s.modalTitle}>
-          {step === 'upload' ? 'Import Members' : 'Preview Import'}
+          {step === 'upload' ? t('admin.import.title') : t('admin.import.previewTitle')}
         </div>
 
         {error && <div style={s.error}>{error}</div>}
@@ -392,7 +396,7 @@ function ImportModal({ token, onImported, onClose }) {
         {step === 'upload' && (
           <>
             <p style={{ fontSize: 14, color: '#475569', marginBottom: 16, marginTop: -8 }}>
-              Upload a filled template file (.xlsx or .xls). Each row should have: Name, GYM ID, Expiry Date, and Joined Date.
+              {t('admin.import.description')}
             </p>
             <input
               ref={fileRef}
@@ -402,13 +406,13 @@ function ImportModal({ token, onImported, onClose }) {
               onChange={handleFileChange}
               disabled={loading}
             />
-            {loading && <p style={{ textAlign: 'center', color: '#64748b', fontSize: 14 }}>Parsing file...</p>}
+            {loading && <p style={{ textAlign: 'center', color: '#64748b', fontSize: 14 }}>{t('admin.import.parsing')}</p>}
             <button
               type="button"
               style={{ ...s.modalBtn, background: '#e2e8f0', color: '#475569', marginTop: 6 }}
               onClick={onClose}
             >
-              Cancel
+              {t('common.cancel')}
             </button>
           </>
         )}
@@ -416,20 +420,20 @@ function ImportModal({ token, onImported, onClose }) {
         {step === 'preview' && (
           <>
             <div style={s.importSummary}>
-              {validRows.length} of {previewRows.length} rows will be imported.
-              {errorCount > 0 && ` ${errorCount} row${errorCount > 1 ? 's' : ''} with errors will be skipped.`}
+              {t('admin.import.summary', { valid: validRows.length, total: previewRows.length })}
+              {errorCount > 0 && t('admin.import.errorRows', { count: errorCount, s: errorCount > 1 ? 's' : '' })}
             </div>
 
             <div style={{ overflowX: 'auto', marginBottom: 20 }}>
               <table style={{ ...s.table, marginBottom: 0 }}>
                 <thead>
                   <tr>
-                    <th style={s.th}>#</th>
-                    <th style={s.th}>Name</th>
-                    <th style={s.th}>GYM ID</th>
-                    <th style={s.th}>Expiry Date</th>
-                    <th style={s.th}>Joined Date</th>
-                    <th style={s.th}>Status</th>
+                    <th style={s.th}>{t('admin.import.colNum')}</th>
+                    <th style={s.th}>{t('admin.import.colName')}</th>
+                    <th style={s.th}>{t('admin.import.colGymId')}</th>
+                    <th style={s.th}>{t('admin.import.colExpiry')}</th>
+                    <th style={s.th}>{t('admin.import.colJoined')}</th>
+                    <th style={s.th}>{t('admin.import.colStatus')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -442,7 +446,7 @@ function ImportModal({ token, onImported, onClose }) {
                       <td style={s.td}>{row.joinedDate}</td>
                       <td style={s.td}>
                         {row.errors.length === 0 ? (
-                          <span style={{ ...s.badge, ...s.badgeReady }}>Ready</span>
+                          <span style={{ ...s.badge, ...s.badgeReady }}>{t('admin.import.badgeReady')}</span>
                         ) : (
                           <span style={{ ...s.badge, ...s.badgeError }} title={row.errors.join('; ')}>
                             {row.errors[0]}
@@ -461,7 +465,7 @@ function ImportModal({ token, onImported, onClose }) {
                 onClick={handleConfirm}
                 disabled={loading}
               >
-                {loading ? 'Importing...' : `Import ${validRows.length} Member${validRows.length > 1 ? 's' : ''}`}
+                {loading ? t('admin.import.importing') : t('admin.import.importBtn', { count: validRows.length, s: validRows.length > 1 ? 's' : '' })}
               </button>
             )}
             <button
@@ -469,7 +473,7 @@ function ImportModal({ token, onImported, onClose }) {
               style={{ ...s.modalBtn, background: '#e2e8f0', color: '#475569' }}
               onClick={() => { setStep('upload'); setPreviewRows([]); setError(''); if (fileRef.current) fileRef.current.value = ''; }}
             >
-              Back
+              {t('admin.import.back')}
             </button>
           </>
         )}
@@ -487,16 +491,17 @@ function ChangePinModal({ token, onClose }) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const { t } = useTranslation();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    if (newPin !== confirmPin) { setError('New PINs do not match'); return; }
-    if (!/^\d{4,6}$/.test(newPin)) { setError('PIN must be 4–6 digits'); return; }
+    if (newPin !== confirmPin) { setError(t('admin.changepin.mismatch')); return; }
+    if (!/^\d{4,6}$/.test(newPin)) { setError(t('admin.changepin.format')); return; }
     setLoading(true);
     try {
       await changePin(token, currentPin, newPin);
-      setSuccess('PIN changed successfully!');
+      setSuccess(t('admin.changepin.success'));
       setTimeout(onClose, 1500);
     } catch (err) {
       setError(err.message);
@@ -508,29 +513,29 @@ function ChangePinModal({ token, onClose }) {
   return (
     <div style={s.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div style={s.modal}>
-        <div style={s.modalTitle}>Change Admin PIN</div>
+        <div style={s.modalTitle}>{t('admin.changepin.title')}</div>
         {error && <div style={s.error}>{error}</div>}
         {success && <div style={s.success}>{success}</div>}
         <form onSubmit={handleSubmit}>
-          <label style={s.modalLabel}>Current PIN</label>
+          <label style={s.modalLabel}>{t('admin.changepin.currentPin')}</label>
           <input style={s.modalInput} type="password" inputMode="numeric"
             value={currentPin} onChange={(e) => setCurrentPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-            placeholder="Current PIN" required autoFocus />
-          <label style={s.modalLabel}>New PIN</label>
+            placeholder={t('admin.changepin.currentPin')} required autoFocus />
+          <label style={s.modalLabel}>{t('admin.changepin.newPin')}</label>
           <input style={s.modalInput} type="password" inputMode="numeric"
             value={newPin} onChange={(e) => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
             placeholder="4–6 digits" required />
-          <label style={s.modalLabel}>Confirm New PIN</label>
+          <label style={s.modalLabel}>{t('admin.changepin.confirmPin')}</label>
           <input style={s.modalInput} type="password" inputMode="numeric"
             value={confirmPin} onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-            placeholder="Repeat new PIN" required />
+            placeholder={t('admin.changepin.confirmPin')} required />
           <button style={{ ...s.modalBtn, background: '#3b82f6', color: '#fff', opacity: loading ? 0.6 : 1 }}
             type="submit" disabled={loading}>
-            {loading ? 'Saving...' : 'Save PIN'}
+            {loading ? t('admin.changepin.saving') : t('admin.changepin.savePin')}
           </button>
           <button type="button"
             style={{ ...s.modalBtn, background: '#e2e8f0', color: '#475569', marginTop: 10 }}
-            onClick={onClose}>Cancel</button>
+            onClick={onClose}>{t('common.cancel')}</button>
         </form>
       </div>
     </div>
@@ -550,6 +555,7 @@ function AddMemberModal({ token, onAdded, onClose }) {
   const [expiryDate, setExpiryDate] = useState(defaultExpiryDate);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const { t } = useTranslation();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -567,26 +573,210 @@ function AddMemberModal({ token, onAdded, onClose }) {
   return (
     <div style={s.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div style={s.modal}>
-        <div style={s.modalTitle}>Add New Member</div>
+        <div style={s.modalTitle}>{t('admin.add.title')}</div>
         {error && <div style={s.error}>{error}</div>}
         <form onSubmit={handleSubmit}>
-          <label style={s.modalLabel}>Name</label>
+          <label style={s.modalLabel}>{t('admin.add.nameLabel')}</label>
           <input style={s.modalInput} type="text"
             value={name} onChange={(e) => setName(e.target.value)}
-            placeholder="Full name" required autoFocus />
-          <label style={s.modalLabel}>Expiry Date</label>
+            placeholder={t('admin.add.namePlaceholder')} required autoFocus />
+          <label style={s.modalLabel}>{t('admin.add.expiryLabel')}</label>
           <input style={s.modalInput} type="date"
             value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)}
             required />
           <button style={{ ...s.modalBtn, background: '#3b82f6', color: '#fff', opacity: loading ? 0.6 : 1 }}
             type="submit" disabled={loading}>
-            {loading ? 'Adding...' : 'Add Member'}
+            {loading ? t('admin.add.adding') : t('admin.add.addMember')}
           </button>
           <button type="button"
             style={{ ...s.modalBtn, background: '#e2e8f0', color: '#475569', marginTop: 10 }}
-            onClick={onClose}>Cancel</button>
+            onClick={onClose}>{t('common.cancel')}</button>
         </form>
       </div>
+    </div>
+  );
+}
+
+// ─── Add Staff Modal ──────────────────────────────────────────────────────────
+
+function AddStaffModal({ token, onAdded, onClose }) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { t } = useTranslation();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      const staff = await addStaff(token, email, password);
+      onAdded(staff);
+    } catch (err) {
+      setError(err.message);
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={s.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={s.modal}>
+        <div style={s.modalTitle}>{t('admin.staff.addTitle')}</div>
+        {error && <div style={s.error}>{error}</div>}
+        <form onSubmit={handleSubmit}>
+          <label style={s.modalLabel}>{t('admin.staff.emailLabel')}</label>
+          <input style={s.modalInput} type="email"
+            value={email} onChange={(e) => setEmail(e.target.value)}
+            placeholder={t('admin.staff.emailPlaceholder')} required autoFocus />
+          <label style={s.modalLabel}>{t('admin.staff.passwordLabel')}</label>
+          <input style={s.modalInput} type="password"
+            value={password} onChange={(e) => setPassword(e.target.value)}
+            placeholder={t('admin.staff.passwordPlaceholder')} required />
+          <button style={{ ...s.modalBtn, background: '#3b82f6', color: '#fff', opacity: loading ? 0.6 : 1 }}
+            type="submit" disabled={loading}>
+            {loading ? t('admin.staff.adding') : t('admin.staff.addTitle')}
+          </button>
+          <button type="button"
+            style={{ ...s.modalBtn, background: '#e2e8f0', color: '#475569', marginTop: 10 }}
+            onClick={onClose}>{t('common.cancel')}</button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Delete Staff Modal ───────────────────────────────────────────────────────
+
+function DeleteStaffModal({ token, staff, onDeleted, onClose }) {
+  const [pin, setPin] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { t } = useTranslation();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      await removeStaff(token, staff.id, pin);
+      onDeleted(staff.id);
+    } catch (err) {
+      setError(err.message);
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={s.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={s.modal}>
+        <div style={s.modalTitle}>{t('admin.staff.deleteTitle')}</div>
+        <p style={{ fontSize: 14, color: '#475569', marginBottom: 16, marginTop: -8 }}>
+          {t('admin.staff.deleteConfirmPre')}<strong>{staff.email}</strong>{t('admin.staff.deleteConfirmPost')}
+        </p>
+        {error && <div style={s.error}>{error}</div>}
+        <form onSubmit={handleSubmit}>
+          <label style={s.modalLabel}>{t('admin.staff.pinLabel')}</label>
+          <input
+            style={s.modalInput}
+            type="password"
+            inputMode="numeric"
+            value={pin}
+            onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            placeholder={t('admin.staff.pinPlaceholder')}
+            required
+            autoFocus
+          />
+          <button
+            style={{ ...s.modalBtn, background: '#dc2626', color: '#fff', opacity: loading ? 0.6 : 1 }}
+            type="submit" disabled={loading}>
+            {loading ? t('admin.staff.removing') : t('admin.members.remove')}
+          </button>
+          <button type="button"
+            style={{ ...s.modalBtn, background: '#e2e8f0', color: '#475569', marginTop: 10 }}
+            onClick={onClose}>{t('common.cancel')}</button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Staff Tab ────────────────────────────────────────────────────────────────
+
+function StaffTab({ token }) {
+  const [staff, setStaff] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [deletingStaff, setDeletingStaff] = useState(null);
+  const { lang, t } = useTranslation();
+
+  useEffect(() => {
+    setLoading(true);
+    getStaff(token)
+      .then(setStaff)
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, [token]);
+
+  const handleAdded = (member) => {
+    setStaff((prev) => [...prev, member]);
+    setShowAddModal(false);
+  };
+
+  const handleDeleted = (id) => {
+    setStaff((prev) => prev.filter((m) => m.id !== id));
+    setDeletingStaff(null);
+  };
+
+  const locale = lang === 'id' ? 'id-ID' : 'en-US';
+
+  return (
+    <div>
+      <div style={{ ...s.toolbar, justifyContent: 'flex-end' }}>
+        <button style={s.addBtn} onClick={() => setShowAddModal(true)}>
+          {t('admin.staff.addStaff')}
+        </button>
+      </div>
+
+      {error && <div style={s.error}>{error}</div>}
+
+      <table style={s.table}>
+        <thead>
+          <tr>
+            <th style={s.th}>{t('admin.staff.colEmail')}</th>
+            <th style={s.th}>{t('admin.staff.colCreated')}</th>
+            <th style={s.th}>{t('admin.staff.colActions')}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {loading ? (
+            <tr><td colSpan={3} style={s.empty}>{t('common.loading')}</td></tr>
+          ) : staff.length === 0 ? (
+            <tr><td colSpan={3} style={s.empty}>{t('admin.staff.noStaff')}</td></tr>
+          ) : staff.map((member) => (
+            <tr key={member.id}>
+              <td style={s.td}>{member.email}</td>
+              <td style={s.td}>{new Date(member.created_at).toLocaleDateString(locale)}</td>
+              <td style={s.td}>
+                <button
+                  style={{ ...s.actionBtn, ...s.deleteBtn }}
+                  onClick={() => setDeletingStaff(member)}
+                >
+                  {t('admin.staff.remove')}
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {showAddModal && (
+        <AddStaffModal token={token} onAdded={handleAdded} onClose={() => setShowAddModal(false)} />
+      )}
+      {deletingStaff && (
+        <DeleteStaffModal token={token} staff={deletingStaff} onDeleted={handleDeleted} onClose={() => setDeletingStaff(null)} />
+      )}
     </div>
   );
 }
@@ -600,6 +790,7 @@ function AttendanceTab({ token }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const { lang, t } = useTranslation();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -628,7 +819,7 @@ function AttendanceTab({ token }) {
         <input
           style={s.searchInput}
           type="text"
-          placeholder="Search by name or gym ID..."
+          placeholder={t('admin.attendance.searchPlaceholder')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -639,22 +830,22 @@ function AttendanceTab({ token }) {
       <table style={s.table}>
         <thead>
           <tr>
-            <th style={s.th}>Member Name</th>
-            <th style={s.th}>Gym ID</th>
-            <th style={s.th}>Clock In</th>
+            <th style={s.th}>{t('admin.attendance.colMember')}</th>
+            <th style={s.th}>{t('admin.attendance.colGymId')}</th>
+            <th style={s.th}>{t('admin.attendance.colClockIn')}</th>
           </tr>
         </thead>
         <tbody>
           {loading ? (
-            <tr><td colSpan={3} style={s.empty}>Loading...</td></tr>
+            <tr><td colSpan={3} style={s.empty}>{t('common.loading')}</td></tr>
           ) : rows.length === 0 ? (
-            <tr><td colSpan={3} style={s.empty}>No attendance records found.</td></tr>
+            <tr><td colSpan={3} style={s.empty}>{t('admin.attendance.noRecords')}</td></tr>
           ) : rows.map((row, i) => (
             <tr key={i}>
               <td style={s.td}>{row.member_name}</td>
               <td style={s.tdMono}>{row.gym_id}</td>
               <td style={s.td}>
-                {new Date(row.checked_in_at).toLocaleString('en-US', { hour12: false })}
+                {new Date(row.checked_in_at).toLocaleString(lang === 'id' ? 'id-ID' : 'en-US', { hour12: false })}
               </td>
             </tr>
           ))}
@@ -678,6 +869,7 @@ function MembersTab({ token }) {
   const [showImportModal, setShowImportModal] = useState(false);
   const [deletingMember, setDeletingMember] = useState(null);
   const [qrMember, setQrMember] = useState(null);
+  const { lang, t } = useTranslation();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -745,20 +937,22 @@ function MembersTab({ token }) {
     }
   };
 
+  const locale = lang === 'id' ? 'id-ID' : 'en-US';
+
   return (
     <div>
       <div style={s.toolbar}>
         <input
           style={s.searchInput}
           type="text"
-          placeholder="Search by name or GYM ID..."
+          placeholder={t('admin.members.searchPlaceholder')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <button style={s.outlineBtn} onClick={handleTemplate}>↓ Template</button>
-        <button style={s.outlineBtn} onClick={handleExport}>↑ Export</button>
-        <button style={s.outlineBtn} onClick={() => setShowImportModal(true)}>↑ Import</button>
-        <button style={s.addBtn} onClick={() => setShowAddModal(true)}>+ Add Member</button>
+        <button style={s.outlineBtn} onClick={handleTemplate}>{t('admin.members.template')}</button>
+        <button style={s.outlineBtn} onClick={handleExport}>{t('admin.members.export')}</button>
+        <button style={s.outlineBtn} onClick={() => setShowImportModal(true)}>{t('admin.members.import')}</button>
+        <button style={s.addBtn} onClick={() => setShowAddModal(true)}>{t('admin.members.addMember')}</button>
       </div>
 
       {error && <div style={s.error}>{error}</div>}
@@ -766,18 +960,18 @@ function MembersTab({ token }) {
       <table style={s.table}>
         <thead>
           <tr>
-            <th style={s.th}>Name</th>
-            <th style={s.th}>GYM ID</th>
-            <th style={s.th}>Expiry Date</th>
-            <th style={s.th}>Joined</th>
-            <th style={s.th}>Actions</th>
+            <th style={s.th}>{t('admin.members.colName')}</th>
+            <th style={s.th}>{t('admin.members.colGymId')}</th>
+            <th style={s.th}>{t('admin.members.colExpiry')}</th>
+            <th style={s.th}>{t('admin.members.colJoined')}</th>
+            <th style={s.th}>{t('admin.members.colActions')}</th>
           </tr>
         </thead>
         <tbody>
           {loading ? (
-            <tr><td colSpan={5} style={s.empty}>Loading...</td></tr>
+            <tr><td colSpan={5} style={s.empty}>{t('common.loading')}</td></tr>
           ) : members.length === 0 ? (
-            <tr><td colSpan={5} style={s.empty}>No members found.</td></tr>
+            <tr><td colSpan={5} style={s.empty}>{t('admin.members.noMembers')}</td></tr>
           ) : members.map((member) => {
             const isExpired = member.expiry_date && new Date(member.expiry_date) < new Date();
             return (
@@ -804,23 +998,23 @@ function MembersTab({ token }) {
                     />
                   ) : member.expiry_date ? (
                     <>
-                      {new Date(member.expiry_date).toLocaleDateString('en-US')}
-                      {isExpired && <span style={{ marginLeft: 6, fontSize: 11 }}>(Expired)</span>}
+                      {new Date(member.expiry_date).toLocaleDateString(locale)}
+                      {isExpired && <span style={{ marginLeft: 6, fontSize: 11 }}>{t('admin.members.expired')}</span>}
                     </>
                   ) : '—'}
                 </td>
-                <td style={s.td}>{new Date(member.created_at).toLocaleDateString('en-US')}</td>
+                <td style={s.td}>{new Date(member.created_at).toLocaleDateString(locale)}</td>
                 <td style={s.td}>
                   {editingId === member.id ? (
                     <>
-                      <button style={{ ...s.actionBtn, ...s.saveBtn }} onClick={() => saveEdit(member.id)}>Save</button>
-                      <button style={{ ...s.actionBtn, ...s.cancelBtn }} onClick={cancelEdit}>Cancel</button>
+                      <button style={{ ...s.actionBtn, ...s.saveBtn }} onClick={() => saveEdit(member.id)}>{t('admin.members.save')}</button>
+                      <button style={{ ...s.actionBtn, ...s.cancelBtn }} onClick={cancelEdit}>{t('common.cancel')}</button>
                     </>
                   ) : (
                     <>
-                      <button style={{ ...s.actionBtn, ...s.qrBtn }} onClick={() => setQrMember(member)}>QR Code</button>
-                      <button style={{ ...s.actionBtn, ...s.editBtn }} onClick={() => startEdit(member)}>Edit</button>
-                      <button style={{ ...s.actionBtn, ...s.deleteBtn }} onClick={() => setDeletingMember(member)}>Remove</button>
+                      <button style={{ ...s.actionBtn, ...s.qrBtn }} onClick={() => setQrMember(member)}>{t('admin.members.qrCode')}</button>
+                      <button style={{ ...s.actionBtn, ...s.editBtn }} onClick={() => startEdit(member)}>{t('admin.members.edit')}</button>
+                      <button style={{ ...s.actionBtn, ...s.deleteBtn }} onClick={() => setDeletingMember(member)}>{t('admin.members.remove')}</button>
                     </>
                   )}
                 </td>
@@ -848,17 +1042,24 @@ function MembersTab({ token }) {
 
 // ─── Admin Page ───────────────────────────────────────────────────────────────
 
-export default function AdminPage({ token, onBack }) {
+export default function AdminPage({ token, gymName, onBack }) {
   const [tab, setTab] = useState('attendance');
   const [showChangePin, setShowChangePin] = useState(false);
+  const { t } = useTranslation();
 
   return (
     <div style={s.page}>
       <div style={s.header}>
-        <div style={s.headerTitle}>Admin Dashboard</div>
+        <div>
+          <div style={s.headerTitle}>{gymName ?? t('admin.title')}</div>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', marginTop: 2, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+            {t('admin.title')}
+          </div>
+        </div>
         <div style={s.headerRight}>
-          <button style={s.changePinBtn} onClick={() => setShowChangePin(true)}>Change PIN</button>
-          <button style={s.backBtn} onClick={onBack}>← Back to Scanner</button>
+          <LanguageSwitcher variant="light" />
+          <button style={s.changePinBtn} onClick={() => setShowChangePin(true)}>{t('admin.changePin')}</button>
+          <button style={s.backBtn} onClick={onBack}>{t('admin.backToScanner')}</button>
         </div>
       </div>
 
@@ -868,18 +1069,25 @@ export default function AdminPage({ token, onBack }) {
             style={{ ...s.tab, ...(tab === 'attendance' ? s.tabActive : {}) }}
             onClick={() => setTab('attendance')}
           >
-            Attendance
+            {t('admin.tabs.attendance')}
           </button>
           <button
             style={{ ...s.tab, ...(tab === 'members' ? s.tabActive : {}) }}
             onClick={() => setTab('members')}
           >
-            Members
+            {t('admin.tabs.members')}
+          </button>
+          <button
+            style={{ ...s.tab, ...(tab === 'staff' ? s.tabActive : {}) }}
+            onClick={() => setTab('staff')}
+          >
+            {t('admin.tabs.staff')}
           </button>
         </div>
 
         {tab === 'attendance' && <AttendanceTab token={token} />}
         {tab === 'members' && <MembersTab token={token} />}
+        {tab === 'staff' && <StaffTab token={token} />}
       </div>
 
       {showChangePin && (

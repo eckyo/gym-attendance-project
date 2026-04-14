@@ -56,6 +56,25 @@ ALTER TABLE gyms ADD COLUMN IF NOT EXISTS admin_pin_hash TEXT;
 -- Sequential GYM ID counter per gym
 ALTER TABLE gyms ADD COLUMN IF NOT EXISTS member_id_counter INTEGER NOT NULL DEFAULT 0;
 
+-- Superadmin: allow users without a gym (gym_id nullable)
+ALTER TABLE users ALTER COLUMN gym_id DROP NOT NULL;
+
+-- Superadmin role support
+DO $$
+BEGIN
+  ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
+  ALTER TABLE users ADD CONSTRAINT users_role_check
+    CHECK (role IN ('admin', 'staff', 'member', 'superadmin'));
+EXCEPTION WHEN others THEN NULL;
+END $$;
+
+-- Unique email index for superadmin (gym_id IS NULL) rows
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_superadmin_email
+  ON users(email) WHERE gym_id IS NULL;
+
+-- Kiosk active/inactive flag
+ALTER TABLE gyms ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true;
+
 -- Member expiry date
 ALTER TABLE members ADD COLUMN IF NOT EXISTS expiry_date DATE;
 

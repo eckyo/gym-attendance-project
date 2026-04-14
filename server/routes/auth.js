@@ -16,7 +16,10 @@ router.post('/login', async (req, res, next) => {
     }
 
     const result = await pool.query(
-      'SELECT id, gym_id, password_hash, role FROM users WHERE email = $1',
+      `SELECT u.id, u.gym_id, u.password_hash, u.role, g.is_active, g.name AS gym_name
+       FROM users u
+       LEFT JOIN gyms g ON g.id = u.gym_id
+       WHERE u.email = $1`,
       [email.trim().toLowerCase()]
     );
 
@@ -34,13 +37,18 @@ router.post('/login', async (req, res, next) => {
       return res.status(403).json({ error: 'Members cannot access the kiosk' });
     }
 
+    // Block login for disabled gyms (superadmin has no gym, skip check)
+    if (user.role !== 'superadmin' && user.is_active === false) {
+      return res.status(403).json({ error: 'This kiosk has been disabled. Please contact your service provider.' });
+    }
+
     const token = jwt.sign(
       { userId: user.id, gymId: user.gym_id, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: '8h' }
     );
 
-    res.json({ token, role: user.role, gymId: user.gym_id });
+    res.json({ token, role: user.role, gymId: user.gym_id, gymName: user.gym_name ?? null });
   } catch (err) {
     next(err);
   }

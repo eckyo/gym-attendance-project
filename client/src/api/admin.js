@@ -89,3 +89,22 @@ export const confirmImport = (token, rows) =>
     headers: authHeaders(token),
     body: JSON.stringify({ rows }),
   }).then(handleResponse);
+
+export const getStaff = (token) =>
+  fetch(`${API_BASE}/api/admin/staff`, {
+    headers: authHeaders(token),
+  }).then(handleResponse);
+
+export const addStaff = (token, email, password) =>
+  fetch(`${API_BASE}/api/admin/staff`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify({ email, password }),
+  }).then(handleResponse);
+
+export const removeStaff = (token, id, pin) =>
+  fetch(`${API_BASE}/api/admin/staff/${id}`, {
+    method: 'DELETE',
+    headers: authHeaders(token),
+    body: JSON.stringify({ pin }),
+  }).then(handleResponse);

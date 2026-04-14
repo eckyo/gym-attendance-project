@@ -3,6 +3,8 @@ import { login } from './api/scan.js';
 import { verifyPin } from './api/admin.js';
 import ScanPage from './pages/ScanPage.jsx';
 import AdminPage from './pages/AdminPage.jsx';
+import SuperadminPage from './pages/SuperadminPage.jsx';
+import { useTranslation, LanguageSwitcher } from './i18n/LanguageContext.jsx';
 
 const s = {
   container: {
@@ -72,6 +74,11 @@ const s = {
     maxWidth: 340,
     boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
   },
+  langRow: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    marginBottom: 16,
+  },
 };
 
 function LoginForm({ onLogin }) {
@@ -79,6 +86,7 @@ function LoginForm({ onLogin }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const { t } = useTranslation();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -86,7 +94,7 @@ function LoginForm({ onLogin }) {
     setLoading(true);
     try {
       const data = await login(email, password);
-      onLogin(data.token, data.role);
+      onLogin(data.token, data.role, data.gymName);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -97,21 +105,24 @@ function LoginForm({ onLogin }) {
   return (
     <div style={s.container}>
       <div style={s.card}>
-        <div style={s.title}>Gym Attendance</div>
-        <div style={s.subtitle}>Staff login to access the scanner</div>
+        <div style={s.langRow}>
+          <LanguageSwitcher />
+        </div>
+        <div style={s.title}>{t('login.title')}</div>
+        <div style={s.subtitle}>{t('login.subtitle')}</div>
         {error && <div style={s.error}>{error}</div>}
         <form onSubmit={handleSubmit}>
-          <label style={s.label}>Email</label>
+          <label style={s.label}>{t('login.emailLabel')}</label>
           <input
             style={s.input}
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="staff@gym1.test"
+            placeholder={t('login.emailPlaceholder')}
             required
             autoComplete="username"
           />
-          <label style={s.label}>Password</label>
+          <label style={s.label}>{t('login.passwordLabel')}</label>
           <input
             style={s.input}
             type="password"
@@ -126,7 +137,7 @@ function LoginForm({ onLogin }) {
             type="submit"
             disabled={loading}
           >
-            {loading ? 'Signing in...' : 'Sign In'}
+            {loading ? t('login.signingIn') : t('login.signIn')}
           </button>
         </form>
       </div>
@@ -138,6 +149,7 @@ function PinModal({ token, onSuccess, onCancel }) {
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const { t } = useTranslation();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -157,11 +169,11 @@ function PinModal({ token, onSuccess, onCancel }) {
   return (
     <div style={s.overlay} onClick={(e) => e.target === e.currentTarget && onCancel()}>
       <div style={s.modalCard}>
-        <div style={{ ...s.title, fontSize: 20, marginBottom: 6 }}>Admin Dashboard</div>
-        <div style={{ ...s.subtitle, marginBottom: 24 }}>Enter your admin PIN to continue</div>
+        <div style={{ ...s.title, fontSize: 20, marginBottom: 6 }}>{t('pin.title')}</div>
+        <div style={{ ...s.subtitle, marginBottom: 24 }}>{t('pin.subtitle')}</div>
         {error && <div style={s.error}>{error}</div>}
         <form onSubmit={handleSubmit}>
-          <label style={s.label}>PIN</label>
+          <label style={s.label}>{t('pin.label')}</label>
           <input
             style={{ ...s.input, letterSpacing: 8, textAlign: 'center', fontSize: 22 }}
             type="password"
@@ -177,14 +189,14 @@ function PinModal({ token, onSuccess, onCancel }) {
             type="submit"
             disabled={loading || pin.length < 4}
           >
-            {loading ? 'Verifying...' : 'Unlock'}
+            {loading ? t('pin.verifying') : t('pin.unlock')}
           </button>
           <button
             type="button"
             style={{ ...s.btn, background: '#e2e8f0', color: '#475569', marginTop: 10 }}
             onClick={onCancel}
           >
-            Cancel
+            {t('common.cancel')}
           </button>
         </form>
       </div>
@@ -197,10 +209,14 @@ export default function App() {
   const [page, setPage] = useState('scan');
   const [showPinModal, setShowPinModal] = useState(false);
 
-  const handleLogin = (token, role) => setAuth({ token, role });
+  const handleLogin = (token, role, gymName) => setAuth({ token, role, gymName });
   const handleLogout = () => { setAuth(null); setPage('scan'); };
 
   if (!auth) return <LoginForm onLogin={handleLogin} />;
+
+  if (auth.role === 'superadmin') {
+    return <SuperadminPage token={auth.token} onLogout={handleLogout} />;
+  }
 
   return (
     <>
@@ -208,6 +224,7 @@ export default function App() {
         <ScanPage
           token={auth.token}
           role={auth.role}
+          gymName={auth.gymName}
           onLogout={handleLogout}
           onAdminAccess={() => setShowPinModal(true)}
         />
@@ -215,6 +232,7 @@ export default function App() {
       {page === 'admin' && (
         <AdminPage
           token={auth.token}
+          gymName={auth.gymName}
           onBack={() => setPage('scan')}
         />
       )}
