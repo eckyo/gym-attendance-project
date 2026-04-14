@@ -16,6 +16,9 @@ const generateGymId = (counter) => {
 };
 
 const migrate = async () => {
+  if (!process.env.DATABASE_URL) {
+    throw new Error('DATABASE_URL environment variable is not set');
+  }
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -72,6 +75,6 @@ const migrate = async () => {
 };
 
 migrate().catch((err) => {
-  console.error('Migration failed:', err.message);
+  console.error('Migration failed:', err);
   process.exit(1);
 });
