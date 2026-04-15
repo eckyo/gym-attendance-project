@@ -3,7 +3,7 @@ import QRCode from 'qrcode';
 import {
   getAttendance, getMembers, addMember, updateMember,
   deleteMember, changePin, exportMembers, downloadTemplate,
-  previewImport, confirmImport, getStaff, addStaff, removeStaff,
+  previewImport, confirmImport, getStaff, addStaff, removeStaff, verifyPin,
 } from '../api/admin.js';
 import { useTranslation, LanguageSwitcher } from '../i18n/LanguageContext.jsx';
 
@@ -550,9 +550,19 @@ const defaultExpiryDate = () => {
   return d.toISOString().slice(0, 10);
 };
 
+const formatPhoneDigits = (digits) => digits.replace(/(\d{4})(?=\d)/g, '$1 ');
+
+const maskPhone = (phone) => {
+  if (!phone) return '—';
+  const digits = phone.replace('+62', '');
+  const visible = digits.slice(-3);
+  return '+62' + '*'.repeat(Math.max(0, digits.length - 3)) + visible;
+};
+
 function AddMemberModal({ token, onAdded, onClose }) {
   const [name, setName] = useState('');
   const [expiryDate, setExpiryDate] = useState(defaultExpiryDate);
+  const [phone, setPhone] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { t } = useTranslation();
@@ -562,7 +572,7 @@ function AddMemberModal({ token, onAdded, onClose }) {
     setError('');
     setLoading(true);
     try {
-      const member = await addMember(token, name, expiryDate);
+      const member = await addMember(token, name, expiryDate, phone ? '+62' + phone : '');
       onAdded(member);
     } catch (err) {
       setError(err.message);
@@ -584,9 +594,79 @@ function AddMemberModal({ token, onAdded, onClose }) {
           <input style={s.modalInput} type="date"
             value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)}
             required />
+          <label style={s.modalLabel}>{t('admin.add.phoneLabel')}</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14 }}>
+            <span style={{ fontSize: 14, color: '#374151', fontWeight: 600, whiteSpace: 'nowrap' }}>+62</span>
+            <input
+              style={{ ...s.modalInput, marginBottom: 0, flex: 1 }}
+              type="tel"
+              inputMode="numeric"
+              value={formatPhoneDigits(phone)}
+              onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 13))}
+              placeholder="8123 4567 890"
+            />
+          </div>
           <button style={{ ...s.modalBtn, background: '#3b82f6', color: '#fff', opacity: loading ? 0.6 : 1 }}
             type="submit" disabled={loading}>
             {loading ? t('admin.add.adding') : t('admin.add.addMember')}
+          </button>
+          <button type="button"
+            style={{ ...s.modalBtn, background: '#e2e8f0', color: '#475569', marginTop: 10 }}
+            onClick={onClose}>{t('common.cancel')}</button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Phone Reveal Modal ───────────────────────────────────────────────────────
+
+function PhoneRevealModal({ token, onSuccess, onClose }) {
+  const [pin, setPin] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { t } = useTranslation();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      await verifyPin(token, pin);
+      onSuccess();
+    } catch (err) {
+      setError(err.message);
+      setPin('');
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={s.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={{ ...s.modal, maxWidth: 340 }}>
+        <div style={s.modalTitle}>{t('admin.members.revealPhone')}</div>
+        <div style={{ fontSize: 13, color: '#64748b', marginBottom: 18, marginTop: -8 }}>
+          {t('admin.members.revealPhoneSubtitle')}
+        </div>
+        {error && <div style={s.error}>{error}</div>}
+        <form onSubmit={handleSubmit}>
+          <label style={s.modalLabel}>{t('admin.delete.pinLabel')}</label>
+          <input
+            style={{ ...s.modalInput, letterSpacing: 8, textAlign: 'center', fontSize: 20 }}
+            type="password"
+            inputMode="numeric"
+            value={pin}
+            onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            placeholder="••••"
+            required
+            autoFocus
+          />
+          <button
+            style={{ ...s.modalBtn, background: '#1a1a2e', color: '#fff', opacity: loading || pin.length < 4 ? 0.6 : 1 }}
+            type="submit"
+            disabled={loading || pin.length < 4}
+          >
+            {loading ? '...' : t('pin.unlock')}
           </button>
           <button type="button"
             style={{ ...s.modalBtn, background: '#e2e8f0', color: '#475569', marginTop: 10 }}
@@ -865,6 +945,9 @@ function MembersTab({ token }) {
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState('');
   const [editExpiry, setEditExpiry] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [revealedPhoneId, setRevealedPhoneId] = useState(null);
+  const [pendingRevealId, setPendingRevealId] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [deletingMember, setDeletingMember] = useState(null);
@@ -890,13 +973,19 @@ function MembersTab({ token }) {
     setEditingId(member.id);
     setEditName(member.name);
     setEditExpiry(member.expiry_date ? member.expiry_date.slice(0, 10) : '');
+    setEditPhone(member.phone_number ? member.phone_number.replace('+62', '') : '');
   };
 
-  const cancelEdit = () => { setEditingId(null); setEditName(''); setEditExpiry(''); };
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditName('');
+    setEditExpiry('');
+    setEditPhone('');
+  };
 
   const saveEdit = async (id) => {
     try {
-      const updated = await updateMember(token, id, editName, editExpiry);
+      const updated = await updateMember(token, id, editName, editExpiry, editPhone ? '+62' + editPhone : '');
       setMembers((prev) => prev.map((m) => m.id === id ? updated : m));
       setEditingId(null);
     } catch (err) {
@@ -962,6 +1051,7 @@ function MembersTab({ token }) {
           <tr>
             <th style={s.th}>{t('admin.members.colName')}</th>
             <th style={s.th}>{t('admin.members.colGymId')}</th>
+            <th style={s.th}>{t('admin.members.colPhone')}</th>
             <th style={s.th}>{t('admin.members.colExpiry')}</th>
             <th style={s.th}>{t('admin.members.colJoined')}</th>
             <th style={s.th}>{t('admin.members.colActions')}</th>
@@ -969,9 +1059,9 @@ function MembersTab({ token }) {
         </thead>
         <tbody>
           {loading ? (
-            <tr><td colSpan={5} style={s.empty}>{t('common.loading')}</td></tr>
+            <tr><td colSpan={6} style={s.empty}>{t('common.loading')}</td></tr>
           ) : members.length === 0 ? (
-            <tr><td colSpan={5} style={s.empty}>{t('admin.members.noMembers')}</td></tr>
+            <tr><td colSpan={6} style={s.empty}>{t('admin.members.noMembers')}</td></tr>
           ) : members.map((member) => {
             const isExpired = member.expiry_date && new Date(member.expiry_date) < new Date();
             return (
@@ -988,6 +1078,38 @@ function MembersTab({ token }) {
                   ) : member.name}
                 </td>
                 <td style={s.tdMono}>{member.scan_token}</td>
+                <td style={s.td}>
+                  {editingId === member.id ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>+62</span>
+                      <input
+                        style={{ ...s.inlineInput, maxWidth: 140 }}
+                        type="tel"
+                        inputMode="numeric"
+                        value={formatPhoneDigits(editPhone)}
+                        onChange={(e) => setEditPhone(e.target.value.replace(/\D/g, '').slice(0, 13))}
+                        placeholder="8123 4567 890"
+                      />
+                    </div>
+                  ) : member.phone_number ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontFamily: 'monospace', fontSize: 13 }}>
+                        {revealedPhoneId === member.id
+                          ? '+62 ' + formatPhoneDigits(member.phone_number.replace('+62', ''))
+                          : maskPhone(member.phone_number)}
+                      </span>
+                      <button
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, padding: '0 2px', lineHeight: 1 }}
+                        onClick={() => revealedPhoneId === member.id
+                          ? setRevealedPhoneId(null)
+                          : setPendingRevealId(member.id)}
+                        title={revealedPhoneId === member.id ? 'Hide' : 'Reveal'}
+                      >
+                        {revealedPhoneId === member.id ? '🙈' : '👁'}
+                      </button>
+                    </div>
+                  ) : '—'}
+                </td>
                 <td style={{ ...s.td, color: isExpired ? '#dc2626' : '#1e293b', fontWeight: isExpired ? 600 : 400 }}>
                   {editingId === member.id ? (
                     <input
@@ -1035,6 +1157,13 @@ function MembersTab({ token }) {
       )}
       {qrMember && (
         <QrCodeModal member={qrMember} onClose={() => setQrMember(null)} />
+      )}
+      {pendingRevealId && (
+        <PhoneRevealModal
+          token={token}
+          onSuccess={() => { setRevealedPhoneId(pendingRevealId); setPendingRevealId(null); }}
+          onClose={() => setPendingRevealId(null)}
+        />
       )}
     </div>
   );

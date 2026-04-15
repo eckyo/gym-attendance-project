@@ -59,10 +59,13 @@
       "addMember": "+ Tambah Anggota",
       "colName": "Nama",
       "colGymId": "ID GYM",
+      "colPhone": "Telepon",
       "colExpiry": "Tanggal Kedaluwarsa",
       "colJoined": "Bergabung",
       "colActions": "Aksi",
       "noMembers": "Tidak ada anggota.",
+      "revealPhone": "Tampilkan Nomor Telepon",
+      "revealPhoneSubtitle": "Masukkan PIN admin untuk melihat nomor lengkap",
       "expired": "(Kedaluwarsa)",
       "save": "Simpan",
       "edit": "Edit",
@@ -144,6 +147,7 @@
       "nameLabel": "Nama",
       "namePlaceholder": "Nama lengkap",
       "expiryLabel": "Tanggal Kedaluwarsa",
+      "phoneLabel": "Nomor Telepon",
       "adding": "Menambahkan...",
       "addMember": "Tambah Anggota"
     }

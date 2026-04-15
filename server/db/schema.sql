@@ -78,6 +78,9 @@ ALTER TABLE gyms ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT tru
 -- Member expiry date
 ALTER TABLE members ADD COLUMN IF NOT EXISTS expiry_date DATE;
 
+-- Member phone number (Indonesian format)
+ALTER TABLE members ADD COLUMN IF NOT EXISTS phone_number TEXT;
+
 -- Convert scan_token from UUID type to TEXT (idempotent)
 DO $$
 BEGIN

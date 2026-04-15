@@ -59,10 +59,13 @@
       "addMember": "+ Add Member",
       "colName": "Name",
       "colGymId": "GYM ID",
+      "colPhone": "Phone",
       "colExpiry": "Expiry Date",
       "colJoined": "Joined",
       "colActions": "Actions",
       "noMembers": "No members found.",
+      "revealPhone": "Reveal Phone Number",
+      "revealPhoneSubtitle": "Enter admin PIN to view the full number",
       "expired": "(Expired)",
       "save": "Save",
       "edit": "Edit",
@@ -144,6 +147,7 @@
       "nameLabel": "Name",
       "namePlaceholder": "Full name",
       "expiryLabel": "Expiry Date",
+      "phoneLabel": "Phone Number",
       "adding": "Adding...",
       "addMember": "Add Member"
     }

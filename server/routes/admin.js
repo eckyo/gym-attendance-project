@@ -258,7 +258,7 @@ router.get('/members', async (req, res, next) => {
     const search = req.query.search ? `%${req.query.search}%` : '%';
 
     const result = await pool.query(
-      `SELECT id, name, scan_token, expiry_date, created_at
+      `SELECT id, name, scan_token, expiry_date, phone_number, created_at
        FROM members
        WHERE gym_id = $1
          AND deleted_at IS NULL
@@ -277,9 +277,12 @@ router.get('/members', async (req, res, next) => {
 router.post('/members', async (req, res, next) => {
   const client = await pool.connect();
   try {
-    const { name, expiryDate } = req.body;
+    const { name, expiryDate, phoneNumber } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'Name is required' });
     if (!expiryDate) return res.status(400).json({ error: 'Expiry date is required' });
+    if (phoneNumber && !/^\+62\d{8,13}$/.test(phoneNumber)) {
+      return res.status(400).json({ error: 'Invalid phone number format' });
+    }
 
     await client.query('BEGIN');
 
@@ -297,10 +300,10 @@ router.post('/members', async (req, res, next) => {
     );
 
     const result = await client.query(
-      `INSERT INTO members (gym_id, name, scan_token, expiry_date)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, name, scan_token, expiry_date, created_at`,
-      [req.gymId, name.trim(), scanToken, expiryDate]
+      `INSERT INTO members (gym_id, name, scan_token, expiry_date, phone_number)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, name, scan_token, expiry_date, phone_number, created_at`,
+      [req.gymId, name.trim(), scanToken, expiryDate, phoneNumber || null]
     );
 
     await client.query('COMMIT');
@@ -316,16 +319,19 @@ router.post('/members', async (req, res, next) => {
 // PUT /api/admin/members/:id
 router.put('/members/:id', async (req, res, next) => {
   try {
-    const { name, expiryDate } = req.body;
+    const { name, expiryDate, phoneNumber } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'Name is required' });
     if (!expiryDate) return res.status(400).json({ error: 'Expiry date is required' });
+    if (phoneNumber && !/^\+62\d{8,13}$/.test(phoneNumber)) {
+      return res.status(400).json({ error: 'Invalid phone number format' });
+    }
 
     const result = await pool.query(
       `UPDATE members
-       SET name = $1, expiry_date = $2, updated_at = NOW()
-       WHERE id = $3 AND gym_id = $4 AND deleted_at IS NULL
-       RETURNING id, name, scan_token, expiry_date, created_at`,
-      [name.trim(), expiryDate, req.params.id, req.gymId]
+       SET name = $1, expiry_date = $2, phone_number = $3, updated_at = NOW()
+       WHERE id = $4 AND gym_id = $5 AND deleted_at IS NULL
+       RETURNING id, name, scan_token, expiry_date, phone_number, created_at`,
+      [name.trim(), expiryDate, phoneNumber || null, req.params.id, req.gymId]
     );
 
     if (result.rows.length === 0) return res.status(404).json({ error: 'Member not found' });
