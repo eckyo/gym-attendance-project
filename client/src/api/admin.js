@@ -108,3 +108,10 @@ export const removeStaff = (token, id, pin) =>
     headers: authHeaders(token),
     body: JSON.stringify({ pin }),
   }).then(handleResponse);
+
+export const changeStaffPassword = (token, id, newPassword, pin) =>
+  fetch(`${API_BASE}/api/admin/staff/${id}/password`, {
+    method: 'PUT',
+    headers: authHeaders(token),
+    body: JSON.stringify({ newPassword, pin }),
+  }).then(handleResponse);

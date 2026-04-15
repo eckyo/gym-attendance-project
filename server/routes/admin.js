@@ -6,18 +6,13 @@ import { requireAuth } from '../middleware/auth.js';
 import { injectGymId } from '../middleware/tenant.js';
 import { requireRole } from '../middleware/roles.js';
 import pool from '../db/pool.js';
+import { generateGymMemberId } from '../utils/gymId.js';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 // All admin routes require auth + admin role
 router.use(requireAuth, injectGymId, requireRole('admin'));
-
-const generateGymMemberId = (counter) => {
-  const letterIndex = Math.floor((counter - 1) / 9999);
-  const number = ((counter - 1) % 9999) + 1;
-  return String.fromCharCode(65 + letterIndex) + String(number).padStart(4, '0');
-};
 
 const gymIdToCounter = (gymId) => {
   const letter = gymId.charCodeAt(0) - 65;
@@ -422,6 +417,34 @@ router.delete('/staff/:id', async (req, res, next) => {
       [req.params.id, req.gymId]
     );
 
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Staff not found' });
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PUT /api/admin/staff/:id/password (requires admin PIN)
+router.put('/staff/:id/password', async (req, res, next) => {
+  try {
+    const { newPassword, pin } = req.body;
+    if (!newPassword || newPassword.length < 6)
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    if (!pin) return res.status(400).json({ error: 'PIN is required' });
+
+    const gymResult = await pool.query(
+      'SELECT admin_pin_hash FROM gyms WHERE id = $1',
+      [req.gymId]
+    );
+    const isValid = await bcrypt.compare(String(pin), gymResult.rows[0].admin_pin_hash);
+    if (!isValid) return res.status(403).json({ error: 'Invalid PIN' });
+
+    const hash = await bcrypt.hash(newPassword, 10);
+    const result = await pool.query(
+      `UPDATE users SET password_hash = $1, updated_at = NOW()
+       WHERE id = $2 AND gym_id = $3 AND role = 'staff' RETURNING id`,
+      [hash, req.params.id, req.gymId]
+    );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Staff not found' });
     res.json({ success: true });
   } catch (err) {

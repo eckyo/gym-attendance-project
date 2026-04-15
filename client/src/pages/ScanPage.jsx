@@ -3,10 +3,12 @@ import { Html5Qrcode } from 'html5-qrcode';
 import Lottie from 'lottie-react';
 import successAnimation from '../assets/success.json';
 import errorAnimation from '../assets/error.json';
-import { postScan, verifyScanPin } from '../api/scan.js';
+import { postScan, verifyScanPin, registerMember } from '../api/scan.js';
 import { useTranslation, LanguageSwitcher } from '../i18n/LanguageContext.jsx';
 
 const DEBOUNCE_MS = 5000;
+
+const formatPhoneDigits = (digits) => digits.replace(/(\d{4})(?=\d)/g, '$1 ');
 
 const st = {
   page: {
@@ -266,7 +268,7 @@ const st = {
 
 // ── Image PIN Modal ────────────────────────────────────────────────────────────
 
-function ImagePinModal({ token, onVerified, onClose }) {
+function ImagePinModal({ token, onVerified, onClose, subtitle, isPassword }) {
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -290,26 +292,110 @@ function ImagePinModal({ token, onVerified, onClose }) {
     <div style={st.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div style={st.pinCard}>
         <div style={st.pinTitle}>📂 {t('scan.scanImage')}</div>
-        <div style={st.pinSubtitle}>{t('scan.pinForImage')}</div>
+        <div style={st.pinSubtitle}>{subtitle ?? t('scan.pinForImage')}</div>
         {error && <div style={st.pinError}>{error}</div>}
         <form onSubmit={handleSubmit}>
-          <label style={st.pinLabel}>PIN</label>
+          <label style={st.pinLabel}>
+            {isPassword ? t('scan.staffPasswordLabel') : 'PIN'}
+          </label>
           <input
-            style={st.pinInput}
+            style={isPassword
+              ? { ...st.pinInput, letterSpacing: 'normal', fontSize: 16 }
+              : st.pinInput}
             type="password"
-            inputMode="numeric"
+            inputMode={isPassword ? undefined : 'numeric'}
             value={pin}
-            onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-            placeholder="••••"
+            onChange={(e) => isPassword
+              ? setPin(e.target.value)
+              : setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            placeholder={isPassword ? t('scan.staffPasswordPlaceholder') : '••••'}
             required
             autoFocus
           />
           <button
-            style={{ ...st.pinBtn, opacity: loading || pin.length < 4 ? 0.6 : 1 }}
+            style={{ ...st.pinBtn, opacity: loading || pin.length < (isPassword ? 1 : 4) ? 0.6 : 1 }}
             type="submit"
-            disabled={loading || pin.length < 4}
+            disabled={loading || pin.length < (isPassword ? 1 : 4)}
           >
             {loading ? '...' : t('pin.unlock')}
+          </button>
+          <button type="button" style={st.pinCancelBtn} onClick={onClose}>
+            {t('common.cancel')}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ── Register Modal ─────────────────────────────────────────────────────────────
+
+function RegisterModal({ token, onSuccess, onClose }) {
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [expiryDate, setExpiryDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 30);
+    return d.toISOString().slice(0, 10);
+  });
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { t } = useTranslation();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      const result = await registerMember(token, name, expiryDate, phone ? '+62' + phone : '');
+      onSuccess(result);
+    } catch (err) {
+      setError(err.message);
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={st.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={st.pinCard}>
+        <div style={st.pinTitle}>📋 {t('scan.registerTitle')}</div>
+        {error && <div style={st.pinError}>{error}</div>}
+        <form onSubmit={handleSubmit}>
+          <label style={st.pinLabel}>{t('admin.add.nameLabel')}</label>
+          <input
+            style={{ ...st.pinInput, letterSpacing: 'normal', textAlign: 'left', fontSize: 15 }}
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={t('admin.add.namePlaceholder')}
+            required
+            autoFocus
+          />
+          <label style={st.pinLabel}>{t('admin.add.phoneLabel')}</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14 }}>
+            <span style={{ fontSize: 14, color: '#374151', fontWeight: 600, whiteSpace: 'nowrap' }}>+62</span>
+            <input
+              style={{ ...st.pinInput, marginBottom: 0, flex: 1, letterSpacing: 'normal', textAlign: 'left', fontSize: 15 }}
+              type="tel"
+              inputMode="numeric"
+              value={formatPhoneDigits(phone)}
+              onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 13))}
+              placeholder="8123 4567 890"
+            />
+          </div>
+          <label style={st.pinLabel}>{t('admin.add.expiryLabel')}</label>
+          <input
+            style={{ ...st.pinInput, letterSpacing: 'normal', textAlign: 'left', fontSize: 15, marginBottom: 14 }}
+            type="date"
+            value={expiryDate}
+            onChange={(e) => setExpiryDate(e.target.value)}
+          />
+          <button
+            style={{ ...st.pinBtn, opacity: loading || !name.trim() ? 0.6 : 1 }}
+            type="submit"
+            disabled={loading || !name.trim()}
+          >
+            {loading ? t('scan.registering') : t('scan.registerTitle')}
           </button>
           <button type="button" style={st.pinCancelBtn} onClick={onClose}>
             {t('common.cancel')}
@@ -327,6 +413,8 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
   const [isProcessing, setIsProcessing] = useState(false);
   const [cameraError, setCameraError] = useState(false);
   const [showImagePin, setShowImagePin] = useState(false);
+  const [showRegisterPin, setShowRegisterPin] = useState(false);
+  const [showRegisterForm, setShowRegisterForm] = useState(false);
 
   const lastScanRef = useRef(null);
   const isProcessingRef = useRef(false);
@@ -451,6 +539,11 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
           📂 {t('scan.scanImage')}
         </button>
 
+        {/* Register new member button */}
+        <button style={{ ...st.imageBtn, marginTop: 8 }} onClick={() => setShowRegisterPin(true)}>
+          📋 {t('scan.registerMember')}
+        </button>
+
         {/* Hidden elements for file scanning */}
         <input
           ref={fileInputRef}
@@ -468,6 +561,31 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
           token={token}
           onVerified={handleImagePinVerified}
           onClose={() => setShowImagePin(false)}
+          isPassword={role === 'staff'}
+        />
+      )}
+
+      {/* ── Register PIN modal ── */}
+      {showRegisterPin && (
+        <ImagePinModal
+          token={token}
+          subtitle={role === 'staff' ? t('scan.registerPinSubtitle') : t('scan.registerPinSubtitle')}
+          onVerified={() => { setShowRegisterPin(false); setShowRegisterForm(true); }}
+          onClose={() => setShowRegisterPin(false)}
+          isPassword={role === 'staff'}
+        />
+      )}
+
+      {/* ── Register form modal ── */}
+      {showRegisterForm && (
+        <RegisterModal
+          token={token}
+          onSuccess={(result) => {
+            setShowRegisterForm(false);
+            setFeedback({ type: 'success', memberName: result.memberName, gymId: result.gymId, checkedInAt: result.checkedInAt, isNewMember: true });
+            setTimeout(() => setFeedback(null), 5000);
+          }}
+          onClose={() => setShowRegisterForm(false)}
         />
       )}
 
@@ -499,7 +617,9 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
               loop={false}
               style={{ width: 160, height: 160, margin: '0 auto' }}
             />
-            <p style={st.cardHeading}>{t('scan.checkinSuccess')}</p>
+            <p style={st.cardHeading}>
+              {feedback.isNewMember ? t('scan.registerSuccess') : t('scan.checkinSuccess')}
+            </p>
             <div style={st.cardName}>{feedback.memberName}</div>
             <div style={st.cardGymId}>{t('scan.gymId')}: {feedback.gymId}</div>
             <div style={st.cardTime}>{t('scan.clockedIn', { time: formatTime(feedback.checkedInAt) })}</div>

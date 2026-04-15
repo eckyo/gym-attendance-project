@@ -3,7 +3,7 @@ import QRCode from 'qrcode';
 import {
   getAttendance, getMembers, addMember, updateMember,
   deleteMember, changePin, exportMembers, downloadTemplate,
-  previewImport, confirmImport, getStaff, addStaff, removeStaff,
+  previewImport, confirmImport, getStaff, addStaff, removeStaff, changeStaffPassword,
 } from '../api/admin.js';
 import { useTranslation, LanguageSwitcher } from '../i18n/LanguageContext.jsx';
 
@@ -701,6 +701,92 @@ function DeleteStaffModal({ token, staff, onDeleted, onClose }) {
   );
 }
 
+// ─── Change Staff Password Modal ──────────────────────────────────────────────
+
+function ChangeStaffPasswordModal({ token, staff, onClose }) {
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [pin, setPin] = useState('');
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { t } = useTranslation();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    if (newPassword.length < 6) {
+      setError(t('admin.staff.passwordTooShort'));
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError(t('admin.staff.passwordMismatch'));
+      return;
+    }
+    setLoading(true);
+    try {
+      await changeStaffPassword(token, staff.id, newPassword, pin);
+      setSuccess(t('admin.staff.passwordUpdated'));
+      setTimeout(onClose, 1500);
+    } catch (err) {
+      setError(err.message);
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={s.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={s.modal}>
+        <div style={s.modalTitle}>{t('admin.staff.changePasswordTitle')}</div>
+        <p style={{ fontSize: 14, color: '#475569', marginBottom: 16, marginTop: -8 }}>
+          <strong>{staff.email}</strong>
+        </p>
+        {error && <div style={s.error}>{error}</div>}
+        {success && <div style={s.success}>{success}</div>}
+        <form onSubmit={handleSubmit}>
+          <label style={s.modalLabel}>{t('admin.staff.newPasswordLabel')}</label>
+          <input
+            style={s.modalInput}
+            type="password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            placeholder={t('admin.staff.passwordPlaceholder')}
+            required
+            autoFocus
+          />
+          <label style={s.modalLabel}>{t('admin.staff.confirmPasswordLabel')}</label>
+          <input
+            style={s.modalInput}
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            placeholder={t('admin.staff.passwordPlaceholder')}
+            required
+          />
+          <label style={s.modalLabel}>{t('admin.staff.pinLabel')}</label>
+          <input
+            style={s.modalInput}
+            type="password"
+            inputMode="numeric"
+            value={pin}
+            onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            placeholder={t('admin.staff.pinPlaceholder')}
+            required
+          />
+          <button
+            style={{ ...s.modalBtn, background: '#3b82f6', color: '#fff', opacity: loading ? 0.6 : 1 }}
+            type="submit" disabled={loading}>
+            {loading ? t('admin.changepin.saving') : t('admin.staff.changePassword')}
+          </button>
+          <button type="button"
+            style={{ ...s.modalBtn, background: '#e2e8f0', color: '#475569', marginTop: 10 }}
+            onClick={onClose}>{t('common.cancel')}</button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ─── Staff Tab ────────────────────────────────────────────────────────────────
 
 function StaffTab({ token }) {
@@ -709,6 +795,7 @@ function StaffTab({ token }) {
   const [error, setError] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [deletingStaff, setDeletingStaff] = useState(null);
+  const [changingPasswordStaff, setChangingPasswordStaff] = useState(null);
   const { lang, t } = useTranslation();
 
   useEffect(() => {
@@ -760,6 +847,12 @@ function StaffTab({ token }) {
               <td style={s.td}>{new Date(member.created_at).toLocaleDateString(locale)}</td>
               <td style={s.td}>
                 <button
+                  style={{ ...s.actionBtn, ...s.editBtn }}
+                  onClick={() => setChangingPasswordStaff(member)}
+                >
+                  {t('admin.staff.changePassword')}
+                </button>
+                <button
                   style={{ ...s.actionBtn, ...s.deleteBtn }}
                   onClick={() => setDeletingStaff(member)}
                 >
@@ -776,6 +869,9 @@ function StaffTab({ token }) {
       )}
       {deletingStaff && (
         <DeleteStaffModal token={token} staff={deletingStaff} onDeleted={handleDeleted} onClose={() => setDeletingStaff(null)} />
+      )}
+      {changingPasswordStaff && (
+        <ChangeStaffPasswordModal token={token} staff={changingPasswordStaff} onClose={() => setChangingPasswordStaff(null)} />
       )}
     </div>
   );

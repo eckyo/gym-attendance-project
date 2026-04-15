@@ -22,6 +22,17 @@ export const verifyScanPin = async (token, pin) => {
   return data;
 };
 
+export const registerMember = async (token, name, expiryDate, phoneNumber) => {
+  const res = await fetch(`${API_BASE}/api/scan/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ name, expiryDate, phoneNumber }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Registration failed');
+  return data;
+};
+
 export const postScan = async (token, scanToken) => {
   const res = await fetch(`${API_BASE}/api/scan`, {
     method: 'POST',
