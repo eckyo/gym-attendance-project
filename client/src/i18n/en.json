@@ -33,7 +33,14 @@
     "scanImage": "Scan Image File",
     "pinForImage": "Enter admin PIN to use image scanning",
     "noQrFound": "No QR code found in image",
-    "cameraError": "Camera unavailable — use image scan below"
+    "cameraError": "Camera unavailable — use image scan below",
+    "registerMember": "Register New Member",
+    "registerPinSubtitle": "Enter admin PIN to register a new member",
+    "registerTitle": "Register New Member",
+    "registering": "Registering...",
+    "registerSuccess": "New Member Registered!",
+    "staffPasswordLabel": "Your Password",
+    "staffPasswordPlaceholder": "Enter your password"
   },
   "admin": {
     "title": "Admin Dashboard",
@@ -140,7 +147,14 @@
       "deleteConfirmPost": ". Enter your admin PIN to confirm.",
       "pinLabel": "Admin PIN",
       "pinPlaceholder": "Enter your PIN",
-      "removing": "Removing..."
+      "removing": "Removing...",
+      "changePassword": "Change Password",
+      "changePasswordTitle": "Change Staff Password",
+      "newPasswordLabel": "New Password",
+      "confirmPasswordLabel": "Confirm New Password",
+      "passwordMismatch": "Passwords do not match",
+      "passwordTooShort": "Password must be at least 6 characters",
+      "passwordUpdated": "Password updated!"
     },
     "add": {
       "title": "Add New Member",

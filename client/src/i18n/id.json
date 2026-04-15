@@ -33,7 +33,14 @@
     "scanImage": "Pindai File Gambar",
     "pinForImage": "Masukkan PIN admin untuk memindai file gambar",
     "noQrFound": "Tidak ada kode QR dalam gambar",
-    "cameraError": "Kamera tidak tersedia — gunakan pindai gambar di bawah"
+    "cameraError": "Kamera tidak tersedia — gunakan pindai gambar di bawah",
+    "registerMember": "Daftarkan Anggota Baru",
+    "registerPinSubtitle": "Masukkan PIN admin untuk mendaftarkan anggota baru",
+    "registerTitle": "Daftarkan Anggota Baru",
+    "registering": "Mendaftarkan...",
+    "registerSuccess": "Anggota Baru Terdaftar!",
+    "staffPasswordLabel": "Kata Sandi Anda",
+    "staffPasswordPlaceholder": "Masukkan kata sandi Anda"
   },
   "admin": {
     "title": "Dasbor Admin",
@@ -140,7 +147,14 @@
       "deleteConfirmPost": ". Masukkan PIN admin untuk konfirmasi.",
       "pinLabel": "PIN Admin",
       "pinPlaceholder": "Masukkan PIN Anda",
-      "removing": "Menghapus..."
+      "removing": "Menghapus...",
+      "changePassword": "Ubah Kata Sandi",
+      "changePasswordTitle": "Ubah Kata Sandi Staf",
+      "newPasswordLabel": "Kata Sandi Baru",
+      "confirmPasswordLabel": "Konfirmasi Kata Sandi Baru",
+      "passwordMismatch": "Kata sandi tidak cocok",
+      "passwordTooShort": "Kata sandi minimal 6 karakter",
+      "passwordUpdated": "Kata sandi berhasil diubah!"
     },
     "add": {
       "title": "Tambah Anggota Baru",
