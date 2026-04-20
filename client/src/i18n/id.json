@@ -74,7 +74,10 @@
       "save": "Simpan",
       "edit": "Edit",
       "remove": "Hapus",
-      "qrCode": "Kode QR"
+      "qrCode": "Kode QR",
+      "colPhone": "Telepon",
+      "sendWa": "Kirim QR via WhatsApp",
+      "noPhone": "Belum ada nomor telepon — edit anggota untuk menambahkan"
     },
     "qr": {
       "howToShare": "📋 Cara berbagi kode QR ini",
@@ -158,7 +161,8 @@
       "nameLabel": "Nama",
       "namePlaceholder": "Nama lengkap",
       "expiryLabel": "Tanggal Kedaluwarsa",
-      "phoneLabel": "Nomor Telepon",
+      "phoneLabel": "Nomor Telepon (WhatsApp)",
+      "phoneOptional": "opsional",
       "adding": "Menambahkan...",
       "addMember": "Tambah Anggota"
     }

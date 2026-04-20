@@ -78,6 +78,10 @@ ALTER TABLE gyms ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT tru
 -- Member expiry date
 ALTER TABLE members ADD COLUMN IF NOT EXISTS expiry_date DATE;
 
+-- Phone number and WhatsApp delivery tracking
+ALTER TABLE members ADD COLUMN IF NOT EXISTS phone_number TEXT;
+ALTER TABLE members ADD COLUMN IF NOT EXISTS whatsapp_sent_at TIMESTAMPTZ;
+
 -- Convert scan_token from UUID type to TEXT (idempotent)
 DO $$
 BEGIN

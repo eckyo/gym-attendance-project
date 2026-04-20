@@ -4,6 +4,7 @@ import {
   getAttendance, getMembers, addMember, updateMember,
   deleteMember, changePin, exportMembers, downloadTemplate,
   previewImport, confirmImport, getStaff, addStaff, removeStaff, changeStaffPassword,
+  sendWhatsappQr,
 } from '../api/admin.js';
 import { useTranslation, LanguageSwitcher } from '../i18n/LanguageContext.jsx';
 
@@ -111,6 +112,15 @@ const s = {
   saveBtn: { background: '#f0fdf4', color: '#16a34a' },
   cancelBtn: { background: '#f8fafc', color: '#64748b' },
   qrBtn: { background: '#f5f3ff', color: '#7c3aed' },
+  waBtn: { background: '#dcfce7', color: '#15803d' },
+  waBtnDisabled: { background: '#f1f5f9', color: '#94a3b8', cursor: 'not-allowed' },
+  toast: {
+    position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
+    padding: '12px 24px', borderRadius: 10, fontSize: 14, fontWeight: 600,
+    boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 999, whiteSpace: 'nowrap',
+  },
+  toastSuccess: { background: '#16a34a', color: '#fff' },
+  toastError: { background: '#dc2626', color: '#fff' },
   empty: { textAlign: 'center', color: '#94a3b8', padding: '40px 16px', fontSize: 14 },
   inlineInput: {
     padding: '6px 10px',
@@ -553,6 +563,7 @@ const defaultExpiryDate = () => {
 function AddMemberModal({ token, onAdded, onClose }) {
   const [name, setName] = useState('');
   const [expiryDate, setExpiryDate] = useState(defaultExpiryDate);
+  const [phoneNumber, setPhoneNumber] = useState('+62');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { t } = useTranslation();
@@ -560,9 +571,12 @@ function AddMemberModal({ token, onAdded, onClose }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    const phone = phoneNumber.trim() === '+62' ? '' : phoneNumber.trim();
+    if (phone && !/^\+62\d{8,13}$/.test(phone))
+      return setError('Phone number must be in +62XXXXXXXXXX format');
     setLoading(true);
     try {
-      const member = await addMember(token, name, expiryDate);
+      const member = await addMember(token, name, expiryDate, phone || undefined);
       onAdded(member);
     } catch (err) {
       setError(err.message);
@@ -584,6 +598,15 @@ function AddMemberModal({ token, onAdded, onClose }) {
           <input style={s.modalInput} type="date"
             value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)}
             required />
+          <label style={s.modalLabel}>{t('admin.add.phoneLabel')} <span style={{ fontWeight: 400, color: '#94a3b8' }}>({t('admin.add.phoneOptional')})</span></label>
+          <input style={s.modalInput} type="tel"
+            value={phoneNumber}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (!v.startsWith('+62')) return;
+              setPhoneNumber(v);
+            }}
+            placeholder="+628XXXXXXXXX" />
           <button style={{ ...s.modalBtn, background: '#3b82f6', color: '#fff', opacity: loading ? 0.6 : 1 }}
             type="submit" disabled={loading}>
             {loading ? t('admin.add.adding') : t('admin.add.addMember')}
@@ -961,11 +984,19 @@ function MembersTab({ token }) {
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState('');
   const [editExpiry, setEditExpiry] = useState('');
+  const [editPhone, setEditPhone] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [deletingMember, setDeletingMember] = useState(null);
   const [qrMember, setQrMember] = useState(null);
+  const [sendingWa, setSendingWa] = useState(new Set());
+  const [toast, setToast] = useState(null);
   const { lang, t } = useTranslation();
+
+  const showToast = (type, message) => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 3500);
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -986,17 +1017,38 @@ function MembersTab({ token }) {
     setEditingId(member.id);
     setEditName(member.name);
     setEditExpiry(member.expiry_date ? member.expiry_date.slice(0, 10) : '');
+    setEditPhone(member.phone_number || '+62');
   };
 
-  const cancelEdit = () => { setEditingId(null); setEditName(''); setEditExpiry(''); };
+  const cancelEdit = () => { setEditingId(null); setEditName(''); setEditExpiry(''); setEditPhone(''); };
 
   const saveEdit = async (id) => {
+    const phone = editPhone.trim() === '+62' ? '' : editPhone.trim();
+    if (phone && !/^\+62\d{8,13}$/.test(phone)) {
+      setError('Phone number must be in +62XXXXXXXXXX format');
+      return;
+    }
     try {
-      const updated = await updateMember(token, id, editName, editExpiry);
+      const updated = await updateMember(token, id, editName, editExpiry, phone || undefined);
       setMembers((prev) => prev.map((m) => m.id === id ? updated : m));
       setEditingId(null);
     } catch (err) {
       setError(err.message);
+    }
+  };
+
+  const handleSendWa = async (member) => {
+    setSendingWa((prev) => new Set(prev).add(member.id));
+    try {
+      const result = await sendWhatsappQr(token, member.id);
+      setMembers((prev) => prev.map((m) =>
+        m.id === member.id ? { ...m, whatsapp_sent_at: result.sentAt } : m
+      ));
+      showToast('success', `QR sent to ${member.phone_number}`);
+    } catch (err) {
+      showToast('error', err.message || 'Failed to send WhatsApp QR');
+    } finally {
+      setSendingWa((prev) => { const s = new Set(prev); s.delete(member.id); return s; });
     }
   };
 
@@ -1059,17 +1111,20 @@ function MembersTab({ token }) {
             <th style={s.th}>{t('admin.members.colName')}</th>
             <th style={s.th}>{t('admin.members.colGymId')}</th>
             <th style={s.th}>{t('admin.members.colExpiry')}</th>
+            <th style={s.th}>{t('admin.members.colPhone')}</th>
             <th style={s.th}>{t('admin.members.colJoined')}</th>
             <th style={s.th}>{t('admin.members.colActions')}</th>
           </tr>
         </thead>
         <tbody>
           {loading ? (
-            <tr><td colSpan={5} style={s.empty}>{t('common.loading')}</td></tr>
+            <tr><td colSpan={6} style={s.empty}>{t('common.loading')}</td></tr>
           ) : members.length === 0 ? (
-            <tr><td colSpan={5} style={s.empty}>{t('admin.members.noMembers')}</td></tr>
+            <tr><td colSpan={6} style={s.empty}>{t('admin.members.noMembers')}</td></tr>
           ) : members.map((member) => {
             const isExpired = member.expiry_date && new Date(member.expiry_date) < new Date();
+            const isSending = sendingWa.has(member.id);
+            const hasPhone = !!member.phone_number;
             return (
               <tr key={member.id}>
                 <td style={s.td}>
@@ -1099,6 +1154,23 @@ function MembersTab({ token }) {
                     </>
                   ) : '—'}
                 </td>
+                <td style={s.td}>
+                  {editingId === member.id ? (
+                    <input
+                      style={{ ...s.inlineInput, maxWidth: 160 }}
+                      type="tel"
+                      value={editPhone}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (!v.startsWith('+62')) return;
+                        setEditPhone(v);
+                      }}
+                      placeholder="+628XXXXXXXXX"
+                    />
+                  ) : member.phone_number ? (
+                    <span style={{ fontSize: 12, fontFamily: 'monospace', color: '#475569' }}>{member.phone_number}</span>
+                  ) : <span style={{ color: '#cbd5e1' }}>—</span>}
+                </td>
                 <td style={s.td}>{new Date(member.created_at).toLocaleDateString(locale)}</td>
                 <td style={s.td}>
                   {editingId === member.id ? (
@@ -1109,6 +1181,15 @@ function MembersTab({ token }) {
                   ) : (
                     <>
                       <button style={{ ...s.actionBtn, ...s.qrBtn }} onClick={() => setQrMember(member)}>{t('admin.members.qrCode')}</button>
+                      <button
+                        style={{ ...s.actionBtn, ...(hasPhone ? s.waBtn : s.waBtnDisabled) }}
+                        onClick={() => hasPhone && !isSending && handleSendWa(member)}
+                        disabled={!hasPhone || isSending}
+                        title={hasPhone ? t('admin.members.sendWa') : t('admin.members.noPhone')}
+                      >
+                        {isSending ? '...' : 'WA'}
+                        {!isSending && member.whatsapp_sent_at && <span style={{ marginLeft: 4, fontSize: 10, opacity: 0.7 }}>✓</span>}
+                      </button>
                       <button style={{ ...s.actionBtn, ...s.editBtn }} onClick={() => startEdit(member)}>{t('admin.members.edit')}</button>
                       <button style={{ ...s.actionBtn, ...s.deleteBtn }} onClick={() => setDeletingMember(member)}>{t('admin.members.remove')}</button>
                     </>
@@ -1119,6 +1200,12 @@ function MembersTab({ token }) {
           })}
         </tbody>
       </table>
+
+      {toast && (
+        <div style={{ ...s.toast, ...(toast.type === 'success' ? s.toastSuccess : s.toastError) }}>
+          {toast.message}
+        </div>
+      )}
 
       {showAddModal && (
         <AddMemberModal token={token} onAdded={handleAdded} onClose={() => setShowAddModal(false)} />

@@ -7,6 +7,8 @@ import { injectGymId } from '../middleware/tenant.js';
 import { requireRole } from '../middleware/roles.js';
 import pool from '../db/pool.js';
 import { generateGymMemberId } from '../utils/gymId.js';
+import { generateQRBuffer } from '../utils/qr.js';
+import { sendQRCode } from '../services/whatsapp.js';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
@@ -253,7 +255,7 @@ router.get('/members', async (req, res, next) => {
     const search = req.query.search ? `%${req.query.search}%` : '%';
 
     const result = await pool.query(
-      `SELECT id, name, scan_token, expiry_date, created_at
+      `SELECT id, name, scan_token, expiry_date, phone_number, whatsapp_sent_at, created_at
        FROM members
        WHERE gym_id = $1
          AND deleted_at IS NULL
@@ -272,9 +274,11 @@ router.get('/members', async (req, res, next) => {
 router.post('/members', async (req, res, next) => {
   const client = await pool.connect();
   try {
-    const { name, expiryDate } = req.body;
+    const { name, expiryDate, phoneNumber } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'Name is required' });
     if (!expiryDate) return res.status(400).json({ error: 'Expiry date is required' });
+    if (phoneNumber && !/^\+62\d{8,13}$/.test(phoneNumber))
+      return res.status(400).json({ error: 'Invalid phone number format' });
 
     await client.query('BEGIN');
 
@@ -292,14 +296,34 @@ router.post('/members', async (req, res, next) => {
     );
 
     const result = await client.query(
-      `INSERT INTO members (gym_id, name, scan_token, expiry_date)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, name, scan_token, expiry_date, created_at`,
-      [req.gymId, name.trim(), scanToken, expiryDate]
+      `INSERT INTO members (gym_id, name, scan_token, expiry_date, phone_number)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, name, scan_token, expiry_date, phone_number, whatsapp_sent_at, created_at`,
+      [req.gymId, name.trim(), scanToken, expiryDate, phoneNumber || null]
     );
 
     await client.query('COMMIT');
-    res.status(201).json(result.rows[0]);
+    const member = result.rows[0];
+
+    // Auto-send QR via WhatsApp if phone number provided (non-blocking)
+    if (phoneNumber) {
+      setImmediate(async () => {
+        try {
+          const qrBuffer = await generateQRBuffer(member.scan_token);
+          const waResult = await sendQRCode(phoneNumber, member.name, qrBuffer);
+          if (waResult.success) {
+            await pool.query(
+              'UPDATE members SET whatsapp_sent_at = NOW(), updated_at = NOW() WHERE id = $1',
+              [member.id]
+            );
+          }
+        } catch (e) {
+          console.error('[WhatsApp auto-send]', e);
+        }
+      });
+    }
+
+    res.status(201).json(member);
   } catch (err) {
     await client.query('ROLLBACK');
     next(err);
@@ -311,20 +335,50 @@ router.post('/members', async (req, res, next) => {
 // PUT /api/admin/members/:id
 router.put('/members/:id', async (req, res, next) => {
   try {
-    const { name, expiryDate } = req.body;
+    const { name, expiryDate, phoneNumber } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'Name is required' });
     if (!expiryDate) return res.status(400).json({ error: 'Expiry date is required' });
+    if (phoneNumber && !/^\+62\d{8,13}$/.test(phoneNumber))
+      return res.status(400).json({ error: 'Invalid phone number format' });
 
     const result = await pool.query(
       `UPDATE members
-       SET name = $1, expiry_date = $2, updated_at = NOW()
-       WHERE id = $3 AND gym_id = $4 AND deleted_at IS NULL
-       RETURNING id, name, scan_token, expiry_date, created_at`,
-      [name.trim(), expiryDate, req.params.id, req.gymId]
+       SET name = $1, expiry_date = $2, phone_number = $3, updated_at = NOW()
+       WHERE id = $4 AND gym_id = $5 AND deleted_at IS NULL
+       RETURNING id, name, scan_token, expiry_date, phone_number, whatsapp_sent_at, created_at`,
+      [name.trim(), expiryDate, phoneNumber || null, req.params.id, req.gymId]
     );
 
     if (result.rows.length === 0) return res.status(404).json({ error: 'Member not found' });
     res.json(result.rows[0]);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/admin/members/:id/send-whatsapp-qr
+router.post('/members/:id/send-whatsapp-qr', async (req, res, next) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, name, scan_token, phone_number FROM members WHERE id = $1 AND gym_id = $2 AND deleted_at IS NULL',
+      [req.params.id, req.gymId]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Member not found' });
+
+    const member = result.rows[0];
+    if (!member.phone_number) return res.status(400).json({ error: 'Member has no phone number' });
+
+    const qrBuffer = await generateQRBuffer(member.scan_token);
+    const waResult = await sendQRCode(member.phone_number, member.name, qrBuffer);
+
+    if (!waResult.success) return res.status(502).json({ error: waResult.reason || 'Failed to send WhatsApp message' });
+
+    const updated = await pool.query(
+      'UPDATE members SET whatsapp_sent_at = NOW(), updated_at = NOW() WHERE id = $1 RETURNING whatsapp_sent_at',
+      [member.id]
+    );
+
+    res.json({ success: true, sentAt: updated.rows[0].whatsapp_sent_at });
   } catch (err) {
     next(err);
   }
