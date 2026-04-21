@@ -48,6 +48,11 @@ const seed = async () => {
         VALUES ($1, $2, $3, 'admin')
         ON CONFLICT (gym_id, email) DO NOTHING
       `, [gymId, adminEmail, passwordHash]);
+      await client.query(`
+        INSERT INTO membership_packages (gym_id, name, duration_days, price, is_default)
+        VALUES ($1, '1 Month', 30, 150000, true)
+        ON CONFLICT DO NOTHING
+      `, [gymId]);
       return gymId;
     };
 

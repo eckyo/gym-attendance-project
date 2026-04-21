@@ -4,6 +4,8 @@ import {
   getAttendance, getMembers, addMember, updateMember,
   deleteMember, changePin, exportMembers, downloadTemplate,
   previewImport, confirmImport, getStaff, addStaff, removeStaff, changeStaffPassword,
+  getPackages, createPackage, updatePackage, deletePackage, setDefaultPackage,
+  addMemberWithPackage,
 } from '../api/admin.js';
 import { useTranslation, LanguageSwitcher } from '../i18n/LanguageContext.jsx';
 
@@ -202,6 +204,25 @@ const s = {
     fontSize: 14, cursor: 'pointer', marginBottom: 14,
     boxSizing: 'border-box',
   },
+  select: {
+    padding: '10px 14px',
+    border: '1.5px solid #e2e8f0', borderRadius: 8,
+    fontSize: 15, marginBottom: 14, outline: 'none',
+    width: '100%', background: '#fff', boxSizing: 'border-box',
+  },
+  inlineSelect: {
+    padding: '6px 10px',
+    border: '1.5px solid #93c5fd', borderRadius: 6,
+    fontSize: 14, outline: 'none', background: '#fff',
+    maxWidth: 200,
+  },
+  expiryPreview: { fontSize: 12, color: '#64748b', marginTop: -10, marginBottom: 14 },
+  defaultBadge: {
+    display: 'inline-block', padding: '2px 8px',
+    borderRadius: 99, fontSize: 11, fontWeight: 600,
+    background: '#fef9c3', color: '#854d0e',
+  },
+  starBtn: { background: '#fefce8', color: '#ca8a04' },
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -544,31 +565,53 @@ function ChangePinModal({ token, onClose }) {
 
 // ─── Add Member Modal ─────────────────────────────────────────────────────────
 
-const defaultExpiryDate = () => {
+const calcExpiryFromDuration = (durationDays) => {
   const d = new Date();
-  d.setDate(d.getDate() + 30);
+  d.setDate(d.getDate() + durationDays);
   return d.toISOString().slice(0, 10);
 };
 
+const defaultExpiryDate = () => calcExpiryFromDuration(30);
+
 function AddMemberModal({ token, onAdded, onClose }) {
   const [name, setName] = useState('');
-  const [expiryDate, setExpiryDate] = useState(defaultExpiryDate);
+  const [packages, setPackages] = useState([]);
+  const [selectedPackageId, setSelectedPackageId] = useState('');
+  const [customExpiry, setCustomExpiry] = useState(defaultExpiryDate);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { t } = useTranslation();
+
+  useEffect(() => {
+    getPackages(token)
+      .then((pkgs) => {
+        setPackages(pkgs);
+        const def = pkgs.find((p) => p.is_default);
+        setSelectedPackageId(def ? def.id : (pkgs.length > 0 ? pkgs[0].id : '__custom__'));
+      })
+      .catch(() => setSelectedPackageId('__custom__'));
+  }, [token]);
+
+  const isCustom = selectedPackageId === '__custom__';
+  const selectedPkg = packages.find((p) => p.id === selectedPackageId);
+  const computedExpiry = selectedPkg ? calcExpiryFromDuration(selectedPkg.duration_days) : null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      const member = await addMember(token, name, expiryDate);
+      const member = isCustom
+        ? await addMember(token, name, customExpiry)
+        : await addMemberWithPackage(token, name, null, selectedPackageId);
       onAdded(member);
     } catch (err) {
       setError(err.message);
       setLoading(false);
     }
   };
+
+  const locale = 'en-US';
 
   return (
     <div style={s.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -580,10 +623,29 @@ function AddMemberModal({ token, onAdded, onClose }) {
           <input style={s.modalInput} type="text"
             value={name} onChange={(e) => setName(e.target.value)}
             placeholder={t('admin.add.namePlaceholder')} required autoFocus />
-          <label style={s.modalLabel}>{t('admin.add.expiryLabel')}</label>
-          <input style={s.modalInput} type="date"
-            value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)}
-            required />
+          <label style={s.modalLabel}>{t('admin.packages.packageLabel')}</label>
+          <select style={s.select} value={selectedPackageId} onChange={(e) => setSelectedPackageId(e.target.value)}>
+            {packages.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name} — {p.duration_days}d — Rp {Number(p.price).toLocaleString('id-ID')}
+                {p.is_default ? ' ★' : ''}
+              </option>
+            ))}
+            <option value="__custom__">{t('admin.packages.customDate')}</option>
+          </select>
+          {!isCustom && computedExpiry && (
+            <div style={s.expiryPreview}>
+              {t('admin.packages.expiresOn', { date: new Date(computedExpiry).toLocaleDateString(locale) })}
+            </div>
+          )}
+          {isCustom && (
+            <>
+              <label style={s.modalLabel}>{t('admin.add.expiryLabel')}</label>
+              <input style={s.modalInput} type="date"
+                value={customExpiry} onChange={(e) => setCustomExpiry(e.target.value)}
+                required />
+            </>
+          )}
           <button style={{ ...s.modalBtn, background: '#3b82f6', color: '#fff', opacity: loading ? 0.6 : 1 }}
             type="submit" disabled={loading}>
             {loading ? t('admin.add.adding') : t('admin.add.addMember')}
@@ -955,12 +1017,14 @@ function AttendanceTab({ token }) {
 
 function MembersTab({ token }) {
   const [members, setMembers] = useState([]);
+  const [packages, setPackages] = useState([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState('');
   const [editExpiry, setEditExpiry] = useState('');
+  const [editPackageId, setEditPackageId] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [deletingMember, setDeletingMember] = useState(null);
@@ -981,18 +1045,27 @@ function MembersTab({ token }) {
   }, [token, search]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    getPackages(token).then(setPackages).catch(() => {});
+  }, [token]);
 
   const startEdit = (member) => {
     setEditingId(member.id);
     setEditName(member.name);
     setEditExpiry(member.expiry_date ? member.expiry_date.slice(0, 10) : '');
+    setEditPackageId(member.package_id || '__custom__');
   };
 
-  const cancelEdit = () => { setEditingId(null); setEditName(''); setEditExpiry(''); };
+  const cancelEdit = () => { setEditingId(null); setEditName(''); setEditExpiry(''); setEditPackageId(''); };
 
   const saveEdit = async (id) => {
     try {
-      const updated = await updateMember(token, id, editName, editExpiry);
+      const isCustom = editPackageId === '__custom__';
+      const updated = await updateMember(
+        token, id, editName,
+        isCustom ? editExpiry : null,
+        isCustom ? null : editPackageId,
+      );
       setMembers((prev) => prev.map((m) => m.id === id ? updated : m));
       setEditingId(null);
     } catch (err) {
@@ -1058,6 +1131,7 @@ function MembersTab({ token }) {
           <tr>
             <th style={s.th}>{t('admin.members.colName')}</th>
             <th style={s.th}>{t('admin.members.colGymId')}</th>
+            <th style={s.th}>{t('admin.members.colPackage')}</th>
             <th style={s.th}>{t('admin.members.colExpiry')}</th>
             <th style={s.th}>{t('admin.members.colJoined')}</th>
             <th style={s.th}>{t('admin.members.colActions')}</th>
@@ -1065,15 +1139,21 @@ function MembersTab({ token }) {
         </thead>
         <tbody>
           {loading ? (
-            <tr><td colSpan={5} style={s.empty}>{t('common.loading')}</td></tr>
+            <tr><td colSpan={6} style={s.empty}>{t('common.loading')}</td></tr>
           ) : members.length === 0 ? (
-            <tr><td colSpan={5} style={s.empty}>{t('admin.members.noMembers')}</td></tr>
+            <tr><td colSpan={6} style={s.empty}>{t('admin.members.noMembers')}</td></tr>
           ) : members.map((member) => {
             const isExpired = member.expiry_date && new Date(member.expiry_date) < new Date();
+            const isEditingThis = editingId === member.id;
+            const editPkgIsCustom = editPackageId === '__custom__';
+            const editSelectedPkg = packages.find((p) => p.id === editPackageId);
+            const editComputedExpiry = editSelectedPkg
+              ? calcExpiryFromDuration(editSelectedPkg.duration_days)
+              : null;
             return (
               <tr key={member.id}>
                 <td style={s.td}>
-                  {editingId === member.id ? (
+                  {isEditingThis ? (
                     <input
                       style={s.inlineInput}
                       value={editName}
@@ -1084,14 +1164,30 @@ function MembersTab({ token }) {
                   ) : member.name}
                 </td>
                 <td style={s.tdMono}>{member.scan_token}</td>
+                <td style={s.td}>
+                  {isEditingThis ? (
+                    <select style={s.inlineSelect} value={editPackageId} onChange={(e) => setEditPackageId(e.target.value)}>
+                      {packages.map((p) => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                      <option value="__custom__">{t('admin.packages.customDate')}</option>
+                    </select>
+                  ) : member.package_name || '—'}
+                </td>
                 <td style={{ ...s.td, color: isExpired ? '#dc2626' : '#1e293b', fontWeight: isExpired ? 600 : 400 }}>
-                  {editingId === member.id ? (
-                    <input
-                      style={{ ...s.inlineInput, maxWidth: 160 }}
-                      type="date"
-                      value={editExpiry}
-                      onChange={(e) => setEditExpiry(e.target.value)}
-                    />
+                  {isEditingThis ? (
+                    editPkgIsCustom ? (
+                      <input
+                        style={{ ...s.inlineInput, maxWidth: 160 }}
+                        type="date"
+                        value={editExpiry}
+                        onChange={(e) => setEditExpiry(e.target.value)}
+                      />
+                    ) : (
+                      <span style={{ fontSize: 12, color: '#64748b' }}>
+                        {editComputedExpiry ? new Date(editComputedExpiry).toLocaleDateString(locale) : '—'}
+                      </span>
+                    )
                   ) : member.expiry_date ? (
                     <>
                       {new Date(member.expiry_date).toLocaleDateString(locale)}
@@ -1101,7 +1197,7 @@ function MembersTab({ token }) {
                 </td>
                 <td style={s.td}>{new Date(member.created_at).toLocaleDateString(locale)}</td>
                 <td style={s.td}>
-                  {editingId === member.id ? (
+                  {isEditingThis ? (
                     <>
                       <button style={{ ...s.actionBtn, ...s.saveBtn }} onClick={() => saveEdit(member.id)}>{t('admin.members.save')}</button>
                       <button style={{ ...s.actionBtn, ...s.cancelBtn }} onClick={cancelEdit}>{t('common.cancel')}</button>
@@ -1136,9 +1232,179 @@ function MembersTab({ token }) {
   );
 }
 
+// ─── Packages Tab ─────────────────────────────────────────────────────────────
+
+function PackagesTab({ token }) {
+  const [packages, setPackages] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [editingId, setEditingId] = useState(null);
+  const [editName, setEditName] = useState('');
+  const [editDuration, setEditDuration] = useState('');
+  const [editPrice, setEditPrice] = useState('');
+  const [newName, setNewName] = useState('');
+  const [newDuration, setNewDuration] = useState('');
+  const [newPrice, setNewPrice] = useState('');
+  const [addLoading, setAddLoading] = useState(false);
+  const { t } = useTranslation();
+
+  useEffect(() => {
+    setLoading(true);
+    getPackages(token)
+      .then(setPackages)
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, [token]);
+
+  const handleAdd = async (e) => {
+    e.preventDefault();
+    setError('');
+    setAddLoading(true);
+    try {
+      const pkg = await createPackage(token, {
+        name: newName,
+        durationDays: Number(newDuration),
+        price: Number(newPrice),
+        isDefault: packages.length === 0,
+      });
+      setPackages((prev) => [...prev, pkg].sort((a, b) => a.price - b.price));
+      setNewName(''); setNewDuration(''); setNewPrice('');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setAddLoading(false);
+    }
+  };
+
+  const startEdit = (pkg) => {
+    setEditingId(pkg.id);
+    setEditName(pkg.name);
+    setEditDuration(String(pkg.duration_days));
+    setEditPrice(String(pkg.price));
+  };
+
+  const cancelEdit = () => { setEditingId(null); setEditName(''); setEditDuration(''); setEditPrice(''); };
+
+  const saveEdit = async (id) => {
+    setError('');
+    try {
+      const updated = await updatePackage(token, id, {
+        name: editName,
+        durationDays: Number(editDuration),
+        price: Number(editPrice),
+      });
+      setPackages((prev) => prev.map((p) => p.id === id ? updated : p).sort((a, b) => a.price - b.price));
+      setEditingId(null);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    setError('');
+    try {
+      await deletePackage(token, id);
+      setPackages((prev) => prev.filter((p) => p.id !== id));
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleSetDefault = async (id) => {
+    setError('');
+    try {
+      const updated = await setDefaultPackage(token, id);
+      setPackages((prev) => prev.map((p) => ({ ...p, is_default: p.id === updated.id })));
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  return (
+    <div>
+      {error && <div style={s.error}>{error}</div>}
+      <table style={s.table}>
+        <thead>
+          <tr>
+            <th style={s.th}>{t('admin.packages.colName')}</th>
+            <th style={s.th}>{t('admin.packages.colDuration')}</th>
+            <th style={s.th}>{t('admin.packages.colPrice')}</th>
+            <th style={s.th}>{t('admin.packages.colDefault')}</th>
+            <th style={s.th}>{t('admin.packages.colActions')}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {loading ? (
+            <tr><td colSpan={5} style={s.empty}>{t('common.loading')}</td></tr>
+          ) : packages.length === 0 ? (
+            <tr><td colSpan={5} style={s.empty}>{t('admin.packages.noPackages')}</td></tr>
+          ) : packages.map((pkg) => (
+            <tr key={pkg.id}>
+              <td style={s.td}>
+                {editingId === pkg.id ? (
+                  <input style={s.inlineInput} value={editName} onChange={(e) => setEditName(e.target.value)} autoFocus />
+                ) : pkg.name}
+              </td>
+              <td style={s.td}>
+                {editingId === pkg.id ? (
+                  <input style={{ ...s.inlineInput, maxWidth: 80 }} type="number" min={1} value={editDuration} onChange={(e) => setEditDuration(e.target.value)} />
+                ) : `${pkg.duration_days}d`}
+              </td>
+              <td style={s.td}>
+                {editingId === pkg.id ? (
+                  <input style={{ ...s.inlineInput, maxWidth: 120 }} type="number" min={0} value={editPrice} onChange={(e) => setEditPrice(e.target.value)} />
+                ) : `Rp ${Number(pkg.price).toLocaleString('id-ID')}`}
+              </td>
+              <td style={s.td}>
+                {pkg.is_default
+                  ? <span style={s.defaultBadge}>{t('admin.packages.isDefault')}</span>
+                  : <button style={{ ...s.actionBtn, ...s.starBtn }} onClick={() => handleSetDefault(pkg.id)}>{t('admin.packages.setDefault')}</button>}
+              </td>
+              <td style={s.td}>
+                {editingId === pkg.id ? (
+                  <>
+                    <button style={{ ...s.actionBtn, ...s.saveBtn }} onClick={() => saveEdit(pkg.id)}>{t('admin.packages.save')}</button>
+                    <button style={{ ...s.actionBtn, ...s.cancelBtn }} onClick={cancelEdit}>{t('admin.packages.cancel')}</button>
+                  </>
+                ) : (
+                  <>
+                    <button style={{ ...s.actionBtn, ...s.editBtn }} onClick={() => startEdit(pkg)}>{t('admin.members.edit')}</button>
+                    <button style={{ ...s.actionBtn, ...s.deleteBtn }} onClick={() => handleDelete(pkg.id)}>{t('admin.members.remove')}</button>
+                  </>
+                )}
+              </td>
+            </tr>
+          ))}
+          <tr>
+            <td style={s.td}>
+              <input style={s.inlineInput} value={newName} onChange={(e) => setNewName(e.target.value)} placeholder={t('admin.packages.namePlaceholder')} />
+            </td>
+            <td style={s.td}>
+              <input style={{ ...s.inlineInput, maxWidth: 80 }} type="number" min={1} value={newDuration} onChange={(e) => setNewDuration(e.target.value)} placeholder={t('admin.packages.durationPlaceholder')} />
+            </td>
+            <td style={s.td}>
+              <input style={{ ...s.inlineInput, maxWidth: 120 }} type="number" min={0} value={newPrice} onChange={(e) => setNewPrice(e.target.value)} placeholder={t('admin.packages.pricePlaceholder')} />
+            </td>
+            <td style={s.td} />
+            <td style={s.td}>
+              <button
+                style={{ ...s.actionBtn, ...s.saveBtn, opacity: addLoading ? 0.6 : 1 }}
+                onClick={handleAdd}
+                disabled={addLoading || !newName.trim() || !newDuration || !newPrice}
+              >
+                {t('admin.packages.addPackage')}
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 // ─── Admin Page ───────────────────────────────────────────────────────────────
 
-export default function AdminPage({ token, gymName, onBack }) {
+export default function AdminPage({ token, role, gymName, onBack }) {
   const [tab, setTab] = useState('attendance');
   const [showChangePin, setShowChangePin] = useState(false);
   const { t } = useTranslation();
@@ -1179,11 +1445,20 @@ export default function AdminPage({ token, gymName, onBack }) {
           >
             {t('admin.tabs.staff')}
           </button>
+          {role === 'admin' && (
+            <button
+              style={{ ...s.tab, ...(tab === 'packages' ? s.tabActive : {}) }}
+              onClick={() => setTab('packages')}
+            >
+              {t('admin.packages.tab')}
+            </button>
+          )}
         </div>
 
         {tab === 'attendance' && <AttendanceTab token={token} />}
         {tab === 'members' && <MembersTab token={token} />}
         {tab === 'staff' && <StaffTab token={token} />}
+        {tab === 'packages' && role === 'admin' && <PackagesTab token={token} />}
       </div>
 
       {showChangePin && (

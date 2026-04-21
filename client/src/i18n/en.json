@@ -74,7 +74,8 @@
       "save": "Save",
       "edit": "Edit",
       "remove": "Remove",
-      "qrCode": "QR Code"
+      "qrCode": "QR Code",
+      "colPackage": "Package"
     },
     "qr": {
       "howToShare": "📋 How to share this QR code",
@@ -161,6 +162,31 @@
       "phoneLabel": "Phone Number",
       "adding": "Adding...",
       "addMember": "Add Member"
+    },
+    "packages": {
+      "tab": "Packages",
+      "colName": "Package Name",
+      "colDuration": "Duration",
+      "colPrice": "Price",
+      "colDefault": "Default",
+      "colActions": "Actions",
+      "noPackages": "No packages yet.",
+      "setDefault": "Set Default",
+      "isDefault": "Default",
+      "durationDays": "{n} days",
+      "addPackage": "+ Add Package",
+      "deleteBlocked": "Cannot delete — members are assigned to this package",
+      "namePlaceholder": "e.g. 1 Month",
+      "durationPlaceholder": "30",
+      "pricePlaceholder": "150000",
+      "editTitle": "Edit Package",
+      "saving": "Saving...",
+      "save": "Save",
+      "cancel": "Cancel",
+      "packageLabel": "Package",
+      "customDate": "Custom date...",
+      "expiresOn": "Expires: {date}",
+      "daysRemaining": "{n} days remaining"
     }
   },
   "superadmin": {

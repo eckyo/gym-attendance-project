@@ -48,9 +48,10 @@ export const processScan = async (gymId, scanToken) => {
 
     // 1. Resolve member by scan token (GYM ID), scoped to gym
     const memberResult = await client.query(
-      `SELECT id, name, expiry_date
-       FROM members
-       WHERE gym_id = $1 AND scan_token = $2 AND deleted_at IS NULL`,
+      `SELECT m.id, m.name, m.expiry_date, p.name AS package_name
+       FROM members m
+       LEFT JOIN membership_packages p ON p.id = m.package_id
+       WHERE m.gym_id = $1 AND m.scan_token = $2 AND m.deleted_at IS NULL`,
       [gymId, scanToken]
     );
 
@@ -103,5 +104,11 @@ export const processScan = async (gymId, scanToken) => {
   // 5. Write to XLSX after DB commit — failure here won't roll back the DB record
   appendToXlsx({ memberName: member.name, gymMemberId: scanToken, checkedInAt: log.checked_in_at });
 
-  return { memberName: member.name, checkedInAt: log.checked_in_at, scanToken };
+  return {
+    memberName: member.name,
+    checkedInAt: log.checked_in_at,
+    scanToken,
+    packageName: member.package_name || null,
+    expiryDate: member.expiry_date || null,
+  };
 };

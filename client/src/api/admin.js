@@ -42,11 +42,11 @@ export const addMember = (token, name, expiryDate) =>
     body: JSON.stringify({ name, expiryDate }),
   }).then(handleResponse);
 
-export const updateMember = (token, id, name, expiryDate) =>
+export const updateMember = (token, id, name, expiryDate, packageId) =>
   fetch(`${API_BASE}/api/admin/members/${id}`, {
     method: 'PUT',
     headers: authHeaders(token),
-    body: JSON.stringify({ name, expiryDate }),
+    body: JSON.stringify({ name, expiryDate, packageId }),
   }).then(handleResponse);
 
 export const deleteMember = (token, id, pin) =>
@@ -114,4 +114,42 @@ export const changeStaffPassword = (token, id, newPassword, pin) =>
     method: 'PUT',
     headers: authHeaders(token),
     body: JSON.stringify({ newPassword, pin }),
+  }).then(handleResponse);
+
+export const getPackages = (token) =>
+  fetch(`${API_BASE}/api/packages`, {
+    headers: authHeaders(token),
+  }).then(handleResponse);
+
+export const createPackage = (token, data) =>
+  fetch(`${API_BASE}/api/packages`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify(data),
+  }).then(handleResponse);
+
+export const updatePackage = (token, id, data) =>
+  fetch(`${API_BASE}/api/packages/${id}`, {
+    method: 'PUT',
+    headers: authHeaders(token),
+    body: JSON.stringify(data),
+  }).then(handleResponse);
+
+export const deletePackage = (token, id) =>
+  fetch(`${API_BASE}/api/packages/${id}`, {
+    method: 'DELETE',
+    headers: authHeaders(token),
+  }).then(handleResponse);
+
+export const setDefaultPackage = (token, id) =>
+  fetch(`${API_BASE}/api/packages/${id}/default`, {
+    method: 'PATCH',
+    headers: authHeaders(token),
+  }).then(handleResponse);
+
+export const addMemberWithPackage = (token, name, expiryDate, packageId) =>
+  fetch(`${API_BASE}/api/admin/members`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify({ name, expiryDate, packageId }),
   }).then(handleResponse);

@@ -253,12 +253,14 @@ router.get('/members', async (req, res, next) => {
     const search = req.query.search ? `%${req.query.search}%` : '%';
 
     const result = await pool.query(
-      `SELECT id, name, scan_token, expiry_date, created_at
-       FROM members
-       WHERE gym_id = $1
-         AND deleted_at IS NULL
-         AND (name ILIKE $2 OR scan_token ILIKE $2)
-       ORDER BY scan_token`,
+      `SELECT m.id, m.name, m.scan_token, m.expiry_date, m.created_at,
+              p.id AS package_id, p.name AS package_name, p.duration_days, p.price
+       FROM members m
+       LEFT JOIN membership_packages p ON p.id = m.package_id
+       WHERE m.gym_id = $1
+         AND m.deleted_at IS NULL
+         AND (m.name ILIKE $2 OR m.scan_token ILIKE $2)
+       ORDER BY m.scan_token`,
       [req.gymId, search]
     );
 
@@ -268,13 +270,38 @@ router.get('/members', async (req, res, next) => {
   }
 });
 
+const calcExpiry = (currentExpiry, durationDays) => {
+  const base = currentExpiry && new Date(currentExpiry) > new Date()
+    ? new Date(currentExpiry)
+    : new Date();
+  base.setDate(base.getDate() + durationDays);
+  return base.toISOString().slice(0, 10);
+};
+
 // POST /api/admin/members
 router.post('/members', async (req, res, next) => {
   const client = await pool.connect();
   try {
-    const { name, expiryDate } = req.body;
+    const { name, expiryDate, packageId } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'Name is required' });
-    if (!expiryDate) return res.status(400).json({ error: 'Expiry date is required' });
+
+    let resolvedExpiry = expiryDate || null;
+    let resolvedPackageId = null;
+    let packageName = null;
+
+    if (packageId) {
+      const pkgResult = await pool.query(
+        'SELECT id, name, duration_days FROM membership_packages WHERE id = $1 AND gym_id = $2',
+        [packageId, req.gymId]
+      );
+      if (pkgResult.rows.length === 0) return res.status(400).json({ error: 'Package not found' });
+      const pkg = pkgResult.rows[0];
+      resolvedExpiry = calcExpiry(null, pkg.duration_days);
+      resolvedPackageId = pkg.id;
+      packageName = pkg.name;
+    }
+
+    if (!resolvedExpiry) return res.status(400).json({ error: 'Expiry date is required' });
 
     await client.query('BEGIN');
 
@@ -292,14 +319,14 @@ router.post('/members', async (req, res, next) => {
     );
 
     const result = await client.query(
-      `INSERT INTO members (gym_id, name, scan_token, expiry_date)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, name, scan_token, expiry_date, created_at`,
-      [req.gymId, name.trim(), scanToken, expiryDate]
+      `INSERT INTO members (gym_id, name, scan_token, expiry_date, package_id)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, name, scan_token, expiry_date, package_id, created_at`,
+      [req.gymId, name.trim(), scanToken, resolvedExpiry, resolvedPackageId]
     );
 
     await client.query('COMMIT');
-    res.status(201).json(result.rows[0]);
+    res.status(201).json({ ...result.rows[0], package_name: packageName });
   } catch (err) {
     await client.query('ROLLBACK');
     next(err);
@@ -311,20 +338,60 @@ router.post('/members', async (req, res, next) => {
 // PUT /api/admin/members/:id
 router.put('/members/:id', async (req, res, next) => {
   try {
-    const { name, expiryDate } = req.body;
+    const { name, expiryDate, packageId } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'Name is required' });
-    if (!expiryDate) return res.status(400).json({ error: 'Expiry date is required' });
 
+    let resolvedExpiry = expiryDate || null;
+    let resolvedPackageId = packageId === undefined ? undefined : (packageId || null);
+    let packageName = null;
+
+    if (packageId) {
+      const current = await pool.query(
+        'SELECT expiry_date FROM members WHERE id = $1 AND gym_id = $2 AND deleted_at IS NULL',
+        [req.params.id, req.gymId]
+      );
+      if (current.rows.length === 0) return res.status(404).json({ error: 'Member not found' });
+
+      const pkgResult = await pool.query(
+        'SELECT id, name, duration_days FROM membership_packages WHERE id = $1 AND gym_id = $2',
+        [packageId, req.gymId]
+      );
+      if (pkgResult.rows.length === 0) return res.status(400).json({ error: 'Package not found' });
+      const pkg = pkgResult.rows[0];
+      resolvedExpiry = calcExpiry(current.rows[0].expiry_date, pkg.duration_days);
+      resolvedPackageId = pkg.id;
+      packageName = pkg.name;
+    }
+
+    if (!resolvedExpiry) return res.status(400).json({ error: 'Expiry date is required' });
+
+    const setClauses = ['name = $1', 'expiry_date = $2', 'updated_at = NOW()'];
+    const params = [name.trim(), resolvedExpiry];
+
+    if (resolvedPackageId !== undefined) {
+      setClauses.push(`package_id = $${params.length + 1}`);
+      params.push(resolvedPackageId);
+    }
+
+    params.push(req.params.id, req.gymId);
     const result = await pool.query(
-      `UPDATE members
-       SET name = $1, expiry_date = $2, updated_at = NOW()
-       WHERE id = $3 AND gym_id = $4 AND deleted_at IS NULL
-       RETURNING id, name, scan_token, expiry_date, created_at`,
-      [name.trim(), expiryDate, req.params.id, req.gymId]
+      `UPDATE members SET ${setClauses.join(', ')}
+       WHERE id = $${params.length - 1} AND gym_id = $${params.length} AND deleted_at IS NULL
+       RETURNING id, name, scan_token, expiry_date, package_id, created_at`,
+      params
     );
 
     if (result.rows.length === 0) return res.status(404).json({ error: 'Member not found' });
-    res.json(result.rows[0]);
+
+    if (!packageName && result.rows[0].package_id) {
+      const pkgResult = await pool.query(
+        'SELECT name FROM membership_packages WHERE id = $1',
+        [result.rows[0].package_id]
+      );
+      packageName = pkgResult.rows[0]?.name || null;
+    }
+
+    res.json({ ...result.rows[0], package_name: packageName });
   } catch (err) {
     next(err);
   }

@@ -74,7 +74,8 @@
       "save": "Simpan",
       "edit": "Edit",
       "remove": "Hapus",
-      "qrCode": "Kode QR"
+      "qrCode": "Kode QR",
+      "colPackage": "Paket"
     },
     "qr": {
       "howToShare": "📋 Cara berbagi kode QR ini",
@@ -161,6 +162,31 @@
       "phoneLabel": "Nomor Telepon",
       "adding": "Menambahkan...",
       "addMember": "Tambah Anggota"
+    },
+    "packages": {
+      "tab": "Paket",
+      "colName": "Nama Paket",
+      "colDuration": "Durasi",
+      "colPrice": "Harga",
+      "colDefault": "Default",
+      "colActions": "Aksi",
+      "noPackages": "Belum ada paket.",
+      "setDefault": "Jadikan Default",
+      "isDefault": "Default",
+      "durationDays": "{n} hari",
+      "addPackage": "+ Tambah Paket",
+      "deleteBlocked": "Tidak dapat dihapus — ada anggota yang menggunakan paket ini",
+      "namePlaceholder": "cth. 1 Bulan",
+      "durationPlaceholder": "30",
+      "pricePlaceholder": "150000",
+      "editTitle": "Edit Paket",
+      "saving": "Menyimpan...",
+      "save": "Simpan",
+      "cancel": "Batal",
+      "packageLabel": "Paket",
+      "customDate": "Tanggal kustom...",
+      "expiresOn": "Kedaluwarsa: {date}",
+      "daysRemaining": "{n} hari tersisa"
     }
   },
   "superadmin": {

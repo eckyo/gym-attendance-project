@@ -232,6 +232,7 @@ export default function App() {
       {page === 'admin' && (
         <AdminPage
           token={auth.token}
+          role={auth.role}
           gymName={auth.gymName}
           onBack={() => setPage('scan')}
         />

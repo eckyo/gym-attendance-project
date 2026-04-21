@@ -89,3 +89,18 @@ BEGIN
     ALTER TABLE members ALTER COLUMN scan_token DROP DEFAULT;
   END IF;
 END $$;
+
+-- Membership packages
+CREATE TABLE IF NOT EXISTS membership_packages (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  gym_id        UUID NOT NULL REFERENCES gyms(id),
+  name          TEXT NOT NULL,
+  duration_days INTEGER NOT NULL,
+  price         INTEGER NOT NULL DEFAULT 0,
+  is_default    BOOLEAN NOT NULL DEFAULT false,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_membership_packages_gym ON membership_packages(gym_id);
+
+ALTER TABLE members ADD COLUMN IF NOT EXISTS package_id UUID REFERENCES membership_packages(id);

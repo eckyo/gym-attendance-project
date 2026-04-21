@@ -76,6 +76,12 @@ router.post('/gyms', async (req, res, next) => {
       [gym.id, adminEmail.trim().toLowerCase(), passwordHash]
     );
 
+    await client.query(
+      `INSERT INTO membership_packages (gym_id, name, duration_days, price, is_default)
+       VALUES ($1, '1 Month', 30, 150000, true)`,
+      [gym.id]
+    );
+
     await client.query('COMMIT');
 
     res.status(201).json({
