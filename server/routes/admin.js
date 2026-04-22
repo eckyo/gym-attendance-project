@@ -166,15 +166,15 @@ router.post('/members/import', upload.single('file'), async (req, res, next) => 
 
       if (!gymId) {
         errors.push('GYM ID is required');
-      } else if (!/^[A-Z]\d{4}$/.test(gymId)) {
-        errors.push(`GYM ID "${gymId}" is invalid (must be letter + 4 digits, e.g. A0001)`);
+      } else if (!/^[A-Z0-9]{1,10}$/.test(gymId)) {
+        errors.push(`GYM ID "${gymId}" is invalid (must be 1–10 alphanumeric characters, e.g. A1, GYM01, A0001)`);
       } else if (existingIds.has(gymId)) {
         errors.push(`GYM ID ${gymId} already exists in the system`);
       } else if (seenGymIds.has(gymId)) {
         errors.push(`GYM ID ${gymId} is duplicated in this file (first seen on row ${seenGymIds.get(gymId)})`);
       }
 
-      if (gymId && /^[A-Z]\d{4}$/.test(gymId) && !existingIds.has(gymId) && !seenGymIds.has(gymId)) {
+      if (gymId && /^[A-Z0-9]{1,10}$/.test(gymId) && !existingIds.has(gymId) && !seenGymIds.has(gymId)) {
         seenGymIds.set(gymId, rowIndex);
       }
 
@@ -212,9 +212,15 @@ router.post('/members/import/confirm', async (req, res, next) => {
     );
     let counter = gymResult.rows[0].member_id_counter;
 
-    // Bump counter if any imported GYM ID exceeds current counter
-    const maxImported = Math.max(...rows.map((r) => gymIdToCounter(r.gymId)));
-    counter = Math.max(counter, maxImported);
+    // Only sync counter for standard-format IDs (A0001…) to protect future auto-gen IDs
+    const STANDARD_ID_RE = /^[A-Z]\d{4}$/;
+    const standardCounters = rows
+      .map((r) => r.gymId)
+      .filter((id) => STANDARD_ID_RE.test(id))
+      .map((id) => gymIdToCounter(id));
+    if (standardCounters.length > 0) {
+      counter = Math.max(counter, Math.max(...standardCounters));
+    }
 
     const inserted = [];
     for (const row of rows) {
