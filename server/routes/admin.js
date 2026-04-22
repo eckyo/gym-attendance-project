@@ -54,6 +54,7 @@ router.get('/attendance', async (req, res, next) => {
       `SELECT
          m.name        AS member_name,
          m.scan_token  AS gym_id,
+         m.created_at  AS member_created_at,
          al.checked_in_at
        FROM attendance_logs al
        JOIN members m ON m.id = al.member_id
@@ -76,7 +77,7 @@ router.get('/members/export', async (req, res, next) => {
   try {
     const today = new Date().toISOString().slice(0, 10);
     const result = await pool.query(
-      `SELECT name, scan_token, expiry_date, created_at
+      `SELECT name, scan_token, expiry_date, created_at, phone_number
        FROM members WHERE gym_id = $1 AND deleted_at IS NULL ORDER BY scan_token`,
       [req.gymId]
     );
@@ -86,6 +87,7 @@ router.get('/members/export', async (req, res, next) => {
       'GYM ID': m.scan_token,
       'Expiry Date': m.expiry_date ? new Date(m.expiry_date).toISOString().slice(0, 10) : '',
       'Joined Date': m.created_at ? new Date(m.created_at).toISOString().slice(0, 10) : today,
+      'Phone Number': m.phone_number || '',
     }));
 
     const ws = XLSX.utils.json_to_sheet(rows);
@@ -105,7 +107,7 @@ router.get('/members/export', async (req, res, next) => {
 router.get('/members/template', async (req, res, next) => {
   try {
     const ws = XLSX.utils.json_to_sheet([], {
-      header: ['Name', 'GYM ID', 'Expiry Date', 'Joined Date'],
+      header: ['Name', 'GYM ID', 'Expiry Date', 'Joined Date', 'Phone Number'],
     });
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Members');
@@ -137,6 +139,12 @@ router.post('/members/import', upload.single('file'), async (req, res, next) => 
       if (val instanceof Date) return val.toISOString().slice(0, 10);
       const s = String(val).trim();
       if (!s) return '';
+      // Handle DD-MM-YYYY or DD/MM/YYYY (Indonesian/European format) before falling back to JS Date
+      const dmy = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+      if (dmy) {
+        const iso = `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`;
+        if (!isNaN(Date.parse(iso))) return iso;
+      }
       const parsed = new Date(s);
       if (!isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10);
       return s; // return raw so validation can catch it
@@ -158,6 +166,7 @@ router.post('/members/import', upload.single('file'), async (req, res, next) => 
       const gymId = String(row['GYM ID'] || '').trim().toUpperCase();
       const expiryDate = toDateStr(row['Expiry Date']);
       const joinedDate = toDateStr(row['Joined Date']) || today;
+      const phoneNumber = String(row['Phone Number'] || '').trim() || null;
 
       const errors = [];
 
@@ -165,15 +174,15 @@ router.post('/members/import', upload.single('file'), async (req, res, next) => 
 
       if (!gymId) {
         errors.push('GYM ID is required');
-      } else if (!/^[A-Z]\d{4}$/.test(gymId)) {
-        errors.push(`GYM ID "${gymId}" is invalid (must be letter + 4 digits, e.g. A0001)`);
+      } else if (!/^[A-Z0-9]{1,10}$/.test(gymId)) {
+        errors.push(`GYM ID "${gymId}" is invalid (must be 1–10 alphanumeric characters, e.g. A1, GYM01, A0001)`);
       } else if (existingIds.has(gymId)) {
         errors.push(`GYM ID ${gymId} already exists in the system`);
       } else if (seenGymIds.has(gymId)) {
         errors.push(`GYM ID ${gymId} is duplicated in this file (first seen on row ${seenGymIds.get(gymId)})`);
       }
 
-      if (gymId && /^[A-Z]\d{4}$/.test(gymId) && !existingIds.has(gymId) && !seenGymIds.has(gymId)) {
+      if (gymId && /^[A-Z0-9]{1,10}$/.test(gymId) && !existingIds.has(gymId) && !seenGymIds.has(gymId)) {
         seenGymIds.set(gymId, rowIndex);
       }
 
@@ -185,7 +194,7 @@ router.post('/members/import', upload.single('file'), async (req, res, next) => 
         errors.push(`Joined Date "${joinedDate}" is not a valid date`);
       }
 
-      return { rowIndex, name, gymId, expiryDate, joinedDate, errors };
+      return { rowIndex, name, gymId, expiryDate, joinedDate, phoneNumber, errors };
     });
 
     res.json({ rows });
@@ -211,21 +220,28 @@ router.post('/members/import/confirm', async (req, res, next) => {
     );
     let counter = gymResult.rows[0].member_id_counter;
 
-    // Bump counter if any imported GYM ID exceeds current counter
-    const maxImported = Math.max(...rows.map((r) => gymIdToCounter(r.gymId)));
-    counter = Math.max(counter, maxImported);
+    // Only sync counter for standard-format IDs (A0001…) to protect future auto-gen IDs
+    const STANDARD_ID_RE = /^[A-Z]\d{4}$/;
+    const standardCounters = rows
+      .map((r) => r.gymId)
+      .filter((id) => STANDARD_ID_RE.test(id))
+      .map((id) => gymIdToCounter(id));
+    if (standardCounters.length > 0) {
+      counter = Math.max(counter, Math.max(...standardCounters));
+    }
 
     const inserted = [];
     for (const row of rows) {
       const result = await client.query(
-        `INSERT INTO members (gym_id, name, scan_token, expiry_date, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $5)
-         RETURNING id, name, scan_token, expiry_date, created_at`,
+        `INSERT INTO members (gym_id, name, scan_token, expiry_date, phone_number, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $6)
+         RETURNING id, name, scan_token, expiry_date, phone_number, created_at`,
         [
           req.gymId,
           row.name,
           row.gymId,
           row.expiryDate || null,
+          row.phoneNumber || null,
           row.joinedDate,
         ]
       );
@@ -247,37 +263,120 @@ router.post('/members/import/confirm', async (req, res, next) => {
   }
 });
 
-// GET /api/admin/members?search=alice
+const SORT_COLS = {
+  name: 'm.name',
+  scan_token: 'm.scan_token',
+  expiry_date: 'm.expiry_date',
+  created_at: 'm.created_at',
+  package_name: 'p.name',
+};
+
+// GET /api/admin/members?search=alice&limit=20&offset=0&sort=name&order=asc&status=active&packageId=uuid&newOnly=true
 router.get('/members', async (req, res, next) => {
   try {
-    const search = req.query.search ? `%${req.query.search}%` : '%';
+    const search  = req.query.search ? `%${req.query.search}%` : '%';
+    const limit   = Math.min(parseInt(req.query.limit,  10) || 20, 100);
+    const offset  = Math.max(parseInt(req.query.offset, 10) || 0,  0);
+    const sortCol = SORT_COLS[req.query.sort] ?? 'm.scan_token';
+    const sortOrd = req.query.order === 'desc' ? 'DESC' : 'ASC';
+
+    const statuses   = [].concat(req.query.status    || []).filter((s) => ['active', 'expired'].includes(s));
+    const packageIds = [].concat(req.query.packageId || []);
+    const { newOnly } = req.query;
+    const queryParams = [req.gymId, search];
+    const extraConditions = [];
+
+    if (statuses.length === 1) {
+      if (statuses[0] === 'active') {
+        extraConditions.push('(m.expiry_date IS NOT NULL AND m.expiry_date >= CURRENT_DATE)');
+      } else {
+        extraConditions.push('(m.expiry_date IS NOT NULL AND m.expiry_date < CURRENT_DATE)');
+      }
+    } else if (statuses.length === 2) {
+      extraConditions.push('m.expiry_date IS NOT NULL');
+    }
+
+    if (packageIds.length > 0) {
+      const hasNone = packageIds.includes('none');
+      const uuids   = packageIds.filter((id) => id !== 'none');
+      const parts   = [];
+      if (hasNone) parts.push('m.package_id IS NULL');
+      if (uuids.length > 0) {
+        const placeholders = uuids.map((uuid) => { queryParams.push(uuid); return `$${queryParams.length}`; });
+        parts.push(`m.package_id IN (${placeholders.join(', ')})`);
+      }
+      extraConditions.push(parts.length === 1 ? parts[0] : `(${parts.join(' OR ')})`);
+    }
+
+    if (newOnly === 'true') {
+      extraConditions.push("m.created_at >= NOW() - INTERVAL '7 days'");
+    }
+
+    const extraWhere = extraConditions.length ? `AND ${extraConditions.join(' AND ')}` : '';
+    queryParams.push(limit, offset);
+    const limitParam  = `$${queryParams.length - 1}`;
+    const offsetParam = `$${queryParams.length}`;
 
     const result = await pool.query(
-      `SELECT id, name, scan_token, expiry_date, phone_number, created_at
-       FROM members
-       WHERE gym_id = $1
-         AND deleted_at IS NULL
-         AND (name ILIKE $2 OR scan_token ILIKE $2)
-       ORDER BY scan_token`,
-      [req.gymId, search]
+      `SELECT m.id, m.name, m.scan_token, m.expiry_date, m.phone_number, m.created_at,
+              p.id AS package_id, p.name AS package_name, p.duration_days, p.price,
+              COUNT(*) OVER() AS total_count
+       FROM members m
+       LEFT JOIN membership_packages p ON p.id = m.package_id
+       WHERE m.gym_id = $1
+         AND m.deleted_at IS NULL
+         AND (m.name ILIKE $2 OR m.scan_token ILIKE $2)
+         ${extraWhere}
+       ORDER BY ${sortCol} ${sortOrd} NULLS LAST
+       LIMIT ${limitParam} OFFSET ${offsetParam}`,
+      queryParams
     );
 
-    res.json(result.rows);
+    const total = parseInt(result.rows[0]?.total_count ?? 0, 10);
+    const members = result.rows.map(({ total_count, ...r }) => r);
+    res.json({ members, total });
   } catch (err) {
     next(err);
   }
 });
 
+const calcExpiry = (currentExpiry, durationDays) => {
+  const base = currentExpiry && new Date(currentExpiry) > new Date()
+    ? new Date(currentExpiry)
+    : new Date();
+  base.setDate(base.getDate() + durationDays);
+  return base.toISOString().slice(0, 10);
+};
+
 // POST /api/admin/members
 router.post('/members', async (req, res, next) => {
   const client = await pool.connect();
   try {
-    const { name, expiryDate, phoneNumber } = req.body;
+    const { name, expiryDate, packageId, phoneNumber } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'Name is required' });
-    if (!expiryDate) return res.status(400).json({ error: 'Expiry date is required' });
-    if (phoneNumber && !/^\+62\d{8,13}$/.test(phoneNumber)) {
-      return res.status(400).json({ error: 'Invalid phone number format' });
+
+    const phoneRe = /^\+62\d{8,13}$/;
+    if (phoneNumber && !phoneRe.test(phoneNumber)) {
+      return res.status(400).json({ error: 'Invalid phone number format. Use +62 followed by 8–13 digits.' });
     }
+
+    let resolvedExpiry = expiryDate || null;
+    let resolvedPackageId = null;
+    let packageName = null;
+
+    if (packageId) {
+      const pkgResult = await pool.query(
+        'SELECT id, name, duration_days FROM membership_packages WHERE id = $1 AND gym_id = $2',
+        [packageId, req.gymId]
+      );
+      if (pkgResult.rows.length === 0) return res.status(400).json({ error: 'Package not found' });
+      const pkg = pkgResult.rows[0];
+      resolvedExpiry = calcExpiry(null, pkg.duration_days);
+      resolvedPackageId = pkg.id;
+      packageName = pkg.name;
+    }
+
+    if (!resolvedExpiry) return res.status(400).json({ error: 'Expiry date is required' });
 
     await client.query('BEGIN');
 
@@ -295,14 +394,14 @@ router.post('/members', async (req, res, next) => {
     );
 
     const result = await client.query(
-      `INSERT INTO members (gym_id, name, scan_token, expiry_date, phone_number)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING id, name, scan_token, expiry_date, phone_number, created_at`,
-      [req.gymId, name.trim(), scanToken, expiryDate, phoneNumber || null]
+      `INSERT INTO members (gym_id, name, scan_token, expiry_date, package_id, phone_number)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, name, scan_token, expiry_date, package_id, phone_number, created_at`,
+      [req.gymId, name.trim(), scanToken, resolvedExpiry, resolvedPackageId, phoneNumber || null]
     );
 
     await client.query('COMMIT');
-    res.status(201).json(result.rows[0]);
+    res.status(201).json({ ...result.rows[0], package_name: packageName });
   } catch (err) {
     await client.query('ROLLBACK');
     next(err);
@@ -314,23 +413,70 @@ router.post('/members', async (req, res, next) => {
 // PUT /api/admin/members/:id
 router.put('/members/:id', async (req, res, next) => {
   try {
-    const { name, expiryDate, phoneNumber } = req.body;
+    const { name, expiryDate, packageId, phoneNumber } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'Name is required' });
-    if (!expiryDate) return res.status(400).json({ error: 'Expiry date is required' });
-    if (phoneNumber && !/^\+62\d{8,13}$/.test(phoneNumber)) {
-      return res.status(400).json({ error: 'Invalid phone number format' });
+
+    const phoneRe = /^\+62\d{8,13}$/;
+    if (phoneNumber && !phoneRe.test(phoneNumber)) {
+      return res.status(400).json({ error: 'Invalid phone number format. Use +62 followed by 8–13 digits.' });
     }
 
+    let resolvedExpiry = expiryDate || null;
+    let resolvedPackageId = packageId === undefined ? undefined : (packageId || null);
+    let packageName = null;
+
+    if (packageId) {
+      const current = await pool.query(
+        'SELECT expiry_date FROM members WHERE id = $1 AND gym_id = $2 AND deleted_at IS NULL',
+        [req.params.id, req.gymId]
+      );
+      if (current.rows.length === 0) return res.status(404).json({ error: 'Member not found' });
+
+      const pkgResult = await pool.query(
+        'SELECT id, name, duration_days FROM membership_packages WHERE id = $1 AND gym_id = $2',
+        [packageId, req.gymId]
+      );
+      if (pkgResult.rows.length === 0) return res.status(400).json({ error: 'Package not found' });
+      const pkg = pkgResult.rows[0];
+      resolvedExpiry = calcExpiry(current.rows[0].expiry_date, pkg.duration_days);
+      resolvedPackageId = pkg.id;
+      packageName = pkg.name;
+    }
+
+    if (!resolvedExpiry) return res.status(400).json({ error: 'Expiry date is required' });
+
+    const setClauses = ['name = $1', 'expiry_date = $2', 'updated_at = NOW()'];
+    const params = [name.trim(), resolvedExpiry];
+
+    if (resolvedPackageId !== undefined) {
+      setClauses.push(`package_id = $${params.length + 1}`);
+      params.push(resolvedPackageId);
+    }
+
+    if (phoneNumber !== undefined) {
+      setClauses.splice(2, 0, `phone_number = $${params.length + 1}`);
+      params.push(phoneNumber || null);
+    }
+
+    params.push(req.params.id, req.gymId);
     const result = await pool.query(
-      `UPDATE members
-       SET name = $1, expiry_date = $2, phone_number = $3, updated_at = NOW()
-       WHERE id = $4 AND gym_id = $5 AND deleted_at IS NULL
-       RETURNING id, name, scan_token, expiry_date, phone_number, created_at`,
-      [name.trim(), expiryDate, phoneNumber || null, req.params.id, req.gymId]
+      `UPDATE members SET ${setClauses.join(', ')}
+       WHERE id = $${params.length - 1} AND gym_id = $${params.length} AND deleted_at IS NULL
+       RETURNING id, name, scan_token, expiry_date, package_id, phone_number, created_at`,
+      params
     );
 
     if (result.rows.length === 0) return res.status(404).json({ error: 'Member not found' });
-    res.json(result.rows[0]);
+
+    if (!packageName && result.rows[0].package_id) {
+      const pkgResult = await pool.query(
+        'SELECT name FROM membership_packages WHERE id = $1',
+        [result.rows[0].package_id]
+      );
+      packageName = pkgResult.rows[0]?.name || null;
+    }
+
+    res.json({ ...result.rows[0], package_name: packageName });
   } catch (err) {
     next(err);
   }

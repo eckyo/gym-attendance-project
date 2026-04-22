@@ -18,7 +18,14 @@ router.post('/', requireAuth, injectGymId, requireRole('admin', 'staff'), async 
     }
 
     const result = await processScan(req.gymId, scanToken.trim());
-    res.json({ success: true, memberName: result.memberName, checkedInAt: result.checkedInAt, gymId: result.scanToken });
+    res.json({
+      success: true,
+      memberName: result.memberName,
+      checkedInAt: result.checkedInAt,
+      gymId: result.scanToken,
+      packageName: result.packageName,
+      expiryDate: result.expiryDate,
+    });
   } catch (err) {
     if (err instanceof MemberNotFoundError) {
       return res.status(404).json({ error: err.message });
@@ -67,14 +74,38 @@ router.post('/verify-pin', requireAuth, injectGymId, requireRole('admin', 'staff
   }
 });
 
+const calcExpiry = (currentExpiry, durationDays) => {
+  const base = currentExpiry && new Date(currentExpiry) > new Date()
+    ? new Date(currentExpiry)
+    : new Date();
+  base.setDate(base.getDate() + durationDays);
+  return base.toISOString().slice(0, 10);
+};
+
 // POST /api/scan/register — staff registers a new member with auto check-in
 router.post('/register', requireAuth, injectGymId, requireRole('admin', 'staff'), async (req, res, next) => {
   const client = await pool.connect();
   try {
-    const { name, expiryDate, phoneNumber } = req.body;
+    const { name, expiryDate, phoneNumber, packageId } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'Name is required' });
     if (phoneNumber && !/^\+62\d{8,13}$/.test(phoneNumber))
       return res.status(400).json({ error: 'Invalid phone number format' });
+
+    let resolvedExpiry = expiryDate || null;
+    let resolvedPackageId = null;
+    let packageName = null;
+
+    if (packageId) {
+      const pkgResult = await client.query(
+        'SELECT id, name, duration_days FROM membership_packages WHERE id = $1 AND gym_id = $2',
+        [packageId, req.gymId]
+      );
+      if (pkgResult.rows.length === 0) return res.status(400).json({ error: 'Package not found' });
+      const pkg = pkgResult.rows[0];
+      resolvedExpiry = calcExpiry(null, pkg.duration_days);
+      resolvedPackageId = pkg.id;
+      packageName = pkg.name;
+    }
 
     await client.query('BEGIN');
 
@@ -87,9 +118,9 @@ router.post('/register', requireAuth, injectGymId, requireRole('admin', 'staff')
     await client.query('UPDATE gyms SET member_id_counter = $1 WHERE id = $2', [newCounter, req.gymId]);
 
     const memberResult = await client.query(
-      `INSERT INTO members (gym_id, name, scan_token, expiry_date, phone_number)
-       VALUES ($1, $2, $3, $4, $5) RETURNING id, name, scan_token`,
-      [req.gymId, name.trim(), scanToken, expiryDate || null, phoneNumber || null]
+      `INSERT INTO members (gym_id, name, scan_token, expiry_date, package_id)
+       VALUES ($1, $2, $3, $4, $5) RETURNING id, name, scan_token, expiry_date`,
+      [req.gymId, name.trim(), scanToken, resolvedExpiry, resolvedPackageId]
     );
     const member = memberResult.rows[0];
 
@@ -104,6 +135,8 @@ router.post('/register', requireAuth, injectGymId, requireRole('admin', 'staff')
       memberName: member.name,
       gymId: member.scan_token,
       checkedInAt: logResult.rows[0].checked_in_at,
+      packageName,
+      expiryDate: member.expiry_date,
     });
   } catch (err) {
     await client.query('ROLLBACK');

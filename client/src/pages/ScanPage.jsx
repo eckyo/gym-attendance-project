@@ -4,7 +4,16 @@ import Lottie from 'lottie-react';
 import successAnimation from '../assets/success.json';
 import errorAnimation from '../assets/error.json';
 import { postScan, verifyScanPin, registerMember } from '../api/scan.js';
+import { getPackages } from '../api/admin.js';
 import { useTranslation, LanguageSwitcher } from '../i18n/LanguageContext.jsx';
+
+const daysUntilExpiry = (dateStr) => Math.ceil((new Date(dateStr) - new Date()) / 86400000);
+
+const calcExpiryFromDuration = (durationDays) => {
+  const d = new Date();
+  d.setDate(d.getDate() + durationDays);
+  return d.toISOString().slice(0, 10);
+};
 
 const DEBOUNCE_MS = 5000;
 
@@ -161,6 +170,34 @@ const st = {
   cardTime: {
     fontSize: 14,
     color: '#94a3b8',
+  },
+  cardPackage: {
+    fontSize: 13,
+    color: '#64748b',
+    marginTop: 6,
+    fontWeight: 600,
+  },
+  cardExpiry: {
+    fontSize: 13,
+    color: '#94a3b8',
+    marginTop: 2,
+  },
+  registerSelect: {
+    width: '100%',
+    padding: '10px 14px',
+    border: '1.5px solid #e2e8f0',
+    borderRadius: 8,
+    fontSize: 14,
+    marginBottom: 14,
+    outline: 'none',
+    background: '#fff',
+    boxSizing: 'border-box',
+  },
+  expiryPreview: {
+    fontSize: 12,
+    color: '#64748b',
+    marginTop: -10,
+    marginBottom: 14,
   },
   errorHeading: {
     fontSize: 20,
@@ -333,21 +370,38 @@ function ImagePinModal({ token, onVerified, onClose, subtitle, isPassword }) {
 function RegisterModal({ token, onSuccess, onClose }) {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [expiryDate, setExpiryDate] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 30);
-    return d.toISOString().slice(0, 10);
-  });
+  const [packages, setPackages] = useState([]);
+  const [selectedPackageId, setSelectedPackageId] = useState('__custom__');
+  const [customExpiry, setCustomExpiry] = useState(() => calcExpiryFromDuration(30));
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { t } = useTranslation();
+
+  useEffect(() => {
+    getPackages(token)
+      .then((pkgs) => {
+        setPackages(pkgs);
+        const def = pkgs.find((p) => p.is_default);
+        setSelectedPackageId(def ? def.id : (pkgs.length > 0 ? pkgs[0].id : '__custom__'));
+      })
+      .catch(() => setSelectedPackageId('__custom__'));
+  }, [token]);
+
+  const isCustom = selectedPackageId === '__custom__';
+  const selectedPkg = packages.find((p) => p.id === selectedPackageId);
+  const computedExpiry = selectedPkg ? calcExpiryFromDuration(selectedPkg.duration_days) : null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      const result = await registerMember(token, name, expiryDate, phone ? '+62' + phone : '');
+      const result = await registerMember(
+        token, name,
+        isCustom ? customExpiry : null,
+        phone ? '+62' + phone : '',
+        isCustom ? null : selectedPackageId,
+      );
       onSuccess(result);
     } catch (err) {
       setError(err.message);
@@ -383,13 +437,35 @@ function RegisterModal({ token, onSuccess, onClose }) {
               placeholder="8123 4567 890"
             />
           </div>
-          <label style={st.pinLabel}>{t('admin.add.expiryLabel')}</label>
-          <input
-            style={{ ...st.pinInput, letterSpacing: 'normal', textAlign: 'left', fontSize: 15, marginBottom: 14 }}
-            type="date"
-            value={expiryDate}
-            onChange={(e) => setExpiryDate(e.target.value)}
-          />
+          <label style={st.pinLabel}>{t('admin.packages.packageLabel')}</label>
+          <select
+            style={st.registerSelect}
+            value={selectedPackageId}
+            onChange={(e) => setSelectedPackageId(e.target.value)}
+          >
+            {packages.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name} — {p.duration_days}d{p.is_default ? ' ★' : ''}
+              </option>
+            ))}
+            <option value="__custom__">{t('admin.packages.customDate')}</option>
+          </select>
+          {!isCustom && computedExpiry && (
+            <div style={st.expiryPreview}>
+              {t('admin.packages.expiresOn', { date: new Date(computedExpiry).toLocaleDateString('en-US') })}
+            </div>
+          )}
+          {isCustom && (
+            <>
+              <label style={st.pinLabel}>{t('admin.add.expiryLabel')}</label>
+              <input
+                style={{ ...st.pinInput, letterSpacing: 'normal', textAlign: 'left', fontSize: 15, marginBottom: 14 }}
+                type="date"
+                value={customExpiry}
+                onChange={(e) => setCustomExpiry(e.target.value)}
+              />
+            </>
+          )}
           <button
             style={{ ...st.pinBtn, opacity: loading || !name.trim() ? 0.6 : 1 }}
             type="submit"
@@ -443,6 +519,8 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
         memberName: result.memberName,
         gymId: result.gymId,
         checkedInAt: result.checkedInAt,
+        packageName: result.packageName || null,
+        expiryDate: result.expiryDate || null,
       });
       setTimeout(() => setFeedback(null), 5000);
     } catch (err) {
@@ -582,7 +660,15 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
           token={token}
           onSuccess={(result) => {
             setShowRegisterForm(false);
-            setFeedback({ type: 'success', memberName: result.memberName, gymId: result.gymId, checkedInAt: result.checkedInAt, isNewMember: true });
+            setFeedback({
+              type: 'success',
+              memberName: result.memberName,
+              gymId: result.gymId,
+              checkedInAt: result.checkedInAt,
+              packageName: result.packageName || null,
+              expiryDate: result.expiryDate || null,
+              isNewMember: true,
+            });
             setTimeout(() => setFeedback(null), 5000);
           }}
           onClose={() => setShowRegisterForm(false)}
@@ -623,6 +709,17 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
             <div style={st.cardName}>{feedback.memberName}</div>
             <div style={st.cardGymId}>{t('scan.gymId')}: {feedback.gymId}</div>
             <div style={st.cardTime}>{t('scan.clockedIn', { time: formatTime(feedback.checkedInAt) })}</div>
+            {feedback.packageName && (
+              <div style={st.cardPackage}>{feedback.packageName}</div>
+            )}
+            {feedback.expiryDate && (() => {
+              const days = daysUntilExpiry(feedback.expiryDate);
+              return (
+                <div style={{ ...st.cardExpiry, color: days <= 7 ? '#f59e0b' : '#94a3b8' }}>
+                  {t('admin.packages.daysRemaining', { n: days })}
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}

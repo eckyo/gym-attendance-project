@@ -4,6 +4,8 @@ import {
   getAttendance, getMembers, addMember, updateMember,
   deleteMember, changePin, exportMembers, downloadTemplate,
   previewImport, confirmImport, getStaff, addStaff, removeStaff, verifyPin, changeStaffPassword,
+  getPackages, createPackage, updatePackage, deletePackage, setDefaultPackage,
+  addMemberWithPackage,
 } from '../api/admin.js';
 import { useTranslation, LanguageSwitcher } from '../i18n/LanguageContext.jsx';
 
@@ -195,12 +197,43 @@ const s = {
   },
   badgeReady: { background: '#dcfce7', color: '#166534' },
   badgeError: { background: '#fee2e2', color: '#991b1b' },
+  badgeNew: { background: '#dbeafe', color: '#1d4ed8', marginLeft: 6 },
   fileInput: {
     display: 'block', width: '100%',
     padding: '10px 14px',
     border: '1.5px dashed #cbd5e1', borderRadius: 8,
     fontSize: 14, cursor: 'pointer', marginBottom: 14,
     boxSizing: 'border-box',
+  },
+  select: {
+    padding: '10px 14px',
+    border: '1.5px solid #e2e8f0', borderRadius: 8,
+    fontSize: 15, marginBottom: 14, outline: 'none',
+    width: '100%', background: '#fff', boxSizing: 'border-box',
+  },
+  inlineSelect: {
+    padding: '6px 10px',
+    border: '1.5px solid #93c5fd', borderRadius: 6,
+    fontSize: 14, outline: 'none', background: '#fff',
+    maxWidth: 200,
+  },
+  expiryPreview: { fontSize: 12, color: '#64748b', marginTop: -10, marginBottom: 14 },
+  defaultBadge: {
+    display: 'inline-block', padding: '2px 8px',
+    borderRadius: 99, fontSize: 11, fontWeight: 600,
+    background: '#fef9c3', color: '#854d0e',
+  },
+  starBtn: { background: '#fefce8', color: '#ca8a04' },
+  filterSelect: {
+    padding: '4px 8px', border: '1.5px solid #e2e8f0',
+    borderRadius: 6, fontSize: 13, background: '#fff', outline: 'none',
+  },
+  filterBtn: {
+    padding: '6px 10px', fontSize: 13,
+    border: '1.5px solid #e2e8f0', borderRadius: 6,
+    background: '#fff', cursor: 'pointer',
+    display: 'inline-flex', alignItems: 'center', gap: 4,
+    whiteSpace: 'nowrap',
   },
 };
 
@@ -376,6 +409,7 @@ function ImportModal({ token, onImported, onClose }) {
         gymId: r.gymId,
         expiryDate: r.expiryDate,
         joinedDate: r.joinedDate,
+        phoneNumber: r.phoneNumber,
       })));
       onImported(result.members);
     } catch (err) {
@@ -433,6 +467,7 @@ function ImportModal({ token, onImported, onClose }) {
                     <th style={s.th}>{t('admin.import.colGymId')}</th>
                     <th style={s.th}>{t('admin.import.colExpiry')}</th>
                     <th style={s.th}>{t('admin.import.colJoined')}</th>
+                    <th style={s.th}>{t('admin.members.colPhone')}</th>
                     <th style={s.th}>{t('admin.import.colStatus')}</th>
                   </tr>
                 </thead>
@@ -444,6 +479,7 @@ function ImportModal({ token, onImported, onClose }) {
                       <td style={s.tdMono}>{row.gymId || <span style={{ color: '#94a3b8' }}>—</span>}</td>
                       <td style={s.td}>{row.expiryDate || <span style={{ color: '#94a3b8' }}>—</span>}</td>
                       <td style={s.td}>{row.joinedDate}</td>
+                      <td style={s.td}>{row.phoneNumber || <span style={{ color: '#94a3b8' }}>—</span>}</td>
                       <td style={s.td}>
                         {row.errors.length === 0 ? (
                           <span style={{ ...s.badge, ...s.badgeReady }}>{t('admin.import.badgeReady')}</span>
@@ -544,9 +580,9 @@ function ChangePinModal({ token, onClose }) {
 
 // ─── Add Member Modal ─────────────────────────────────────────────────────────
 
-const defaultExpiryDate = () => {
+const calcExpiryFromDuration = (durationDays) => {
   const d = new Date();
-  d.setDate(d.getDate() + 30);
+  d.setDate(d.getDate() + durationDays);
   return d.toISOString().slice(0, 10);
 };
 
@@ -559,26 +595,62 @@ const maskPhone = (phone) => {
   return '+62' + '*'.repeat(Math.max(0, digits.length - 3)) + visible;
 };
 
+const defaultExpiryDate = () => calcExpiryFromDuration(30);
+
 function AddMemberModal({ token, onAdded, onClose }) {
   const [name, setName] = useState('');
-  const [expiryDate, setExpiryDate] = useState(defaultExpiryDate);
-  const [phone, setPhone] = useState('');
+  const [packages, setPackages] = useState([]);
+  const [selectedPackageId, setSelectedPackageId] = useState('');
+  const [customExpiry, setCustomExpiry] = useState(defaultExpiryDate);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [phone, setPhone] = useState('');
+  const [phoneError, setPhoneError] = useState('');
   const { t } = useTranslation();
+
+  useEffect(() => {
+    getPackages(token)
+      .then((pkgs) => {
+        setPackages(pkgs);
+        const def = pkgs.find((p) => p.is_default);
+        setSelectedPackageId(def ? def.id : (pkgs.length > 0 ? pkgs[0].id : '__custom__'));
+      })
+      .catch(() => setSelectedPackageId('__custom__'));
+  }, [token]);
+
+  const isCustom = selectedPackageId === '__custom__';
+  const selectedPkg = packages.find((p) => p.id === selectedPackageId);
+  const computedExpiry = selectedPkg ? calcExpiryFromDuration(selectedPkg.duration_days) : null;
+  const regFeeTotal = !isCustom && selectedPkg?.has_registration_fee && selectedPkg?.registration_fee > 0
+    ? (selectedPkg.price || 0) + selectedPkg.registration_fee
+    : null;
+  const fmtTotal = regFeeTotal != null ? `Rp ${Number(regFeeTotal).toLocaleString('id-ID')}` : null;
+
+  const PHONE_RE = /^\+62\d{8,13}$/;
+  const toDigits   = (full) => full.startsWith('+62') ? full.slice(3) : full;
+  const fromDigits = (raw)  => { const d = raw.replace(/\D/g, ''); return d ? '+62' + d : ''; };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setPhoneError('');
+    if (phone && !PHONE_RE.test(phone)) {
+      setPhoneError('Phone must start with +62 followed by 8–13 digits');
+      return;
+    }
     setLoading(true);
     try {
-      const member = await addMember(token, name, expiryDate, phone ? '+62' + phone : '');
+      const member = isCustom
+        ? await addMember(token, name, customExpiry, phone || undefined)
+        : await addMemberWithPackage(token, name, null, selectedPackageId, phone || undefined);
       onAdded(member);
     } catch (err) {
       setError(err.message);
       setLoading(false);
     }
   };
+
+  const locale = 'en-US';
 
   return (
     <div style={s.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -590,22 +662,66 @@ function AddMemberModal({ token, onAdded, onClose }) {
           <input style={s.modalInput} type="text"
             value={name} onChange={(e) => setName(e.target.value)}
             placeholder={t('admin.add.namePlaceholder')} required autoFocus />
-          <label style={s.modalLabel}>{t('admin.add.expiryLabel')}</label>
-          <input style={s.modalInput} type="date"
-            value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)}
-            required />
-          <label style={s.modalLabel}>{t('admin.add.phoneLabel')}</label>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14 }}>
-            <span style={{ fontSize: 14, color: '#374151', fontWeight: 600, whiteSpace: 'nowrap' }}>+62</span>
+          <label style={s.modalLabel}>{t('admin.packages.packageLabel')}</label>
+          <select style={s.select} value={selectedPackageId} onChange={(e) => setSelectedPackageId(e.target.value)}>
+            {packages.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name} — {p.duration_days}d — Rp {Number(p.price).toLocaleString('id-ID')}
+                {p.is_default ? ' ★' : ''}
+              </option>
+            ))}
+            <option value="__custom__">{t('admin.packages.customDate')}</option>
+          </select>
+          {!isCustom && computedExpiry && (
+            <div style={s.expiryPreview}>
+              {t('admin.packages.expiresOn', { date: new Date(computedExpiry).toLocaleDateString(locale) })}
+            </div>
+          )}
+          {regFeeTotal != null && (
+            <div style={{ margin: '10px 0 4px', padding: '10px 14px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, color: '#475569' }}>
+                <span>{t('admin.packages.packageLabel')}</span>
+                <span>Rp {Number(selectedPkg.price).toLocaleString('id-ID')}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#475569' }}>
+                <span>{t('admin.packages.registrationFee')}</span>
+                <span>+Rp {Number(selectedPkg.registration_fee).toLocaleString('id-ID')}</span>
+              </div>
+              <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 8, display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: '#1e293b' }}>
+                <span>{t('admin.packages.totalLabel')}</span>
+                <span>{fmtTotal}</span>
+              </div>
+              <div style={{ marginTop: 10, padding: '8px 12px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 6, color: '#1e40af', fontSize: 12 }}>
+                ℹ️ {t('admin.packages.collectReminder', { amount: fmtTotal })}
+              </div>
+            </div>
+          )}
+          {isCustom && (
+            <>
+              <label style={s.modalLabel}>{t('admin.add.expiryLabel')}</label>
+              <input style={s.modalInput} type="date"
+                value={customExpiry} onChange={(e) => setCustomExpiry(e.target.value)}
+                required />
+            </>
+          )}
+          <label style={s.modalLabel}>
+            {t('admin.add.phoneLabel')} <span style={{ color: '#94a3b8', fontWeight: 400 }}>({t('admin.add.phoneOptional')})</span>
+          </label>
+          <div style={{ display: 'flex', alignItems: 'stretch' }}>
+            <span style={{ ...s.modalInput, width: 'auto', borderRight: 'none', borderRadius: '4px 0 0 4px',
+                           background: '#f1f5f9', color: '#64748b', padding: '0 10px',
+                           display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>
+              +62
+            </span>
             <input
-              style={{ ...s.modalInput, marginBottom: 0, flex: 1 }}
+              style={{ ...s.modalInput, borderRadius: '0 4px 4px 0', flex: 1, borderLeft: 'none' }}
               type="tel"
-              inputMode="numeric"
-              value={formatPhoneDigits(phone)}
-              onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 13))}
-              placeholder="8123 4567 890"
+              value={toDigits(phone)}
+              onChange={(e) => setPhone(fromDigits(e.target.value))}
+              placeholder="81234567890"
             />
           </div>
+          {phoneError && <div style={{ ...s.error, marginBottom: 8 }}>{phoneError}</div>}
           <button style={{ ...s.modalBtn, background: '#3b82f6', color: '#fff', opacity: loading ? 0.6 : 1 }}
             type="submit" disabled={loading}>
             {loading ? t('admin.add.adding') : t('admin.add.addMember')}
@@ -1016,15 +1132,21 @@ function AttendanceTab({ token }) {
             <tr><td colSpan={3} style={s.empty}>{t('common.loading')}</td></tr>
           ) : rows.length === 0 ? (
             <tr><td colSpan={3} style={s.empty}>{t('admin.attendance.noRecords')}</td></tr>
-          ) : rows.map((row, i) => (
-            <tr key={i}>
-              <td style={s.td}>{row.member_name}</td>
-              <td style={s.tdMono}>{row.gym_id}</td>
-              <td style={s.td}>
-                {new Date(row.checked_in_at).toLocaleString(lang === 'id' ? 'id-ID' : 'en-US', { hour12: false })}
-              </td>
-            </tr>
-          ))}
+          ) : rows.map((row, i) => {
+            const isNew = row.member_created_at && (new Date() - new Date(row.member_created_at) < 7 * 24 * 60 * 60 * 1000);
+            return (
+              <tr key={i}>
+                <td style={s.td}>
+                  {row.member_name}
+                  {isNew && <span style={{ ...s.badge, ...s.badgeNew }}>New</span>}
+                </td>
+                <td style={s.tdMono}>{row.gym_id}</td>
+                <td style={s.td}>
+                  {new Date(row.checked_in_at).toLocaleString(lang === 'id' ? 'id-ID' : 'en-US', { hour12: false })}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -1035,53 +1157,128 @@ function AttendanceTab({ token }) {
 
 function MembersTab({ token }) {
   const [members, setMembers] = useState([]);
+  const [packages, setPackages] = useState([]);
   const [search, setSearch] = useState('');
+  const [filterStatuses,   setFilterStatuses]   = useState([]);
+  const [filterPackageIds, setFilterPackageIds] = useState([]);
+  const [filterNewOnly,    setFilterNewOnly]    = useState(false);
+  const [showFilters,      setShowFilters]      = useState(false);
+  const [openDropdown,     setOpenDropdown]     = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState('');
   const [editExpiry, setEditExpiry] = useState('');
+  const [editPackageId, setEditPackageId] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [revealedPhoneId, setRevealedPhoneId] = useState(null);
   const [pendingRevealId, setPendingRevealId] = useState(null);
+  const [sortBy, setSortBy]           = useState('scan_token');
+  const [sortOrder, setSortOrder]     = useState('asc');
+  const [offset, setOffset]           = useState(0);
+  const [hasMore, setHasMore]         = useState(false);
+  const [total, setTotal]             = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [deletingMember, setDeletingMember] = useState(null);
   const [qrMember, setQrMember] = useState(null);
   const { lang, t } = useTranslation();
 
+  const PAGE_SIZE = 20;
+
+  const filterStatusesKey   = filterStatuses.join(',');
+  const filterPackageIdsKey = filterPackageIds.join(',');
+  const toggleStatus  = (val) => setFilterStatuses(prev => prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val]);
+  const togglePackage = (val) => setFilterPackageIds(prev => prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val]);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const data = await getMembers(token, { search: search || undefined });
-      setMembers(data);
+      const data = await getMembers(token, {
+        search: search || undefined,
+        limit: PAGE_SIZE, offset: 0,
+        sort: sortBy, order: sortOrder,
+        statuses:   filterStatuses,
+        packageIds: filterPackageIds,
+        newOnly:    filterNewOnly ? 'true' : undefined,
+      });
+      setMembers(data.members);
+      setTotal(data.total);
+      setOffset(data.members.length);
+      setHasMore(data.members.length < data.total);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [token, search]);
+  }, [token, search, sortBy, sortOrder, filterStatusesKey, filterPackageIdsKey, filterNewOnly]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    getPackages(token).then(setPackages).catch(() => {});
+  }, [token]);
+
+  const loadMore = async () => {
+    setLoadingMore(true);
+    try {
+      const data = await getMembers(token, {
+        search: search || undefined,
+        limit: PAGE_SIZE, offset,
+        sort: sortBy, order: sortOrder,
+        statuses:   filterStatuses,
+        packageIds: filterPackageIds,
+        newOnly:    filterNewOnly ? 'true' : undefined,
+      });
+      setMembers(prev => [...prev, ...data.members]);
+      const newOffset = offset + data.members.length;
+      setOffset(newOffset);
+      setTotal(data.total);
+      setHasMore(newOffset < data.total);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  const handleSort = (col) => {
+    if (col === sortBy) {
+      setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(col);
+      setSortOrder('asc');
+    }
+  };
 
   const startEdit = (member) => {
     setEditingId(member.id);
     setEditName(member.name);
     setEditExpiry(member.expiry_date ? member.expiry_date.slice(0, 10) : '');
-    setEditPhone(member.phone_number ? member.phone_number.replace('+62', '') : '');
+    setEditPackageId(member.package_id || '__custom__');
+    setEditPhone(member.phone_number || '');
   };
 
-  const cancelEdit = () => {
-    setEditingId(null);
-    setEditName('');
-    setEditExpiry('');
-    setEditPhone('');
-  };
+  const cancelEdit = () => { setEditingId(null); setEditName(''); setEditExpiry(''); setEditPackageId(''); setEditPhone(''); };
+
+  const MEMBER_PHONE_RE = /^\+62\d{8,13}$/;
+  const toDigits   = (full) => full.startsWith('+62') ? full.slice(3) : full;
+  const fromDigits = (raw)  => { const d = raw.replace(/\D/g, ''); return d ? '+62' + d : ''; };
 
   const saveEdit = async (id) => {
+    if (editPhone && !MEMBER_PHONE_RE.test(editPhone)) {
+      setError('Phone must start with +62 followed by 8–13 digits');
+      return;
+    }
     try {
-      const updated = await updateMember(token, id, editName, editExpiry, editPhone ? '+62' + editPhone : '');
+      const isCustom = editPackageId === '__custom__';
+      const updated = await updateMember(
+        token, id, editName,
+        isCustom ? editExpiry : null,
+        isCustom ? null : editPackageId,
+        editPhone || undefined,
+      );
       setMembers((prev) => prev.map((m) => m.id === id ? updated : m));
       setEditingId(null);
     } catch (err) {
@@ -1094,17 +1291,9 @@ function MembersTab({ token }) {
     setDeletingMember(null);
   };
 
-  const handleAdded = (member) => {
-    setMembers((prev) => [...prev, member].sort((a, b) => a.scan_token.localeCompare(b.scan_token)));
-    setShowAddModal(false);
-  };
+  const handleAdded = () => { setShowAddModal(false); load(); };
 
-  const handleImported = (newMembers) => {
-    setMembers((prev) =>
-      [...prev, ...newMembers].sort((a, b) => a.scan_token.localeCompare(b.scan_token))
-    );
-    setShowImportModal(false);
-  };
+  const handleImported = () => { setShowImportModal(false); load(); };
 
   const handleExport = async () => {
     try {
@@ -1123,6 +1312,17 @@ function MembersTab({ token }) {
   };
 
   const locale = lang === 'id' ? 'id-ID' : 'en-US';
+  const activeFilterCount = (filterStatuses.length > 0 ? 1 : 0) + (filterPackageIds.length > 0 ? 1 : 0) + (filterNewOnly ? 1 : 0);
+  const statusLabel = filterStatuses.length === 0
+    ? t('admin.members.filterStatusAll')
+    : filterStatuses.length === 1
+      ? (filterStatuses[0] === 'active' ? t('admin.members.filterStatusActive') : t('admin.members.filterStatusExpired'))
+      : t('admin.members.filterCountSelected', { n: 2 });
+  const packageLabel = filterPackageIds.length === 0
+    ? t('admin.members.filterPackageAll')
+    : filterPackageIds.length === 1
+      ? (filterPackageIds[0] === 'none' ? t('admin.members.filterPackageNone') : (packages.find((p) => p.id === filterPackageIds[0])?.name ?? '?'))
+      : t('admin.members.filterCountSelected', { n: filterPackageIds.length });
 
   return (
     <div>
@@ -1134,36 +1334,137 @@ function MembersTab({ token }) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
+        <button
+          style={{ ...s.outlineBtn, ...(showFilters || activeFilterCount > 0 ? { background: '#eff6ff', borderColor: '#93c5fd', color: '#1d4ed8' } : {}) }}
+          onClick={() => setShowFilters(v => !v)}
+        >
+          {t('admin.members.filters')}
+          {activeFilterCount > 0 && <span style={{ ...s.badge, ...s.badgeNew, marginLeft: 6 }}>{activeFilterCount}</span>}
+        </button>
         <button style={s.outlineBtn} onClick={handleTemplate}>{t('admin.members.template')}</button>
         <button style={s.outlineBtn} onClick={handleExport}>{t('admin.members.export')}</button>
         <button style={s.outlineBtn} onClick={() => setShowImportModal(true)}>{t('admin.members.import')}</button>
         <button style={s.addBtn} onClick={() => setShowAddModal(true)}>{t('admin.members.addMember')}</button>
       </div>
 
+      {showFilters && (
+        <>
+          {openDropdown && <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setOpenDropdown(null)} />}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '10px 0 14px', borderBottom: '1px solid #f1f5f9' }}>
+
+            {/* Status dropdown */}
+            <div style={{ position: 'relative' }}>
+              <button
+                style={{ ...s.filterBtn, ...(filterStatuses.length > 0 ? { borderColor: '#93c5fd', background: '#eff6ff', color: '#1d4ed8' } : {}) }}
+                onClick={() => setOpenDropdown((d) => d === 'status' ? null : 'status')}
+              >
+                {t('admin.members.filterStatus')}: {statusLabel} ▾
+              </button>
+              {openDropdown === 'status' && (
+                <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 100, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.1)', padding: '4px 0', minWidth: 160 }}>
+                  {[
+                    { value: 'active',  label: t('admin.members.filterStatusActive') },
+                    { value: 'expired', label: t('admin.members.filterStatusExpired') },
+                  ].map(({ value, label }) => (
+                    <label key={value} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px', cursor: 'pointer', fontSize: 13, color: '#1e293b', whiteSpace: 'nowrap', userSelect: 'none' }}>
+                      <input type="checkbox" checked={filterStatuses.includes(value)} onChange={() => toggleStatus(value)} />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Package dropdown */}
+            <div style={{ position: 'relative' }}>
+              <button
+                style={{ ...s.filterBtn, ...(filterPackageIds.length > 0 ? { borderColor: '#93c5fd', background: '#eff6ff', color: '#1d4ed8' } : {}) }}
+                onClick={() => setOpenDropdown((d) => d === 'package' ? null : 'package')}
+              >
+                {t('admin.members.filterPackage')}: {packageLabel} ▾
+              </button>
+              {openDropdown === 'package' && (
+                <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 100, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.1)', padding: '4px 0', minWidth: 160 }}>
+                  {[{ value: 'none', label: t('admin.members.filterPackageNone') }, ...packages.map((p) => ({ value: p.id, label: p.name }))].map(({ value, label }) => (
+                    <label key={value} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px', cursor: 'pointer', fontSize: 13, color: '#1e293b', whiteSpace: 'nowrap', userSelect: 'none' }}>
+                      <input type="checkbox" checked={filterPackageIds.includes(value)} onChange={() => togglePackage(value)} />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* New only checkbox */}
+            <label style={{ fontSize: 13, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+              <input type="checkbox" checked={filterNewOnly} onChange={(e) => setFilterNewOnly(e.target.checked)} />
+              {t('admin.members.filterNewOnly')}
+            </label>
+
+            {activeFilterCount > 0 && (
+              <button
+                style={{ ...s.actionBtn, ...s.cancelBtn }}
+                onClick={() => { setFilterStatuses([]); setFilterPackageIds([]); setFilterNewOnly(false); }}
+              >
+                {t('admin.members.clearFilters')}
+              </button>
+            )}
+          </div>
+        </>
+      )}
+
       {error && <div style={s.error}>{error}</div>}
 
       <table style={s.table}>
         <thead>
           <tr>
-            <th style={s.th}>{t('admin.members.colName')}</th>
-            <th style={s.th}>{t('admin.members.colGymId')}</th>
+            {[
+              { col: 'name',         label: t('admin.members.colName') },
+              { col: 'scan_token',   label: t('admin.members.colGymId') },
+              { col: 'package_name', label: t('admin.members.colPackage') },
+            ].map(({ col, label }) => {
+              const active = sortBy === col;
+              const arrow = active ? (sortOrder === 'asc' ? ' ▲' : ' ▼') : ' ↕';
+              return (
+                <th key={col} style={{ ...s.th, cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort(col)}>
+                  {label}{arrow}
+                </th>
+              );
+            })}
             <th style={s.th}>{t('admin.members.colPhone')}</th>
-            <th style={s.th}>{t('admin.members.colExpiry')}</th>
-            <th style={s.th}>{t('admin.members.colJoined')}</th>
+            {[
+              { col: 'expiry_date', label: t('admin.members.colExpiry') },
+              { col: 'created_at',  label: t('admin.members.colJoined') },
+            ].map(({ col, label }) => {
+              const active = sortBy === col;
+              const arrow = active ? (sortOrder === 'asc' ? ' ▲' : ' ▼') : ' ↕';
+              return (
+                <th key={col} style={{ ...s.th, cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort(col)}>
+                  {label}{arrow}
+                </th>
+              );
+            })}
             <th style={s.th}>{t('admin.members.colActions')}</th>
           </tr>
         </thead>
         <tbody>
           {loading ? (
-            <tr><td colSpan={6} style={s.empty}>{t('common.loading')}</td></tr>
+            <tr><td colSpan={7} style={s.empty}>{t('common.loading')}</td></tr>
           ) : members.length === 0 ? (
-            <tr><td colSpan={6} style={s.empty}>{t('admin.members.noMembers')}</td></tr>
+            <tr><td colSpan={7} style={s.empty}>{t('admin.members.noMembers')}</td></tr>
           ) : members.map((member) => {
             const isExpired = member.expiry_date && new Date(member.expiry_date) < new Date();
+            const isNew = new Date() - new Date(member.created_at) < 7 * 24 * 60 * 60 * 1000;
+            const isEditingThis = editingId === member.id;
+            const editPkgIsCustom = editPackageId === '__custom__';
+            const editSelectedPkg = packages.find((p) => p.id === editPackageId);
+            const editComputedExpiry = editSelectedPkg
+              ? calcExpiryFromDuration(editSelectedPkg.duration_days)
+              : null;
             return (
               <tr key={member.id}>
                 <td style={s.td}>
-                  {editingId === member.id ? (
+                  {isEditingThis ? (
                     <input
                       style={s.inlineInput}
                       value={editName}
@@ -1171,20 +1472,39 @@ function MembersTab({ token }) {
                       onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(member.id); if (e.key === 'Escape') cancelEdit(); }}
                       autoFocus
                     />
-                  ) : member.name}
+                  ) : (
+                    <>
+                      {member.name}
+                      {isNew && <span style={{ ...s.badge, ...s.badgeNew }}>New</span>}
+                    </>
+                  )}
                 </td>
                 <td style={s.tdMono}>{member.scan_token}</td>
                 <td style={s.td}>
-                  {editingId === member.id ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>+62</span>
+                  {isEditingThis ? (
+                    <select style={s.inlineSelect} value={editPackageId} onChange={(e) => setEditPackageId(e.target.value)}>
+                      {packages.map((p) => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                      <option value="__custom__">{t('admin.packages.customDate')}</option>
+                    </select>
+                  ) : member.package_name || '—'}
+                </td>
+                <td style={s.td}>
+                  {isEditingThis ? (
+                    <div style={{ display: 'flex', alignItems: 'stretch' }}>
+                      <span style={{ ...s.inlineInput, width: 'auto', borderRight: 'none',
+                                     borderRadius: '4px 0 0 4px', background: '#f1f5f9',
+                                     color: '#64748b', padding: '0 6px', display: 'flex',
+                                     alignItems: 'center', whiteSpace: 'nowrap', fontSize: 13 }}>
+                        +62
+                      </span>
                       <input
-                        style={{ ...s.inlineInput, maxWidth: 140 }}
+                        style={{ ...s.inlineInput, borderRadius: '0 4px 4px 0', maxWidth: 140, borderLeft: 'none' }}
                         type="tel"
-                        inputMode="numeric"
-                        value={formatPhoneDigits(editPhone)}
-                        onChange={(e) => setEditPhone(e.target.value.replace(/\D/g, '').slice(0, 13))}
-                        placeholder="8123 4567 890"
+                        value={toDigits(editPhone)}
+                        onChange={(e) => setEditPhone(fromDigits(e.target.value))}
+                        placeholder="81234567890"
                       />
                     </div>
                   ) : member.phone_number ? (
@@ -1207,13 +1527,19 @@ function MembersTab({ token }) {
                   ) : '—'}
                 </td>
                 <td style={{ ...s.td, color: isExpired ? '#dc2626' : '#1e293b', fontWeight: isExpired ? 600 : 400 }}>
-                  {editingId === member.id ? (
-                    <input
-                      style={{ ...s.inlineInput, maxWidth: 160 }}
-                      type="date"
-                      value={editExpiry}
-                      onChange={(e) => setEditExpiry(e.target.value)}
-                    />
+                  {isEditingThis ? (
+                    editPkgIsCustom ? (
+                      <input
+                        style={{ ...s.inlineInput, maxWidth: 160 }}
+                        type="date"
+                        value={editExpiry}
+                        onChange={(e) => setEditExpiry(e.target.value)}
+                      />
+                    ) : (
+                      <span style={{ fontSize: 12, color: '#64748b' }}>
+                        {editComputedExpiry ? new Date(editComputedExpiry).toLocaleDateString(locale) : '—'}
+                      </span>
+                    )
                   ) : member.expiry_date ? (
                     <>
                       {new Date(member.expiry_date).toLocaleDateString(locale)}
@@ -1223,7 +1549,7 @@ function MembersTab({ token }) {
                 </td>
                 <td style={s.td}>{new Date(member.created_at).toLocaleDateString(locale)}</td>
                 <td style={s.td}>
-                  {editingId === member.id ? (
+                  {isEditingThis ? (
                     <>
                       <button style={{ ...s.actionBtn, ...s.saveBtn }} onClick={() => saveEdit(member.id)}>{t('admin.members.save')}</button>
                       <button style={{ ...s.actionBtn, ...s.cancelBtn }} onClick={cancelEdit}>{t('common.cancel')}</button>
@@ -1239,6 +1565,19 @@ function MembersTab({ token }) {
               </tr>
             );
           })}
+          {hasMore && (
+            <tr>
+              <td colSpan={7} style={{ textAlign: 'center', padding: '10px 0' }}>
+                <button
+                  style={{ ...s.actionBtn, padding: '6px 20px', background: '#e2e8f0', color: '#475569' }}
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                >
+                  {loadingMore ? t('common.loading') : `Load More (${total - offset} remaining)`}
+                </button>
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
 
@@ -1265,9 +1604,218 @@ function MembersTab({ token }) {
   );
 }
 
+// ─── Packages Tab ─────────────────────────────────────────────────────────────
+
+function PackagesTab({ token }) {
+  const [packages, setPackages] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [editingId, setEditingId] = useState(null);
+  const [editName, setEditName] = useState('');
+  const [editDuration, setEditDuration] = useState('');
+  const [editPrice, setEditPrice] = useState('');
+  const [editHasRegFee, setEditHasRegFee] = useState(false);
+  const [editRegFee, setEditRegFee] = useState('');
+  const [newName, setNewName] = useState('');
+  const [newDuration, setNewDuration] = useState('');
+  const [newPrice, setNewPrice] = useState('');
+  const [newHasRegFee, setNewHasRegFee] = useState(false);
+  const [newRegFee, setNewRegFee] = useState('');
+  const [addLoading, setAddLoading] = useState(false);
+  const { t } = useTranslation();
+
+  useEffect(() => {
+    setLoading(true);
+    getPackages(token)
+      .then(setPackages)
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, [token]);
+
+  const handleAdd = async (e) => {
+    e.preventDefault();
+    setError('');
+    setAddLoading(true);
+    try {
+      const pkg = await createPackage(token, {
+        name: newName,
+        durationDays: Number(newDuration),
+        price: Number(newPrice),
+        isDefault: packages.length === 0,
+        hasRegistrationFee: newHasRegFee,
+        registrationFee: newHasRegFee ? Number(newRegFee) : 0,
+      });
+      setPackages((prev) => [...prev, pkg].sort((a, b) => a.price - b.price));
+      setNewName(''); setNewDuration(''); setNewPrice(''); setNewHasRegFee(false); setNewRegFee('');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setAddLoading(false);
+    }
+  };
+
+  const startEdit = (pkg) => {
+    setEditingId(pkg.id);
+    setEditName(pkg.name);
+    setEditDuration(String(pkg.duration_days));
+    setEditPrice(String(pkg.price));
+    setEditHasRegFee(!!pkg.has_registration_fee);
+    setEditRegFee(String(pkg.registration_fee ?? 0));
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null); setEditName(''); setEditDuration(''); setEditPrice('');
+    setEditHasRegFee(false); setEditRegFee('');
+  };
+
+  const saveEdit = async (id) => {
+    setError('');
+    try {
+      const updated = await updatePackage(token, id, {
+        name: editName,
+        durationDays: Number(editDuration),
+        price: Number(editPrice),
+        hasRegistrationFee: editHasRegFee,
+        registrationFee: editHasRegFee ? Number(editRegFee) : 0,
+      });
+      setPackages((prev) => prev.map((p) => p.id === id ? updated : p).sort((a, b) => a.price - b.price));
+      setEditingId(null);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    setError('');
+    try {
+      await deletePackage(token, id);
+      setPackages((prev) => prev.filter((p) => p.id !== id));
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleSetDefault = async (id) => {
+    setError('');
+    try {
+      const updated = await setDefaultPackage(token, id);
+      setPackages((prev) => prev.map((p) => ({ ...p, is_default: p.id === updated.id })));
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  return (
+    <div>
+      {error && <div style={s.error}>{error}</div>}
+      <table style={s.table}>
+        <thead>
+          <tr>
+            <th style={s.th}>{t('admin.packages.colName')}</th>
+            <th style={s.th}>{t('admin.packages.colDuration')}</th>
+            <th style={s.th}>{t('admin.packages.colPrice')}</th>
+            <th style={s.th}>{t('admin.packages.colRegFee')}</th>
+            <th style={s.th}>{t('admin.packages.colDefault')}</th>
+            <th style={s.th}>{t('admin.packages.colActions')}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {loading ? (
+            <tr><td colSpan={6} style={s.empty}>{t('common.loading')}</td></tr>
+          ) : packages.length === 0 ? (
+            <tr><td colSpan={6} style={s.empty}>{t('admin.packages.noPackages')}</td></tr>
+          ) : packages.map((pkg) => (
+            <tr key={pkg.id}>
+              <td style={s.td}>
+                {editingId === pkg.id ? (
+                  <input style={s.inlineInput} value={editName} onChange={(e) => setEditName(e.target.value)} autoFocus />
+                ) : pkg.name}
+              </td>
+              <td style={s.td}>
+                {editingId === pkg.id ? (
+                  <input style={{ ...s.inlineInput, maxWidth: 80 }} type="number" min={1} value={editDuration} onChange={(e) => setEditDuration(e.target.value)} />
+                ) : `${pkg.duration_days}d`}
+              </td>
+              <td style={s.td}>
+                {editingId === pkg.id ? (
+                  <input style={{ ...s.inlineInput, maxWidth: 120 }} type="number" min={0} value={editPrice} onChange={(e) => setEditPrice(e.target.value)} />
+                ) : `Rp ${Number(pkg.price).toLocaleString('id-ID')}`}
+              </td>
+              <td style={s.td}>
+                {editingId === pkg.id ? (
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <input type="checkbox" checked={editHasRegFee} onChange={(e) => setEditHasRegFee(e.target.checked)} />
+                    {editHasRegFee && (
+                      <input style={{ ...s.inlineInput, maxWidth: 110 }} type="number" min={0}
+                        value={editRegFee} onChange={(e) => setEditRegFee(e.target.value)} placeholder="0" />
+                    )}
+                  </label>
+                ) : pkg.has_registration_fee ? (
+                  <span>
+                    <span style={{ ...s.badge, background: '#dcfce7', color: '#166534', marginRight: 4 }}>✓</span>
+                    {`Rp ${Number(pkg.registration_fee).toLocaleString('id-ID')}`}
+                  </span>
+                ) : '—'}
+              </td>
+              <td style={s.td}>
+                {pkg.is_default
+                  ? <span style={s.defaultBadge}>{t('admin.packages.isDefault')}</span>
+                  : <button style={{ ...s.actionBtn, ...s.starBtn }} onClick={() => handleSetDefault(pkg.id)}>{t('admin.packages.setDefault')}</button>}
+              </td>
+              <td style={s.td}>
+                {editingId === pkg.id ? (
+                  <>
+                    <button style={{ ...s.actionBtn, ...s.saveBtn }} onClick={() => saveEdit(pkg.id)}>{t('admin.packages.save')}</button>
+                    <button style={{ ...s.actionBtn, ...s.cancelBtn }} onClick={cancelEdit}>{t('admin.packages.cancel')}</button>
+                  </>
+                ) : (
+                  <>
+                    <button style={{ ...s.actionBtn, ...s.editBtn }} onClick={() => startEdit(pkg)}>{t('admin.members.edit')}</button>
+                    <button style={{ ...s.actionBtn, ...s.deleteBtn }} onClick={() => handleDelete(pkg.id)}>{t('admin.members.remove')}</button>
+                  </>
+                )}
+              </td>
+            </tr>
+          ))}
+          <tr>
+            <td style={s.td}>
+              <input style={s.inlineInput} value={newName} onChange={(e) => setNewName(e.target.value)} placeholder={t('admin.packages.namePlaceholder')} />
+            </td>
+            <td style={s.td}>
+              <input style={{ ...s.inlineInput, maxWidth: 80 }} type="number" min={1} value={newDuration} onChange={(e) => setNewDuration(e.target.value)} placeholder={t('admin.packages.durationPlaceholder')} />
+            </td>
+            <td style={s.td}>
+              <input style={{ ...s.inlineInput, maxWidth: 120 }} type="number" min={0} value={newPrice} onChange={(e) => setNewPrice(e.target.value)} placeholder={t('admin.packages.pricePlaceholder')} />
+            </td>
+            <td style={s.td}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <input type="checkbox" checked={newHasRegFee} onChange={(e) => setNewHasRegFee(e.target.checked)} />
+                {newHasRegFee && (
+                  <input style={{ ...s.inlineInput, maxWidth: 110 }} type="number" min={0}
+                    value={newRegFee} onChange={(e) => setNewRegFee(e.target.value)} placeholder="0" />
+                )}
+              </label>
+            </td>
+            <td style={s.td} />
+            <td style={s.td}>
+              <button
+                style={{ ...s.actionBtn, ...s.saveBtn, opacity: addLoading ? 0.6 : 1 }}
+                onClick={handleAdd}
+                disabled={addLoading || !newName.trim() || !newDuration || !newPrice}
+              >
+                {t('admin.packages.addPackage')}
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 // ─── Admin Page ───────────────────────────────────────────────────────────────
 
-export default function AdminPage({ token, gymName, onBack }) {
+export default function AdminPage({ token, role, gymName, onBack }) {
   const [tab, setTab] = useState('attendance');
   const [showChangePin, setShowChangePin] = useState(false);
   const { t } = useTranslation();
@@ -1308,11 +1856,20 @@ export default function AdminPage({ token, gymName, onBack }) {
           >
             {t('admin.tabs.staff')}
           </button>
+          {role === 'admin' && (
+            <button
+              style={{ ...s.tab, ...(tab === 'packages' ? s.tabActive : {}) }}
+              onClick={() => setTab('packages')}
+            >
+              {t('admin.packages.tab')}
+            </button>
+          )}
         </div>
 
         {tab === 'attendance' && <AttendanceTab token={token} />}
         {tab === 'members' && <MembersTab token={token} />}
         {tab === 'staff' && <StaffTab token={token} />}
+        {tab === 'packages' && role === 'admin' && <PackagesTab token={token} />}
       </div>
 
       {showChangePin && (
