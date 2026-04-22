@@ -75,7 +75,8 @@
       "edit": "Edit",
       "remove": "Remove",
       "qrCode": "QR Code",
-      "colPackage": "Package"
+      "colPackage": "Package",
+      "colPhone": "Phone"
     },
     "qr": {
       "howToShare": "📋 How to share this QR code",
@@ -159,7 +160,8 @@
       "nameLabel": "Name",
       "namePlaceholder": "Full name",
       "expiryLabel": "Expiry Date",
-      "phoneLabel": "Phone Number",
+      "phoneLabel": "Phone Number (WhatsApp)",
+      "phoneOptional": "optional",
       "adding": "Adding...",
       "addMember": "Add Member"
     },

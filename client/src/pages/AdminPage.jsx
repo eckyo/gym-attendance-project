@@ -580,6 +580,8 @@ function AddMemberModal({ token, onAdded, onClose }) {
   const [customExpiry, setCustomExpiry] = useState(defaultExpiryDate);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [phone, setPhone] = useState('');
+  const [phoneError, setPhoneError] = useState('');
   const { t } = useTranslation();
 
   useEffect(() => {
@@ -596,14 +598,23 @@ function AddMemberModal({ token, onAdded, onClose }) {
   const selectedPkg = packages.find((p) => p.id === selectedPackageId);
   const computedExpiry = selectedPkg ? calcExpiryFromDuration(selectedPkg.duration_days) : null;
 
+  const PHONE_RE = /^\+62\d{8,13}$/;
+  const toDigits   = (full) => full.startsWith('+62') ? full.slice(3) : full;
+  const fromDigits = (raw)  => { const d = raw.replace(/\D/g, ''); return d ? '+62' + d : ''; };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setPhoneError('');
+    if (phone && !PHONE_RE.test(phone)) {
+      setPhoneError('Phone must start with +62 followed by 8–13 digits');
+      return;
+    }
     setLoading(true);
     try {
       const member = isCustom
-        ? await addMember(token, name, customExpiry)
-        : await addMemberWithPackage(token, name, null, selectedPackageId);
+        ? await addMember(token, name, customExpiry, phone || undefined)
+        : await addMemberWithPackage(token, name, null, selectedPackageId, phone || undefined);
       onAdded(member);
     } catch (err) {
       setError(err.message);
@@ -646,6 +657,24 @@ function AddMemberModal({ token, onAdded, onClose }) {
                 required />
             </>
           )}
+          <label style={s.modalLabel}>
+            {t('admin.add.phoneLabel')} <span style={{ color: '#94a3b8', fontWeight: 400 }}>({t('admin.add.phoneOptional')})</span>
+          </label>
+          <div style={{ display: 'flex', alignItems: 'stretch' }}>
+            <span style={{ ...s.modalInput, width: 'auto', borderRight: 'none', borderRadius: '4px 0 0 4px',
+                           background: '#f1f5f9', color: '#64748b', padding: '0 10px',
+                           display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>
+              +62
+            </span>
+            <input
+              style={{ ...s.modalInput, borderRadius: '0 4px 4px 0', flex: 1, borderLeft: 'none' }}
+              type="tel"
+              value={toDigits(phone)}
+              onChange={(e) => setPhone(fromDigits(e.target.value))}
+              placeholder="81234567890"
+            />
+          </div>
+          {phoneError && <div style={{ ...s.error, marginBottom: 8 }}>{phoneError}</div>}
           <button style={{ ...s.modalBtn, background: '#3b82f6', color: '#fff', opacity: loading ? 0.6 : 1 }}
             type="submit" disabled={loading}>
             {loading ? t('admin.add.adding') : t('admin.add.addMember')}
@@ -1025,46 +1054,101 @@ function MembersTab({ token }) {
   const [editName, setEditName] = useState('');
   const [editExpiry, setEditExpiry] = useState('');
   const [editPackageId, setEditPackageId] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [sortBy, setSortBy]           = useState('scan_token');
+  const [sortOrder, setSortOrder]     = useState('asc');
+  const [offset, setOffset]           = useState(0);
+  const [hasMore, setHasMore]         = useState(false);
+  const [total, setTotal]             = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [deletingMember, setDeletingMember] = useState(null);
   const [qrMember, setQrMember] = useState(null);
   const { lang, t } = useTranslation();
 
+  const PAGE_SIZE = 20;
+
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const data = await getMembers(token, { search: search || undefined });
-      setMembers(data);
+      const data = await getMembers(token, {
+        search: search || undefined,
+        limit: PAGE_SIZE, offset: 0,
+        sort: sortBy, order: sortOrder,
+      });
+      setMembers(data.members);
+      setTotal(data.total);
+      setOffset(data.members.length);
+      setHasMore(data.members.length < data.total);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [token, search]);
+  }, [token, search, sortBy, sortOrder]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
     getPackages(token).then(setPackages).catch(() => {});
   }, [token]);
 
+  const loadMore = async () => {
+    setLoadingMore(true);
+    try {
+      const data = await getMembers(token, {
+        search: search || undefined,
+        limit: PAGE_SIZE, offset,
+        sort: sortBy, order: sortOrder,
+      });
+      setMembers(prev => [...prev, ...data.members]);
+      const newOffset = offset + data.members.length;
+      setOffset(newOffset);
+      setTotal(data.total);
+      setHasMore(newOffset < data.total);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  const handleSort = (col) => {
+    if (col === sortBy) {
+      setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(col);
+      setSortOrder('asc');
+    }
+  };
+
   const startEdit = (member) => {
     setEditingId(member.id);
     setEditName(member.name);
     setEditExpiry(member.expiry_date ? member.expiry_date.slice(0, 10) : '');
     setEditPackageId(member.package_id || '__custom__');
+    setEditPhone(member.phone_number || '');
   };
 
-  const cancelEdit = () => { setEditingId(null); setEditName(''); setEditExpiry(''); setEditPackageId(''); };
+  const cancelEdit = () => { setEditingId(null); setEditName(''); setEditExpiry(''); setEditPackageId(''); setEditPhone(''); };
+
+  const MEMBER_PHONE_RE = /^\+62\d{8,13}$/;
+  const toDigits   = (full) => full.startsWith('+62') ? full.slice(3) : full;
+  const fromDigits = (raw)  => { const d = raw.replace(/\D/g, ''); return d ? '+62' + d : ''; };
 
   const saveEdit = async (id) => {
+    if (editPhone && !MEMBER_PHONE_RE.test(editPhone)) {
+      setError('Phone must start with +62 followed by 8–13 digits');
+      return;
+    }
     try {
       const isCustom = editPackageId === '__custom__';
       const updated = await updateMember(
         token, id, editName,
         isCustom ? editExpiry : null,
         isCustom ? null : editPackageId,
+        editPhone || undefined,
       );
       setMembers((prev) => prev.map((m) => m.id === id ? updated : m));
       setEditingId(null);
@@ -1078,17 +1162,9 @@ function MembersTab({ token }) {
     setDeletingMember(null);
   };
 
-  const handleAdded = (member) => {
-    setMembers((prev) => [...prev, member].sort((a, b) => a.scan_token.localeCompare(b.scan_token)));
-    setShowAddModal(false);
-  };
+  const handleAdded = () => { setShowAddModal(false); load(); };
 
-  const handleImported = (newMembers) => {
-    setMembers((prev) =>
-      [...prev, ...newMembers].sort((a, b) => a.scan_token.localeCompare(b.scan_token))
-    );
-    setShowImportModal(false);
-  };
+  const handleImported = () => { setShowImportModal(false); load(); };
 
   const handleExport = async () => {
     try {
@@ -1129,19 +1205,40 @@ function MembersTab({ token }) {
       <table style={s.table}>
         <thead>
           <tr>
-            <th style={s.th}>{t('admin.members.colName')}</th>
-            <th style={s.th}>{t('admin.members.colGymId')}</th>
-            <th style={s.th}>{t('admin.members.colPackage')}</th>
-            <th style={s.th}>{t('admin.members.colExpiry')}</th>
-            <th style={s.th}>{t('admin.members.colJoined')}</th>
+            {[
+              { col: 'name',         label: t('admin.members.colName') },
+              { col: 'scan_token',   label: t('admin.members.colGymId') },
+              { col: 'package_name', label: t('admin.members.colPackage') },
+            ].map(({ col, label }) => {
+              const active = sortBy === col;
+              const arrow = active ? (sortOrder === 'asc' ? ' ▲' : ' ▼') : ' ↕';
+              return (
+                <th key={col} style={{ ...s.th, cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort(col)}>
+                  {label}{arrow}
+                </th>
+              );
+            })}
+            <th style={s.th}>{t('admin.members.colPhone')}</th>
+            {[
+              { col: 'expiry_date', label: t('admin.members.colExpiry') },
+              { col: 'created_at',  label: t('admin.members.colJoined') },
+            ].map(({ col, label }) => {
+              const active = sortBy === col;
+              const arrow = active ? (sortOrder === 'asc' ? ' ▲' : ' ▼') : ' ↕';
+              return (
+                <th key={col} style={{ ...s.th, cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort(col)}>
+                  {label}{arrow}
+                </th>
+              );
+            })}
             <th style={s.th}>{t('admin.members.colActions')}</th>
           </tr>
         </thead>
         <tbody>
           {loading ? (
-            <tr><td colSpan={6} style={s.empty}>{t('common.loading')}</td></tr>
+            <tr><td colSpan={7} style={s.empty}>{t('common.loading')}</td></tr>
           ) : members.length === 0 ? (
-            <tr><td colSpan={6} style={s.empty}>{t('admin.members.noMembers')}</td></tr>
+            <tr><td colSpan={7} style={s.empty}>{t('admin.members.noMembers')}</td></tr>
           ) : members.map((member) => {
             const isExpired = member.expiry_date && new Date(member.expiry_date) < new Date();
             const isEditingThis = editingId === member.id;
@@ -1173,6 +1270,25 @@ function MembersTab({ token }) {
                       <option value="__custom__">{t('admin.packages.customDate')}</option>
                     </select>
                   ) : member.package_name || '—'}
+                </td>
+                <td style={s.td}>
+                  {isEditingThis ? (
+                    <div style={{ display: 'flex', alignItems: 'stretch' }}>
+                      <span style={{ ...s.inlineInput, width: 'auto', borderRight: 'none',
+                                     borderRadius: '4px 0 0 4px', background: '#f1f5f9',
+                                     color: '#64748b', padding: '0 6px', display: 'flex',
+                                     alignItems: 'center', whiteSpace: 'nowrap', fontSize: 13 }}>
+                        +62
+                      </span>
+                      <input
+                        style={{ ...s.inlineInput, borderRadius: '0 4px 4px 0', maxWidth: 140, borderLeft: 'none' }}
+                        type="tel"
+                        value={toDigits(editPhone)}
+                        onChange={(e) => setEditPhone(fromDigits(e.target.value))}
+                        placeholder="81234567890"
+                      />
+                    </div>
+                  ) : member.phone_number || '—'}
                 </td>
                 <td style={{ ...s.td, color: isExpired ? '#dc2626' : '#1e293b', fontWeight: isExpired ? 600 : 400 }}>
                   {isEditingThis ? (
@@ -1213,6 +1329,19 @@ function MembersTab({ token }) {
               </tr>
             );
           })}
+          {hasMore && (
+            <tr>
+              <td colSpan={7} style={{ textAlign: 'center', padding: '10px 0' }}>
+                <button
+                  style={{ ...s.actionBtn, padding: '6px 20px', background: '#e2e8f0', color: '#475569' }}
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                >
+                  {loadingMore ? t('common.loading') : `Load More (${total - offset} remaining)`}
+                </button>
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
 

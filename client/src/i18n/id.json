@@ -75,7 +75,8 @@
       "edit": "Edit",
       "remove": "Hapus",
       "qrCode": "Kode QR",
-      "colPackage": "Paket"
+      "colPackage": "Paket",
+      "colPhone": "Telepon"
     },
     "qr": {
       "howToShare": "📋 Cara berbagi kode QR ini",
@@ -159,7 +160,8 @@
       "nameLabel": "Nama",
       "namePlaceholder": "Nama lengkap",
       "expiryLabel": "Tanggal Kedaluwarsa",
-      "phoneLabel": "Nomor Telepon",
+      "phoneLabel": "Nomor Telepon (WhatsApp)",
+      "phoneOptional": "opsional",
       "adding": "Menambahkan...",
       "addMember": "Tambah Anggota"
     },

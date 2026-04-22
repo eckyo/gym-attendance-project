@@ -76,7 +76,7 @@ router.get('/members/export', async (req, res, next) => {
   try {
     const today = new Date().toISOString().slice(0, 10);
     const result = await pool.query(
-      `SELECT name, scan_token, expiry_date, created_at
+      `SELECT name, scan_token, expiry_date, created_at, phone_number
        FROM members WHERE gym_id = $1 AND deleted_at IS NULL ORDER BY scan_token`,
       [req.gymId]
     );
@@ -86,6 +86,7 @@ router.get('/members/export', async (req, res, next) => {
       'GYM ID': m.scan_token,
       'Expiry Date': m.expiry_date ? new Date(m.expiry_date).toISOString().slice(0, 10) : '',
       'Joined Date': m.created_at ? new Date(m.created_at).toISOString().slice(0, 10) : today,
+      'Phone Number': m.phone_number || '',
     }));
 
     const ws = XLSX.utils.json_to_sheet(rows);
@@ -105,7 +106,7 @@ router.get('/members/export', async (req, res, next) => {
 router.get('/members/template', async (req, res, next) => {
   try {
     const ws = XLSX.utils.json_to_sheet([], {
-      header: ['Name', 'GYM ID', 'Expiry Date', 'Joined Date'],
+      header: ['Name', 'GYM ID', 'Expiry Date', 'Joined Date', 'Phone Number'],
     });
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Members');
@@ -247,24 +248,40 @@ router.post('/members/import/confirm', async (req, res, next) => {
   }
 });
 
-// GET /api/admin/members?search=alice
+const SORT_COLS = {
+  name: 'm.name',
+  scan_token: 'm.scan_token',
+  expiry_date: 'm.expiry_date',
+  created_at: 'm.created_at',
+  package_name: 'p.name',
+};
+
+// GET /api/admin/members?search=alice&limit=20&offset=0&sort=name&order=asc
 router.get('/members', async (req, res, next) => {
   try {
-    const search = req.query.search ? `%${req.query.search}%` : '%';
+    const search  = req.query.search ? `%${req.query.search}%` : '%';
+    const limit   = Math.min(parseInt(req.query.limit,  10) || 20, 100);
+    const offset  = Math.max(parseInt(req.query.offset, 10) || 0,  0);
+    const sortCol = SORT_COLS[req.query.sort] ?? 'm.scan_token';
+    const sortOrd = req.query.order === 'desc' ? 'DESC' : 'ASC';
 
     const result = await pool.query(
-      `SELECT m.id, m.name, m.scan_token, m.expiry_date, m.created_at,
-              p.id AS package_id, p.name AS package_name, p.duration_days, p.price
+      `SELECT m.id, m.name, m.scan_token, m.expiry_date, m.phone_number, m.created_at,
+              p.id AS package_id, p.name AS package_name, p.duration_days, p.price,
+              COUNT(*) OVER() AS total_count
        FROM members m
        LEFT JOIN membership_packages p ON p.id = m.package_id
        WHERE m.gym_id = $1
          AND m.deleted_at IS NULL
          AND (m.name ILIKE $2 OR m.scan_token ILIKE $2)
-       ORDER BY m.scan_token`,
-      [req.gymId, search]
+       ORDER BY ${sortCol} ${sortOrd} NULLS LAST
+       LIMIT $3 OFFSET $4`,
+      [req.gymId, search, limit, offset]
     );
 
-    res.json(result.rows);
+    const total = parseInt(result.rows[0]?.total_count ?? 0, 10);
+    const members = result.rows.map(({ total_count, ...r }) => r);
+    res.json({ members, total });
   } catch (err) {
     next(err);
   }
@@ -282,8 +299,13 @@ const calcExpiry = (currentExpiry, durationDays) => {
 router.post('/members', async (req, res, next) => {
   const client = await pool.connect();
   try {
-    const { name, expiryDate, packageId } = req.body;
+    const { name, expiryDate, packageId, phoneNumber } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'Name is required' });
+
+    const phoneRe = /^\+62\d{8,13}$/;
+    if (phoneNumber && !phoneRe.test(phoneNumber)) {
+      return res.status(400).json({ error: 'Invalid phone number format. Use +62 followed by 8–13 digits.' });
+    }
 
     let resolvedExpiry = expiryDate || null;
     let resolvedPackageId = null;
@@ -319,10 +341,10 @@ router.post('/members', async (req, res, next) => {
     );
 
     const result = await client.query(
-      `INSERT INTO members (gym_id, name, scan_token, expiry_date, package_id)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING id, name, scan_token, expiry_date, package_id, created_at`,
-      [req.gymId, name.trim(), scanToken, resolvedExpiry, resolvedPackageId]
+      `INSERT INTO members (gym_id, name, scan_token, expiry_date, package_id, phone_number)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, name, scan_token, expiry_date, package_id, phone_number, created_at`,
+      [req.gymId, name.trim(), scanToken, resolvedExpiry, resolvedPackageId, phoneNumber || null]
     );
 
     await client.query('COMMIT');
@@ -338,8 +360,13 @@ router.post('/members', async (req, res, next) => {
 // PUT /api/admin/members/:id
 router.put('/members/:id', async (req, res, next) => {
   try {
-    const { name, expiryDate, packageId } = req.body;
+    const { name, expiryDate, packageId, phoneNumber } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'Name is required' });
+
+    const phoneRe = /^\+62\d{8,13}$/;
+    if (phoneNumber && !phoneRe.test(phoneNumber)) {
+      return res.status(400).json({ error: 'Invalid phone number format. Use +62 followed by 8–13 digits.' });
+    }
 
     let resolvedExpiry = expiryDate || null;
     let resolvedPackageId = packageId === undefined ? undefined : (packageId || null);
@@ -373,11 +400,16 @@ router.put('/members/:id', async (req, res, next) => {
       params.push(resolvedPackageId);
     }
 
+    if (phoneNumber !== undefined) {
+      setClauses.splice(2, 0, `phone_number = $${params.length + 1}`);
+      params.push(phoneNumber || null);
+    }
+
     params.push(req.params.id, req.gymId);
     const result = await pool.query(
       `UPDATE members SET ${setClauses.join(', ')}
        WHERE id = $${params.length - 1} AND gym_id = $${params.length} AND deleted_at IS NULL
-       RETURNING id, name, scan_token, expiry_date, package_id, created_at`,
+       RETURNING id, name, scan_token, expiry_date, package_id, phone_number, created_at`,
       params
     );
 

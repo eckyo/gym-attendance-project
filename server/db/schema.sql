@@ -104,3 +104,4 @@ CREATE TABLE IF NOT EXISTS membership_packages (
 CREATE INDEX IF NOT EXISTS idx_membership_packages_gym ON membership_packages(gym_id);
 
 ALTER TABLE members ADD COLUMN IF NOT EXISTS package_id UUID REFERENCES membership_packages(id);
+ALTER TABLE members ADD COLUMN IF NOT EXISTS phone_number TEXT;

@@ -27,26 +27,30 @@ export const getAttendance = (token, { date, search } = {}) => {
   }).then(handleResponse);
 };
 
-export const getMembers = (token, { search } = {}) => {
+export const getMembers = (token, { search, limit, offset, sort, order } = {}) => {
   const params = new URLSearchParams();
-  if (search) params.set('search', search);
+  if (search)        params.set('search', search);
+  if (limit  != null) params.set('limit',  limit);
+  if (offset != null) params.set('offset', offset);
+  if (sort)          params.set('sort',   sort);
+  if (order)         params.set('order',  order);
   return fetch(`${API_BASE}/api/admin/members?${params}`, {
     headers: authHeaders(token),
   }).then(handleResponse);
 };
 
-export const addMember = (token, name, expiryDate) =>
+export const addMember = (token, name, expiryDate, phoneNumber) =>
   fetch(`${API_BASE}/api/admin/members`, {
     method: 'POST',
     headers: authHeaders(token),
-    body: JSON.stringify({ name, expiryDate }),
+    body: JSON.stringify({ name, expiryDate, phoneNumber }),
   }).then(handleResponse);
 
-export const updateMember = (token, id, name, expiryDate, packageId) =>
+export const updateMember = (token, id, name, expiryDate, packageId, phoneNumber) =>
   fetch(`${API_BASE}/api/admin/members/${id}`, {
     method: 'PUT',
     headers: authHeaders(token),
-    body: JSON.stringify({ name, expiryDate, packageId }),
+    body: JSON.stringify({ name, expiryDate, packageId, phoneNumber }),
   }).then(handleResponse);
 
 export const deleteMember = (token, id, pin) =>
@@ -147,9 +151,9 @@ export const setDefaultPackage = (token, id) =>
     headers: authHeaders(token),
   }).then(handleResponse);
 
-export const addMemberWithPackage = (token, name, expiryDate, packageId) =>
+export const addMemberWithPackage = (token, name, expiryDate, packageId, phoneNumber) =>
   fetch(`${API_BASE}/api/admin/members`, {
     method: 'POST',
     headers: authHeaders(token),
-    body: JSON.stringify({ name, expiryDate, packageId }),
+    body: JSON.stringify({ name, expiryDate, packageId, phoneNumber }),
   }).then(handleResponse);
