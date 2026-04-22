@@ -138,6 +138,12 @@ router.post('/members/import', upload.single('file'), async (req, res, next) => 
       if (val instanceof Date) return val.toISOString().slice(0, 10);
       const s = String(val).trim();
       if (!s) return '';
+      // Handle DD-MM-YYYY or DD/MM/YYYY (Indonesian/European format) before falling back to JS Date
+      const dmy = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+      if (dmy) {
+        const iso = `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`;
+        if (!isNaN(Date.parse(iso))) return iso;
+      }
       const parsed = new Date(s);
       if (!isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10);
       return s; // return raw so validation can catch it
