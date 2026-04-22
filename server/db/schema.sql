@@ -105,3 +105,7 @@ CREATE INDEX IF NOT EXISTS idx_membership_packages_gym ON membership_packages(gy
 
 ALTER TABLE members ADD COLUMN IF NOT EXISTS package_id UUID REFERENCES membership_packages(id);
 ALTER TABLE members ADD COLUMN IF NOT EXISTS phone_number TEXT;
+
+-- Registration fee per membership package
+ALTER TABLE membership_packages ADD COLUMN IF NOT EXISTS has_registration_fee BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE membership_packages ADD COLUMN IF NOT EXISTS registration_fee INTEGER NOT NULL DEFAULT 0;

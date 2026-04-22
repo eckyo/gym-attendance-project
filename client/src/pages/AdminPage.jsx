@@ -197,6 +197,7 @@ const s = {
   },
   badgeReady: { background: '#dcfce7', color: '#166534' },
   badgeError: { background: '#fee2e2', color: '#991b1b' },
+  badgeNew: { background: '#dbeafe', color: '#1d4ed8', marginLeft: 6 },
   fileInput: {
     display: 'block', width: '100%',
     padding: '10px 14px',
@@ -223,6 +224,17 @@ const s = {
     background: '#fef9c3', color: '#854d0e',
   },
   starBtn: { background: '#fefce8', color: '#ca8a04' },
+  filterSelect: {
+    padding: '4px 8px', border: '1.5px solid #e2e8f0',
+    borderRadius: 6, fontSize: 13, background: '#fff', outline: 'none',
+  },
+  filterBtn: {
+    padding: '6px 10px', fontSize: 13,
+    border: '1.5px solid #e2e8f0', borderRadius: 6,
+    background: '#fff', cursor: 'pointer',
+    display: 'inline-flex', alignItems: 'center', gap: 4,
+    whiteSpace: 'nowrap',
+  },
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -600,6 +612,10 @@ function AddMemberModal({ token, onAdded, onClose }) {
   const isCustom = selectedPackageId === '__custom__';
   const selectedPkg = packages.find((p) => p.id === selectedPackageId);
   const computedExpiry = selectedPkg ? calcExpiryFromDuration(selectedPkg.duration_days) : null;
+  const regFeeTotal = !isCustom && selectedPkg?.has_registration_fee && selectedPkg?.registration_fee > 0
+    ? (selectedPkg.price || 0) + selectedPkg.registration_fee
+    : null;
+  const fmtTotal = regFeeTotal != null ? `Rp ${Number(regFeeTotal).toLocaleString('id-ID')}` : null;
 
   const PHONE_RE = /^\+62\d{8,13}$/;
   const toDigits   = (full) => full.startsWith('+62') ? full.slice(3) : full;
@@ -650,6 +666,25 @@ function AddMemberModal({ token, onAdded, onClose }) {
           {!isCustom && computedExpiry && (
             <div style={s.expiryPreview}>
               {t('admin.packages.expiresOn', { date: new Date(computedExpiry).toLocaleDateString(locale) })}
+            </div>
+          )}
+          {regFeeTotal != null && (
+            <div style={{ margin: '10px 0 4px', padding: '10px 14px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, color: '#475569' }}>
+                <span>{t('admin.packages.packageLabel')}</span>
+                <span>Rp {Number(selectedPkg.price).toLocaleString('id-ID')}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#475569' }}>
+                <span>{t('admin.packages.registrationFee')}</span>
+                <span>+Rp {Number(selectedPkg.registration_fee).toLocaleString('id-ID')}</span>
+              </div>
+              <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 8, display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: '#1e293b' }}>
+                <span>{t('admin.packages.totalLabel')}</span>
+                <span>{fmtTotal}</span>
+              </div>
+              <div style={{ marginTop: 10, padding: '8px 12px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 6, color: '#1e40af', fontSize: 12 }}>
+                ℹ️ {t('admin.packages.collectReminder', { amount: fmtTotal })}
+              </div>
             </div>
           )}
           {isCustom && (
@@ -1030,15 +1065,21 @@ function AttendanceTab({ token }) {
             <tr><td colSpan={3} style={s.empty}>{t('common.loading')}</td></tr>
           ) : rows.length === 0 ? (
             <tr><td colSpan={3} style={s.empty}>{t('admin.attendance.noRecords')}</td></tr>
-          ) : rows.map((row, i) => (
-            <tr key={i}>
-              <td style={s.td}>{row.member_name}</td>
-              <td style={s.tdMono}>{row.gym_id}</td>
-              <td style={s.td}>
-                {new Date(row.checked_in_at).toLocaleString(lang === 'id' ? 'id-ID' : 'en-US', { hour12: false })}
-              </td>
-            </tr>
-          ))}
+          ) : rows.map((row, i) => {
+            const isNew = row.member_created_at && (new Date() - new Date(row.member_created_at) < 7 * 24 * 60 * 60 * 1000);
+            return (
+              <tr key={i}>
+                <td style={s.td}>
+                  {row.member_name}
+                  {isNew && <span style={{ ...s.badge, ...s.badgeNew }}>New</span>}
+                </td>
+                <td style={s.tdMono}>{row.gym_id}</td>
+                <td style={s.td}>
+                  {new Date(row.checked_in_at).toLocaleString(lang === 'id' ? 'id-ID' : 'en-US', { hour12: false })}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -1051,6 +1092,11 @@ function MembersTab({ token }) {
   const [members, setMembers] = useState([]);
   const [packages, setPackages] = useState([]);
   const [search, setSearch] = useState('');
+  const [filterStatuses,   setFilterStatuses]   = useState([]);
+  const [filterPackageIds, setFilterPackageIds] = useState([]);
+  const [filterNewOnly,    setFilterNewOnly]    = useState(false);
+  const [showFilters,      setShowFilters]      = useState(false);
+  const [openDropdown,     setOpenDropdown]     = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [editingId, setEditingId] = useState(null);
@@ -1072,6 +1118,11 @@ function MembersTab({ token }) {
 
   const PAGE_SIZE = 20;
 
+  const filterStatusesKey   = filterStatuses.join(',');
+  const filterPackageIdsKey = filterPackageIds.join(',');
+  const toggleStatus  = (val) => setFilterStatuses(prev => prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val]);
+  const togglePackage = (val) => setFilterPackageIds(prev => prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val]);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -1080,6 +1131,9 @@ function MembersTab({ token }) {
         search: search || undefined,
         limit: PAGE_SIZE, offset: 0,
         sort: sortBy, order: sortOrder,
+        statuses:   filterStatuses,
+        packageIds: filterPackageIds,
+        newOnly:    filterNewOnly ? 'true' : undefined,
       });
       setMembers(data.members);
       setTotal(data.total);
@@ -1090,7 +1144,7 @@ function MembersTab({ token }) {
     } finally {
       setLoading(false);
     }
-  }, [token, search, sortBy, sortOrder]);
+  }, [token, search, sortBy, sortOrder, filterStatusesKey, filterPackageIdsKey, filterNewOnly]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
@@ -1104,6 +1158,9 @@ function MembersTab({ token }) {
         search: search || undefined,
         limit: PAGE_SIZE, offset,
         sort: sortBy, order: sortOrder,
+        statuses:   filterStatuses,
+        packageIds: filterPackageIds,
+        newOnly:    filterNewOnly ? 'true' : undefined,
       });
       setMembers(prev => [...prev, ...data.members]);
       const newOffset = offset + data.members.length;
@@ -1186,6 +1243,17 @@ function MembersTab({ token }) {
   };
 
   const locale = lang === 'id' ? 'id-ID' : 'en-US';
+  const activeFilterCount = (filterStatuses.length > 0 ? 1 : 0) + (filterPackageIds.length > 0 ? 1 : 0) + (filterNewOnly ? 1 : 0);
+  const statusLabel = filterStatuses.length === 0
+    ? t('admin.members.filterStatusAll')
+    : filterStatuses.length === 1
+      ? (filterStatuses[0] === 'active' ? t('admin.members.filterStatusActive') : t('admin.members.filterStatusExpired'))
+      : t('admin.members.filterCountSelected', { n: 2 });
+  const packageLabel = filterPackageIds.length === 0
+    ? t('admin.members.filterPackageAll')
+    : filterPackageIds.length === 1
+      ? (filterPackageIds[0] === 'none' ? t('admin.members.filterPackageNone') : (packages.find((p) => p.id === filterPackageIds[0])?.name ?? '?'))
+      : t('admin.members.filterCountSelected', { n: filterPackageIds.length });
 
   return (
     <div>
@@ -1197,11 +1265,84 @@ function MembersTab({ token }) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
+        <button
+          style={{ ...s.outlineBtn, ...(showFilters || activeFilterCount > 0 ? { background: '#eff6ff', borderColor: '#93c5fd', color: '#1d4ed8' } : {}) }}
+          onClick={() => setShowFilters(v => !v)}
+        >
+          {t('admin.members.filters')}
+          {activeFilterCount > 0 && <span style={{ ...s.badge, ...s.badgeNew, marginLeft: 6 }}>{activeFilterCount}</span>}
+        </button>
         <button style={s.outlineBtn} onClick={handleTemplate}>{t('admin.members.template')}</button>
         <button style={s.outlineBtn} onClick={handleExport}>{t('admin.members.export')}</button>
         <button style={s.outlineBtn} onClick={() => setShowImportModal(true)}>{t('admin.members.import')}</button>
         <button style={s.addBtn} onClick={() => setShowAddModal(true)}>{t('admin.members.addMember')}</button>
       </div>
+
+      {showFilters && (
+        <>
+          {openDropdown && <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setOpenDropdown(null)} />}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '10px 0 14px', borderBottom: '1px solid #f1f5f9' }}>
+
+            {/* Status dropdown */}
+            <div style={{ position: 'relative' }}>
+              <button
+                style={{ ...s.filterBtn, ...(filterStatuses.length > 0 ? { borderColor: '#93c5fd', background: '#eff6ff', color: '#1d4ed8' } : {}) }}
+                onClick={() => setOpenDropdown((d) => d === 'status' ? null : 'status')}
+              >
+                {t('admin.members.filterStatus')}: {statusLabel} ▾
+              </button>
+              {openDropdown === 'status' && (
+                <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 100, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.1)', padding: '4px 0', minWidth: 160 }}>
+                  {[
+                    { value: 'active',  label: t('admin.members.filterStatusActive') },
+                    { value: 'expired', label: t('admin.members.filterStatusExpired') },
+                  ].map(({ value, label }) => (
+                    <label key={value} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px', cursor: 'pointer', fontSize: 13, color: '#1e293b', whiteSpace: 'nowrap', userSelect: 'none' }}>
+                      <input type="checkbox" checked={filterStatuses.includes(value)} onChange={() => toggleStatus(value)} />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Package dropdown */}
+            <div style={{ position: 'relative' }}>
+              <button
+                style={{ ...s.filterBtn, ...(filterPackageIds.length > 0 ? { borderColor: '#93c5fd', background: '#eff6ff', color: '#1d4ed8' } : {}) }}
+                onClick={() => setOpenDropdown((d) => d === 'package' ? null : 'package')}
+              >
+                {t('admin.members.filterPackage')}: {packageLabel} ▾
+              </button>
+              {openDropdown === 'package' && (
+                <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 100, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.1)', padding: '4px 0', minWidth: 160 }}>
+                  {[{ value: 'none', label: t('admin.members.filterPackageNone') }, ...packages.map((p) => ({ value: p.id, label: p.name }))].map(({ value, label }) => (
+                    <label key={value} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px', cursor: 'pointer', fontSize: 13, color: '#1e293b', whiteSpace: 'nowrap', userSelect: 'none' }}>
+                      <input type="checkbox" checked={filterPackageIds.includes(value)} onChange={() => togglePackage(value)} />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* New only checkbox */}
+            <label style={{ fontSize: 13, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+              <input type="checkbox" checked={filterNewOnly} onChange={(e) => setFilterNewOnly(e.target.checked)} />
+              {t('admin.members.filterNewOnly')}
+            </label>
+
+            {activeFilterCount > 0 && (
+              <button
+                style={{ ...s.actionBtn, ...s.cancelBtn }}
+                onClick={() => { setFilterStatuses([]); setFilterPackageIds([]); setFilterNewOnly(false); }}
+              >
+                {t('admin.members.clearFilters')}
+              </button>
+            )}
+          </div>
+        </>
+      )}
 
       {error && <div style={s.error}>{error}</div>}
 
@@ -1244,6 +1385,7 @@ function MembersTab({ token }) {
             <tr><td colSpan={7} style={s.empty}>{t('admin.members.noMembers')}</td></tr>
           ) : members.map((member) => {
             const isExpired = member.expiry_date && new Date(member.expiry_date) < new Date();
+            const isNew = new Date() - new Date(member.created_at) < 7 * 24 * 60 * 60 * 1000;
             const isEditingThis = editingId === member.id;
             const editPkgIsCustom = editPackageId === '__custom__';
             const editSelectedPkg = packages.find((p) => p.id === editPackageId);
@@ -1261,7 +1403,12 @@ function MembersTab({ token }) {
                       onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(member.id); if (e.key === 'Escape') cancelEdit(); }}
                       autoFocus
                     />
-                  ) : member.name}
+                  ) : (
+                    <>
+                      {member.name}
+                      {isNew && <span style={{ ...s.badge, ...s.badgeNew }}>New</span>}
+                    </>
+                  )}
                 </td>
                 <td style={s.tdMono}>{member.scan_token}</td>
                 <td style={s.td}>
@@ -1374,9 +1521,13 @@ function PackagesTab({ token }) {
   const [editName, setEditName] = useState('');
   const [editDuration, setEditDuration] = useState('');
   const [editPrice, setEditPrice] = useState('');
+  const [editHasRegFee, setEditHasRegFee] = useState(false);
+  const [editRegFee, setEditRegFee] = useState('');
   const [newName, setNewName] = useState('');
   const [newDuration, setNewDuration] = useState('');
   const [newPrice, setNewPrice] = useState('');
+  const [newHasRegFee, setNewHasRegFee] = useState(false);
+  const [newRegFee, setNewRegFee] = useState('');
   const [addLoading, setAddLoading] = useState(false);
   const { t } = useTranslation();
 
@@ -1398,9 +1549,11 @@ function PackagesTab({ token }) {
         durationDays: Number(newDuration),
         price: Number(newPrice),
         isDefault: packages.length === 0,
+        hasRegistrationFee: newHasRegFee,
+        registrationFee: newHasRegFee ? Number(newRegFee) : 0,
       });
       setPackages((prev) => [...prev, pkg].sort((a, b) => a.price - b.price));
-      setNewName(''); setNewDuration(''); setNewPrice('');
+      setNewName(''); setNewDuration(''); setNewPrice(''); setNewHasRegFee(false); setNewRegFee('');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -1413,9 +1566,14 @@ function PackagesTab({ token }) {
     setEditName(pkg.name);
     setEditDuration(String(pkg.duration_days));
     setEditPrice(String(pkg.price));
+    setEditHasRegFee(!!pkg.has_registration_fee);
+    setEditRegFee(String(pkg.registration_fee ?? 0));
   };
 
-  const cancelEdit = () => { setEditingId(null); setEditName(''); setEditDuration(''); setEditPrice(''); };
+  const cancelEdit = () => {
+    setEditingId(null); setEditName(''); setEditDuration(''); setEditPrice('');
+    setEditHasRegFee(false); setEditRegFee('');
+  };
 
   const saveEdit = async (id) => {
     setError('');
@@ -1424,6 +1582,8 @@ function PackagesTab({ token }) {
         name: editName,
         durationDays: Number(editDuration),
         price: Number(editPrice),
+        hasRegistrationFee: editHasRegFee,
+        registrationFee: editHasRegFee ? Number(editRegFee) : 0,
       });
       setPackages((prev) => prev.map((p) => p.id === id ? updated : p).sort((a, b) => a.price - b.price));
       setEditingId(null);
@@ -1461,15 +1621,16 @@ function PackagesTab({ token }) {
             <th style={s.th}>{t('admin.packages.colName')}</th>
             <th style={s.th}>{t('admin.packages.colDuration')}</th>
             <th style={s.th}>{t('admin.packages.colPrice')}</th>
+            <th style={s.th}>{t('admin.packages.colRegFee')}</th>
             <th style={s.th}>{t('admin.packages.colDefault')}</th>
             <th style={s.th}>{t('admin.packages.colActions')}</th>
           </tr>
         </thead>
         <tbody>
           {loading ? (
-            <tr><td colSpan={5} style={s.empty}>{t('common.loading')}</td></tr>
+            <tr><td colSpan={6} style={s.empty}>{t('common.loading')}</td></tr>
           ) : packages.length === 0 ? (
-            <tr><td colSpan={5} style={s.empty}>{t('admin.packages.noPackages')}</td></tr>
+            <tr><td colSpan={6} style={s.empty}>{t('admin.packages.noPackages')}</td></tr>
           ) : packages.map((pkg) => (
             <tr key={pkg.id}>
               <td style={s.td}>
@@ -1486,6 +1647,22 @@ function PackagesTab({ token }) {
                 {editingId === pkg.id ? (
                   <input style={{ ...s.inlineInput, maxWidth: 120 }} type="number" min={0} value={editPrice} onChange={(e) => setEditPrice(e.target.value)} />
                 ) : `Rp ${Number(pkg.price).toLocaleString('id-ID')}`}
+              </td>
+              <td style={s.td}>
+                {editingId === pkg.id ? (
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <input type="checkbox" checked={editHasRegFee} onChange={(e) => setEditHasRegFee(e.target.checked)} />
+                    {editHasRegFee && (
+                      <input style={{ ...s.inlineInput, maxWidth: 110 }} type="number" min={0}
+                        value={editRegFee} onChange={(e) => setEditRegFee(e.target.value)} placeholder="0" />
+                    )}
+                  </label>
+                ) : pkg.has_registration_fee ? (
+                  <span>
+                    <span style={{ ...s.badge, background: '#dcfce7', color: '#166534', marginRight: 4 }}>✓</span>
+                    {`Rp ${Number(pkg.registration_fee).toLocaleString('id-ID')}`}
+                  </span>
+                ) : '—'}
               </td>
               <td style={s.td}>
                 {pkg.is_default
@@ -1516,6 +1693,15 @@ function PackagesTab({ token }) {
             </td>
             <td style={s.td}>
               <input style={{ ...s.inlineInput, maxWidth: 120 }} type="number" min={0} value={newPrice} onChange={(e) => setNewPrice(e.target.value)} placeholder={t('admin.packages.pricePlaceholder')} />
+            </td>
+            <td style={s.td}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <input type="checkbox" checked={newHasRegFee} onChange={(e) => setNewHasRegFee(e.target.checked)} />
+                {newHasRegFee && (
+                  <input style={{ ...s.inlineInput, maxWidth: 110 }} type="number" min={0}
+                    value={newRegFee} onChange={(e) => setNewRegFee(e.target.value)} placeholder="0" />
+                )}
+              </label>
             </td>
             <td style={s.td} />
             <td style={s.td}>

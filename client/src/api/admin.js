@@ -27,13 +27,16 @@ export const getAttendance = (token, { date, search } = {}) => {
   }).then(handleResponse);
 };
 
-export const getMembers = (token, { search, limit, offset, sort, order } = {}) => {
+export const getMembers = (token, { search, limit, offset, sort, order, statuses = [], packageIds = [], newOnly } = {}) => {
   const params = new URLSearchParams();
-  if (search)        params.set('search', search);
+  if (search)         params.set('search', search);
   if (limit  != null) params.set('limit',  limit);
   if (offset != null) params.set('offset', offset);
-  if (sort)          params.set('sort',   sort);
-  if (order)         params.set('order',  order);
+  if (sort)           params.set('sort',   sort);
+  if (order)          params.set('order',  order);
+  statuses.forEach((s)   => params.append('status',    s));
+  packageIds.forEach((id) => params.append('packageId', id));
+  if (newOnly)        params.set('newOnly', newOnly);
   return fetch(`${API_BASE}/api/admin/members?${params}`, {
     headers: authHeaders(token),
   }).then(handleResponse);

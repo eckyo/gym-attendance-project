@@ -76,7 +76,20 @@
       "remove": "Hapus",
       "qrCode": "Kode QR",
       "colPackage": "Paket",
-      "colPhone": "Telepon"
+      "colPhone": "Telepon",
+      "filters": "Filter",
+      "filterStatus": "Status",
+      "filterStatusAll": "Semua",
+      "filterStatusActive": "Aktif",
+      "filterStatusExpired": "Kedaluwarsa",
+      "filterPackage": "Paket",
+      "filterPackageAll": "Semua Paket",
+      "filterPackageNone": "Tanpa Paket",
+      "filterNew": "Bergabung",
+      "filterNewAll": "Semua",
+      "filterNewOnly": "Baru (7 hari)",
+      "clearFilters": "Hapus filter",
+      "filterCountSelected": "{n} dipilih"
     },
     "qr": {
       "howToShare": "📋 Cara berbagi kode QR ini",
@@ -170,6 +183,7 @@
       "colName": "Nama Paket",
       "colDuration": "Durasi",
       "colPrice": "Harga",
+      "colRegFee": "Biaya Daftar",
       "colDefault": "Default",
       "colActions": "Aksi",
       "noPackages": "Belum ada paket.",
@@ -188,7 +202,10 @@
       "packageLabel": "Paket",
       "customDate": "Tanggal kustom...",
       "expiresOn": "Kedaluwarsa: {date}",
-      "daysRemaining": "{n} hari tersisa"
+      "daysRemaining": "{n} hari tersisa",
+      "registrationFee": "Biaya Pendaftaran",
+      "totalLabel": "Total",
+      "collectReminder": "Harap tagih {amount} dari pelanggan sebelum mengkonfirmasi."
     }
   },
   "superadmin": {
