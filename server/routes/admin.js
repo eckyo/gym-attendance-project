@@ -159,6 +159,7 @@ router.post('/members/import', upload.single('file'), async (req, res, next) => 
       const gymId = String(row['GYM ID'] || '').trim().toUpperCase();
       const expiryDate = toDateStr(row['Expiry Date']);
       const joinedDate = toDateStr(row['Joined Date']) || today;
+      const phoneNumber = String(row['Phone Number'] || '').trim() || null;
 
       const errors = [];
 
@@ -186,7 +187,7 @@ router.post('/members/import', upload.single('file'), async (req, res, next) => 
         errors.push(`Joined Date "${joinedDate}" is not a valid date`);
       }
 
-      return { rowIndex, name, gymId, expiryDate, joinedDate, errors };
+      return { rowIndex, name, gymId, expiryDate, joinedDate, phoneNumber, errors };
     });
 
     res.json({ rows });
@@ -225,14 +226,15 @@ router.post('/members/import/confirm', async (req, res, next) => {
     const inserted = [];
     for (const row of rows) {
       const result = await client.query(
-        `INSERT INTO members (gym_id, name, scan_token, expiry_date, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $5)
-         RETURNING id, name, scan_token, expiry_date, created_at`,
+        `INSERT INTO members (gym_id, name, scan_token, expiry_date, phone_number, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $6)
+         RETURNING id, name, scan_token, expiry_date, phone_number, created_at`,
         [
           req.gymId,
           row.name,
           row.gymId,
           row.expiryDate || null,
+          row.phoneNumber || null,
           row.joinedDate,
         ]
       );

@@ -397,6 +397,7 @@ function ImportModal({ token, onImported, onClose }) {
         gymId: r.gymId,
         expiryDate: r.expiryDate,
         joinedDate: r.joinedDate,
+        phoneNumber: r.phoneNumber,
       })));
       onImported(result.members);
     } catch (err) {
@@ -454,6 +455,7 @@ function ImportModal({ token, onImported, onClose }) {
                     <th style={s.th}>{t('admin.import.colGymId')}</th>
                     <th style={s.th}>{t('admin.import.colExpiry')}</th>
                     <th style={s.th}>{t('admin.import.colJoined')}</th>
+                    <th style={s.th}>{t('admin.members.colPhone')}</th>
                     <th style={s.th}>{t('admin.import.colStatus')}</th>
                   </tr>
                 </thead>
@@ -465,6 +467,7 @@ function ImportModal({ token, onImported, onClose }) {
                       <td style={s.tdMono}>{row.gymId || <span style={{ color: '#94a3b8' }}>—</span>}</td>
                       <td style={s.td}>{row.expiryDate || <span style={{ color: '#94a3b8' }}>—</span>}</td>
                       <td style={s.td}>{row.joinedDate}</td>
+                      <td style={s.td}>{row.phoneNumber || <span style={{ color: '#94a3b8' }}>—</span>}</td>
                       <td style={s.td}>
                         {row.errors.length === 0 ? (
                           <span style={{ ...s.badge, ...s.badgeReady }}>{t('admin.import.badgeReady')}</span>
