@@ -10,7 +10,7 @@ const router = Router();
 router.get('/', requireAuth, injectGymId, requireRole('admin', 'staff'), async (req, res, next) => {
   try {
     const result = await pool.query(
-      `SELECT id, name, duration_days, price, is_default, created_at
+      `SELECT id, name, duration_days, price, is_default, has_registration_fee, registration_fee, created_at
        FROM membership_packages WHERE gym_id = $1 ORDER BY price ASC`,
       [req.gymId]
     );
@@ -24,10 +24,13 @@ router.get('/', requireAuth, injectGymId, requireRole('admin', 'staff'), async (
 router.post('/', requireAuth, injectGymId, requireRole('admin'), async (req, res, next) => {
   const client = await pool.connect();
   try {
-    const { name, durationDays, price, isDefault } = req.body;
+    const { name, durationDays, price, isDefault, hasRegistrationFee, registrationFee } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'Name is required' });
     if (!durationDays || durationDays < 1) return res.status(400).json({ error: 'Duration must be at least 1 day' });
     if (price == null || price < 0) return res.status(400).json({ error: 'Price must be 0 or more' });
+    if (registrationFee != null && registrationFee < 0) return res.status(400).json({ error: 'Registration fee must be 0 or more' });
+
+    const regFee = hasRegistrationFee ? (registrationFee ?? 0) : 0;
 
     await client.query('BEGIN');
     if (isDefault) {
@@ -37,10 +40,10 @@ router.post('/', requireAuth, injectGymId, requireRole('admin'), async (req, res
       );
     }
     const result = await client.query(
-      `INSERT INTO membership_packages (gym_id, name, duration_days, price, is_default)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING id, name, duration_days, price, is_default, created_at`,
-      [req.gymId, name.trim(), durationDays, price, !!isDefault]
+      `INSERT INTO membership_packages (gym_id, name, duration_days, price, is_default, has_registration_fee, registration_fee)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, name, duration_days, price, is_default, has_registration_fee, registration_fee, created_at`,
+      [req.gymId, name.trim(), durationDays, price, !!isDefault, !!hasRegistrationFee, regFee]
     );
     await client.query('COMMIT');
     res.status(201).json(result.rows[0]);
@@ -55,17 +58,20 @@ router.post('/', requireAuth, injectGymId, requireRole('admin'), async (req, res
 // PUT /:id — admin only
 router.put('/:id', requireAuth, injectGymId, requireRole('admin'), async (req, res, next) => {
   try {
-    const { name, durationDays, price } = req.body;
+    const { name, durationDays, price, hasRegistrationFee, registrationFee } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'Name is required' });
     if (!durationDays || durationDays < 1) return res.status(400).json({ error: 'Duration must be at least 1 day' });
     if (price == null || price < 0) return res.status(400).json({ error: 'Price must be 0 or more' });
+    if (registrationFee != null && registrationFee < 0) return res.status(400).json({ error: 'Registration fee must be 0 or more' });
+
+    const regFee = hasRegistrationFee ? (registrationFee ?? 0) : 0;
 
     const result = await pool.query(
       `UPDATE membership_packages
-       SET name = $1, duration_days = $2, price = $3, updated_at = NOW()
-       WHERE id = $4 AND gym_id = $5
-       RETURNING id, name, duration_days, price, is_default, created_at`,
-      [name.trim(), durationDays, price, req.params.id, req.gymId]
+       SET name = $1, duration_days = $2, price = $3, has_registration_fee = $4, registration_fee = $5, updated_at = NOW()
+       WHERE id = $6 AND gym_id = $7
+       RETURNING id, name, duration_days, price, is_default, has_registration_fee, registration_fee, created_at`,
+      [name.trim(), durationDays, price, !!hasRegistrationFee, regFee, req.params.id, req.gymId]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Package not found' });
     res.json(result.rows[0]);

@@ -54,6 +54,7 @@ router.get('/attendance', async (req, res, next) => {
       `SELECT
          m.name        AS member_name,
          m.scan_token  AS gym_id,
+         m.created_at  AS member_created_at,
          al.checked_in_at
        FROM attendance_logs al
        JOIN members m ON m.id = al.member_id
@@ -270,7 +271,7 @@ const SORT_COLS = {
   package_name: 'p.name',
 };
 
-// GET /api/admin/members?search=alice&limit=20&offset=0&sort=name&order=asc
+// GET /api/admin/members?search=alice&limit=20&offset=0&sort=name&order=asc&status=active&packageId=uuid&newOnly=true
 router.get('/members', async (req, res, next) => {
   try {
     const search  = req.query.search ? `%${req.query.search}%` : '%';
@@ -278,6 +279,43 @@ router.get('/members', async (req, res, next) => {
     const offset  = Math.max(parseInt(req.query.offset, 10) || 0,  0);
     const sortCol = SORT_COLS[req.query.sort] ?? 'm.scan_token';
     const sortOrd = req.query.order === 'desc' ? 'DESC' : 'ASC';
+
+    const statuses   = [].concat(req.query.status    || []).filter((s) => ['active', 'expired'].includes(s));
+    const packageIds = [].concat(req.query.packageId || []);
+    const { newOnly } = req.query;
+    const queryParams = [req.gymId, search];
+    const extraConditions = [];
+
+    if (statuses.length === 1) {
+      if (statuses[0] === 'active') {
+        extraConditions.push('(m.expiry_date IS NOT NULL AND m.expiry_date >= CURRENT_DATE)');
+      } else {
+        extraConditions.push('(m.expiry_date IS NOT NULL AND m.expiry_date < CURRENT_DATE)');
+      }
+    } else if (statuses.length === 2) {
+      extraConditions.push('m.expiry_date IS NOT NULL');
+    }
+
+    if (packageIds.length > 0) {
+      const hasNone = packageIds.includes('none');
+      const uuids   = packageIds.filter((id) => id !== 'none');
+      const parts   = [];
+      if (hasNone) parts.push('m.package_id IS NULL');
+      if (uuids.length > 0) {
+        const placeholders = uuids.map((uuid) => { queryParams.push(uuid); return `$${queryParams.length}`; });
+        parts.push(`m.package_id IN (${placeholders.join(', ')})`);
+      }
+      extraConditions.push(parts.length === 1 ? parts[0] : `(${parts.join(' OR ')})`);
+    }
+
+    if (newOnly === 'true') {
+      extraConditions.push("m.created_at >= NOW() - INTERVAL '7 days'");
+    }
+
+    const extraWhere = extraConditions.length ? `AND ${extraConditions.join(' AND ')}` : '';
+    queryParams.push(limit, offset);
+    const limitParam  = `$${queryParams.length - 1}`;
+    const offsetParam = `$${queryParams.length}`;
 
     const result = await pool.query(
       `SELECT m.id, m.name, m.scan_token, m.expiry_date, m.phone_number, m.created_at,
@@ -288,9 +326,10 @@ router.get('/members', async (req, res, next) => {
        WHERE m.gym_id = $1
          AND m.deleted_at IS NULL
          AND (m.name ILIKE $2 OR m.scan_token ILIKE $2)
+         ${extraWhere}
        ORDER BY ${sortCol} ${sortOrd} NULLS LAST
-       LIMIT $3 OFFSET $4`,
-      [req.gymId, search, limit, offset]
+       LIMIT ${limitParam} OFFSET ${offsetParam}`,
+      queryParams
     );
 
     const total = parseInt(result.rows[0]?.total_count ?? 0, 10);
