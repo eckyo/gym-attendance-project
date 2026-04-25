@@ -3,7 +3,7 @@ import { Html5Qrcode } from 'html5-qrcode';
 import Lottie from 'lottie-react';
 import successAnimation from '../assets/success.json';
 import errorAnimation from '../assets/error.json';
-import { postScan, verifyScanPin, registerMember } from '../api/scan.js';
+import { postScan, verifyScanPin, registerMember, checkInVisitor } from '../api/scan.js';
 import { getPackages } from '../api/admin.js';
 import { useTranslation, LanguageSwitcher } from '../i18n/LanguageContext.jsx';
 
@@ -482,6 +482,75 @@ function RegisterModal({ token, onSuccess, onClose }) {
   );
 }
 
+// ── Visitor Check-in Modal ────────────────────────────────────────────────────
+
+function VisitorCheckInModal({ token, onSuccess, onClose }) {
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { t } = useTranslation();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      const result = await checkInVisitor(token, name, phone ? '+62' + phone : null);
+      onSuccess(result);
+    } catch (err) {
+      setError(err.message);
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={st.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={st.pinCard}>
+        <div style={st.pinTitle}>🚶 {t('scan.walkInTitle')}</div>
+        {error && <div style={st.pinError}>{error}</div>}
+        <form onSubmit={handleSubmit}>
+          <label style={st.pinLabel}>{t('admin.add.nameLabel')}</label>
+          <input
+            style={{ ...st.pinInput, letterSpacing: 'normal', textAlign: 'left', fontSize: 15 }}
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={t('admin.add.namePlaceholder')}
+            required
+            autoFocus
+          />
+          <label style={st.pinLabel}>
+            {t('admin.add.phoneLabel')}{' '}
+            <span style={{ fontWeight: 400, color: '#94a3b8' }}>({t('admin.add.phoneOptional')})</span>
+          </label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14 }}>
+            <span style={{ fontSize: 14, color: '#374151', fontWeight: 600, whiteSpace: 'nowrap' }}>+62</span>
+            <input
+              style={{ ...st.pinInput, marginBottom: 0, flex: 1, letterSpacing: 'normal', textAlign: 'left', fontSize: 15 }}
+              type="tel"
+              inputMode="numeric"
+              value={formatPhoneDigits(phone)}
+              onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 13))}
+              placeholder="8123 4567 890"
+            />
+          </div>
+          <button
+            style={{ ...st.pinBtn, opacity: loading || !name.trim() ? 0.6 : 1 }}
+            type="submit"
+            disabled={loading || !name.trim()}
+          >
+            {loading ? t('common.loading') : t('scan.walkIn')}
+          </button>
+          <button type="button" style={st.pinCancelBtn} onClick={onClose}>
+            {t('common.cancel')}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ── Scan Page ──────────────────────────────────────────────────────────────────
 
 export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess }) {
@@ -491,12 +560,24 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
   const [showImagePin, setShowImagePin] = useState(false);
   const [showRegisterPin, setShowRegisterPin] = useState(false);
   const [showRegisterForm, setShowRegisterForm] = useState(false);
+  const [showVisitorPin, setShowVisitorPin] = useState(false);
+  const [showVisitorForm, setShowVisitorForm] = useState(false);
+  const [countdown, setCountdown] = useState(5);
 
   const lastScanRef = useRef(null);
   const isProcessingRef = useRef(false);
   const qrRef = useRef(null);
   const fileInputRef = useRef(null);
   const { lang, t } = useTranslation();
+
+  // Countdown auto-close for success overlay — resets on each new check-in
+  useEffect(() => {
+    if (feedback?.type !== 'success') return;
+    setCountdown(5);
+    const intervalId = setInterval(() => setCountdown((c) => Math.max(0, c - 1)), 1000);
+    const timeoutId = setTimeout(() => setFeedback(null), 5000);
+    return () => { clearInterval(intervalId); clearTimeout(timeoutId); };
+  }, [feedback?.checkedInAt]);
 
   // Keep a stable ref to processQrCode so the camera callback never goes stale
   const processQrCodeRef = useRef(null);
@@ -522,7 +603,6 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
         packageName: result.packageName || null,
         expiryDate: result.expiryDate || null,
       });
-      setTimeout(() => setFeedback(null), 5000);
     } catch (err) {
       const isExpired = err.message?.toLowerCase().includes('expired');
       setFeedback({ type: isExpired ? 'expired' : 'error', message: err.message });
@@ -622,6 +702,11 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
           📋 {t('scan.registerMember')}
         </button>
 
+        {/* Walk-in visitor button */}
+        <button style={{ ...st.imageBtn, marginTop: 8 }} onClick={() => setShowVisitorPin(true)}>
+          🚶 {t('scan.walkIn')}
+        </button>
+
         {/* Hidden elements for file scanning */}
         <input
           ref={fileInputRef}
@@ -669,9 +754,38 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
               expiryDate: result.expiryDate || null,
               isNewMember: true,
             });
-            setTimeout(() => setFeedback(null), 5000);
           }}
           onClose={() => setShowRegisterForm(false)}
+        />
+      )}
+
+      {/* ── Visitor PIN modal ── */}
+      {showVisitorPin && (
+        <ImagePinModal
+          token={token}
+          subtitle={t('scan.walkInPinSubtitle')}
+          onVerified={() => { setShowVisitorPin(false); setShowVisitorForm(true); }}
+          onClose={() => setShowVisitorPin(false)}
+          isPassword={role === 'staff'}
+        />
+      )}
+
+      {/* ── Visitor form modal ── */}
+      {showVisitorForm && (
+        <VisitorCheckInModal
+          token={token}
+          onSuccess={(result) => {
+            setShowVisitorForm(false);
+            setFeedback({
+              type: 'success',
+              memberName: result.visitorName,
+              gymId: '',
+              checkedInAt: result.checkedInAt,
+              isVisitor: true,
+              visitorPrice: result.visitorPrice,
+            });
+          }}
+          onClose={() => setShowVisitorForm(false)}
         />
       )}
 
@@ -704,10 +818,10 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
               style={{ width: 160, height: 160, margin: '0 auto' }}
             />
             <p style={st.cardHeading}>
-              {feedback.isNewMember ? t('scan.registerSuccess') : t('scan.checkinSuccess')}
+              {feedback.isNewMember ? t('scan.registerSuccess') : feedback.isVisitor ? t('scan.walkInSuccess') : t('scan.checkinSuccess')}
             </p>
             <div style={st.cardName}>{feedback.memberName}</div>
-            <div style={st.cardGymId}>{t('scan.gymId')}: {feedback.gymId}</div>
+            {!feedback.isVisitor && <div style={st.cardGymId}>{t('scan.gymId')}: {feedback.gymId}</div>}
             <div style={st.cardTime}>{t('scan.clockedIn', { time: formatTime(feedback.checkedInAt) })}</div>
             {feedback.packageName && (
               <div style={st.cardPackage}>{feedback.packageName}</div>
@@ -720,6 +834,42 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
                 </div>
               );
             })()}
+
+            {/* Visitor payment reminder */}
+            {feedback.isVisitor && feedback.visitorPrice > 0 && (
+              <div style={{
+                background: '#fef9c3', border: '1.5px solid #fde68a',
+                borderRadius: 10, padding: '10px 16px', marginTop: 14,
+              }}>
+                <div style={{ fontSize: 11, color: '#92400e', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>
+                  {t('scan.collectPayment')}
+                </div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: '#b45309' }}>
+                  Rp {Number(feedback.visitorPrice).toLocaleString('id-ID')}
+                </div>
+              </div>
+            )}
+
+            {/* Countdown close button */}
+            <button
+              onClick={() => setFeedback(null)}
+              style={{
+                marginTop: 20, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                gap: 10, width: '100%', padding: '11px 0',
+                background: '#f1f5f9', border: '2px solid #e2e8f0',
+                borderRadius: 12, cursor: 'pointer', fontSize: 15, fontWeight: 600, color: '#475569',
+              }}
+            >
+              <span style={{
+                width: 30, height: 30, borderRadius: '50%',
+                background: '#1a1a2e', color: '#fff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 14, fontWeight: 800, flexShrink: 0,
+              }}>
+                {countdown}
+              </span>
+              {t('scan.closeOverlay')}
+            </button>
           </div>
         </div>
       )}

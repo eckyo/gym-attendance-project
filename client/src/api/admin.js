@@ -160,3 +160,15 @@ export const addMemberWithPackage = (token, name, expiryDate, packageId, phoneNu
     headers: authHeaders(token),
     body: JSON.stringify({ name, expiryDate, packageId, phoneNumber }),
   }).then(handleResponse);
+
+export const getSettings = (token) =>
+  fetch(`${API_BASE}/api/admin/settings`, {
+    headers: authHeaders(token),
+  }).then(handleResponse);
+
+export const setVisitorPrice = (token, price) =>
+  fetch(`${API_BASE}/api/admin/settings/visitor-price`, {
+    method: 'PUT',
+    headers: authHeaders(token),
+    body: JSON.stringify({ price }),
+  }).then(handleResponse);

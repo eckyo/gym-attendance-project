@@ -33,6 +33,17 @@ export const registerMember = async (token, name, expiryDate, phoneNumber, packa
   return data;
 };
 
+export const checkInVisitor = async (token, name, phoneNumber) => {
+  const res = await fetch(`${API_BASE}/api/scan/visitor`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ name, phoneNumber }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Walk-in check-in failed');
+  return data;
+};
+
 export const postScan = async (token, scanToken) => {
   const res = await fetch(`${API_BASE}/api/scan`, {
     method: 'POST',
