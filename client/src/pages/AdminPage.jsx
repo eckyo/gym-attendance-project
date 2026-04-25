@@ -5,7 +5,7 @@ import {
   deleteMember, changePin, exportMembers, downloadTemplate,
   previewImport, confirmImport, getStaff, addStaff, removeStaff, verifyPin, changeStaffPassword,
   getPackages, createPackage, updatePackage, deletePackage, setDefaultPackage,
-  addMemberWithPackage,
+  addMemberWithPackage, getSettings, setVisitorPrice,
 } from '../api/admin.js';
 import { useTranslation, LanguageSwitcher } from '../i18n/LanguageContext.jsx';
 
@@ -1080,6 +1080,9 @@ function AttendanceTab({ token }) {
   const [date, setDate] = useState(today);
   const [search, setSearch] = useState('');
   const [rows, setRows] = useState([]);
+  const [memberCount, setMemberCount] = useState(0);
+  const [visitorCount, setVisitorCount] = useState(0);
+  const [visitorFilter, setVisitorFilter] = useState('all');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const { lang, t } = useTranslation();
@@ -1089,7 +1092,9 @@ function AttendanceTab({ token }) {
     setError('');
     try {
       const data = await getAttendance(token, { date, search: search || undefined });
-      setRows(data);
+      setRows(data.records);
+      setMemberCount(data.memberCount);
+      setVisitorCount(data.visitorCount);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -1098,6 +1103,12 @@ function AttendanceTab({ token }) {
   }, [token, date, search]);
 
   useEffect(() => { load(); }, [load]);
+
+  const filteredRows = rows.filter((row) => {
+    if (visitorFilter === 'members') return !row.is_visitor;
+    if (visitorFilter === 'visitors') return row.is_visitor;
+    return true;
+  });
 
   return (
     <div>
@@ -1117,6 +1128,59 @@ function AttendanceTab({ token }) {
         />
       </div>
 
+      {/* Daily summary counters */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
+        {[
+          { label: t('admin.attendance.memberCount'), value: memberCount, accent: '#3b82f6', bg: '#eff6ff', iconBg: '#dbeafe', icon: '👤' },
+          { label: t('admin.attendance.visitorCount'), value: visitorCount, accent: '#f59e0b', bg: '#fffbeb', iconBg: '#fde68a', icon: '🚶' },
+          { label: t('admin.attendance.totalToday'),  value: memberCount + visitorCount, accent: '#10b981', bg: '#f0fdf4', iconBg: '#d1fae5', icon: '📊' },
+        ].map(({ label, value, accent, bg, iconBg, icon }) => (
+          <div key={label} style={{
+            background: bg,
+            border: `1.5px solid ${accent}22`,
+            borderRadius: 14,
+            padding: '16px 20px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 14,
+            boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
+          }}>
+            <div style={{
+              width: 44, height: 44, borderRadius: 12,
+              background: iconBg,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 20, flexShrink: 0,
+            }}>
+              {icon}
+            </div>
+            <div>
+              <div style={{ fontSize: 28, fontWeight: 800, color: accent, lineHeight: 1 }}>{value}</div>
+              <div style={{ fontSize: 12, color: '#64748b', fontWeight: 600, marginTop: 3, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Filter toggle */}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 14 }}>
+        {['all', 'members', 'visitors'].map((f) => (
+          <button
+            key={f}
+            style={{
+              ...s.actionBtn,
+              padding: '5px 16px',
+              background: visitorFilter === f ? '#3b82f6' : '#fff',
+              color: visitorFilter === f ? '#fff' : '#475569',
+              border: '1.5px solid',
+              borderColor: visitorFilter === f ? '#3b82f6' : '#e2e8f0',
+            }}
+            onClick={() => setVisitorFilter(f)}
+          >
+            {t(`admin.attendance.filter${f.charAt(0).toUpperCase() + f.slice(1)}`)}
+          </button>
+        ))}
+      </div>
+
       {error && <div style={s.error}>{error}</div>}
 
       <table style={s.table}>
@@ -1130,15 +1194,20 @@ function AttendanceTab({ token }) {
         <tbody>
           {loading ? (
             <tr><td colSpan={3} style={s.empty}>{t('common.loading')}</td></tr>
-          ) : rows.length === 0 ? (
+          ) : filteredRows.length === 0 ? (
             <tr><td colSpan={3} style={s.empty}>{t('admin.attendance.noRecords')}</td></tr>
-          ) : rows.map((row, i) => {
-            const isNew = row.member_created_at && (new Date() - new Date(row.member_created_at) < 7 * 24 * 60 * 60 * 1000);
+          ) : filteredRows.map((row, i) => {
+            const isNew = !row.is_visitor && row.member_created_at && (new Date() - new Date(row.member_created_at) < 7 * 24 * 60 * 60 * 1000);
             return (
               <tr key={i}>
                 <td style={s.td}>
                   {row.member_name}
-                  {isNew && <span style={{ ...s.badge, ...s.badgeNew }}>New</span>}
+                  {isNew && <span style={{ ...s.badge, ...s.badgeNew }}>{t('admin.attendance.badgeNew')}</span>}
+                  {row.is_visitor && (
+                    <span style={{ ...s.badge, background: '#fef9c3', color: '#854d0e', marginLeft: 6 }}>
+                      {t('admin.attendance.badgeWalkIn')}
+                    </span>
+                  )}
                 </td>
                 <td style={s.tdMono}>{row.gym_id}</td>
                 <td style={s.td}>
@@ -1622,15 +1691,41 @@ function PackagesTab({ token }) {
   const [newHasRegFee, setNewHasRegFee] = useState(false);
   const [newRegFee, setNewRegFee] = useState('');
   const [addLoading, setAddLoading] = useState(false);
+  const [visitorPriceInput, setVisitorPriceInput] = useState('');
+  const [visitorPriceLoaded, setVisitorPriceLoaded] = useState(false);
+  const [visitorPriceSaving, setVisitorPriceSaving] = useState(false);
+  const [visitorPriceSaved, setVisitorPriceSaved] = useState(false);
   const { t } = useTranslation();
 
   useEffect(() => {
     setLoading(true);
-    getPackages(token)
-      .then(setPackages)
+    Promise.all([
+      getPackages(token),
+      getSettings(token),
+    ])
+      .then(([pkgs, settings]) => {
+        setPackages(pkgs);
+        setVisitorPriceInput(String(settings.visitorPrice));
+        setVisitorPriceLoaded(true);
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [token]);
+
+  const handleSaveVisitorPrice = async (e) => {
+    e.preventDefault();
+    setVisitorPriceSaving(true);
+    setVisitorPriceSaved(false);
+    try {
+      await setVisitorPrice(token, Number(visitorPriceInput));
+      setVisitorPriceSaved(true);
+      setTimeout(() => setVisitorPriceSaved(false), 2000);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setVisitorPriceSaving(false);
+    }
+  };
 
   const handleAdd = async (e) => {
     e.preventDefault();
@@ -1708,6 +1803,33 @@ function PackagesTab({ token }) {
   return (
     <div>
       {error && <div style={s.error}>{error}</div>}
+
+      {/* Visitor price setting */}
+      <div style={{ background: '#fff', borderRadius: 12, padding: '18px 24px', marginBottom: 20, boxShadow: '0 1px 6px rgba(0,0,0,0.07)' }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', marginBottom: 12 }}>
+          {t('admin.packages.visitorPriceTitle')}
+        </div>
+        <form onSubmit={handleSaveVisitorPrice} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <span style={{ fontSize: 14, color: '#374151', fontWeight: 600 }}>Rp</span>
+          <input
+            style={{ ...s.inlineInput, maxWidth: 140 }}
+            type="number"
+            min={0}
+            value={visitorPriceInput}
+            onChange={(e) => { setVisitorPriceInput(e.target.value); setVisitorPriceSaved(false); }}
+            placeholder="0"
+            disabled={!visitorPriceLoaded}
+          />
+          <button
+            style={{ ...s.actionBtn, ...s.saveBtn, opacity: visitorPriceSaving || !visitorPriceLoaded ? 0.6 : 1 }}
+            type="submit"
+            disabled={visitorPriceSaving || !visitorPriceLoaded}
+          >
+            {visitorPriceSaving ? t('admin.packages.visitorPriceSaving') : visitorPriceSaved ? '✓ Saved' : t('admin.packages.visitorPriceSave')}
+          </button>
+        </form>
+      </div>
+
       <table style={s.table}>
         <thead>
           <tr>

@@ -40,7 +40,13 @@
     "registering": "Mendaftarkan...",
     "registerSuccess": "Anggota Baru Terdaftar!",
     "staffPasswordLabel": "Kata Sandi Anda",
-    "staffPasswordPlaceholder": "Masukkan kata sandi Anda"
+    "staffPasswordPlaceholder": "Masukkan kata sandi Anda",
+    "walkIn": "Walk-in",
+    "walkInTitle": "Check-in Walk-in",
+    "walkInSuccess": "Walk-in Berhasil Check-in!",
+    "walkInPinSubtitle": "Masukkan PIN untuk mencatat kunjungan walk-in",
+    "collectPayment": "Tagih Pembayaran",
+    "closeOverlay": "Tutup"
   },
   "admin": {
     "title": "Dasbor Admin",
@@ -56,7 +62,15 @@
       "colMember": "Nama Anggota",
       "colGymId": "ID Gym",
       "colClockIn": "Jam Masuk",
-      "noRecords": "Tidak ada catatan absensi."
+      "noRecords": "Tidak ada catatan absensi.",
+      "memberCount": "Anggota",
+      "visitorCount": "Pengunjung",
+      "totalToday": "Total",
+      "badgeNew": "Baru",
+      "badgeWalkIn": "Walk-in",
+      "filterAll": "Semua",
+      "filterMembers": "Anggota",
+      "filterVisitors": "Pengunjung"
     },
     "members": {
       "searchPlaceholder": "Cari nama atau ID GYM...",
@@ -208,7 +222,10 @@
       "daysRemaining": "{n} hari tersisa",
       "registrationFee": "Biaya Pendaftaran",
       "totalLabel": "Total",
-      "collectReminder": "Harap tagih {amount} dari pelanggan sebelum mengkonfirmasi."
+      "collectReminder": "Harap tagih {amount} dari pelanggan sebelum mengkonfirmasi.",
+      "visitorPriceTitle": "Harga Kunjungan Walk-in",
+      "visitorPriceSave": "Simpan",
+      "visitorPriceSaving": "Menyimpan..."
     }
   },
   "superadmin": {

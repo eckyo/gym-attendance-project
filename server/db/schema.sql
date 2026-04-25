@@ -112,3 +112,8 @@ ALTER TABLE members ADD COLUMN IF NOT EXISTS phone_number TEXT;
 -- Registration fee per membership package
 ALTER TABLE membership_packages ADD COLUMN IF NOT EXISTS has_registration_fee BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE membership_packages ADD COLUMN IF NOT EXISTS registration_fee INTEGER NOT NULL DEFAULT 0;
+
+-- Visitor / walk-in support
+ALTER TABLE members ADD COLUMN IF NOT EXISTS is_visitor BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE gyms ADD COLUMN IF NOT EXISTS visitor_price INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE gyms ADD COLUMN IF NOT EXISTS visitor_id_counter INTEGER NOT NULL DEFAULT 0;

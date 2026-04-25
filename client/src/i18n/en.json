@@ -40,7 +40,13 @@
     "registering": "Registering...",
     "registerSuccess": "New Member Registered!",
     "staffPasswordLabel": "Your Password",
-    "staffPasswordPlaceholder": "Enter your password"
+    "staffPasswordPlaceholder": "Enter your password",
+    "walkIn": "Walk-in",
+    "walkInTitle": "Walk-in Check-in",
+    "walkInSuccess": "Walk-in Checked In!",
+    "walkInPinSubtitle": "Enter your PIN to record a walk-in visit",
+    "collectPayment": "Collect Payment",
+    "closeOverlay": "Close"
   },
   "admin": {
     "title": "Admin Dashboard",
@@ -56,7 +62,15 @@
       "colMember": "Member Name",
       "colGymId": "Gym ID",
       "colClockIn": "Clock In",
-      "noRecords": "No attendance records found."
+      "noRecords": "No attendance records found.",
+      "memberCount": "Members",
+      "visitorCount": "Walk-ins",
+      "totalToday": "Total",
+      "badgeNew": "New",
+      "badgeWalkIn": "Walk-in",
+      "filterAll": "All",
+      "filterMembers": "Members",
+      "filterVisitors": "Visitors"
     },
     "members": {
       "searchPlaceholder": "Search by name or GYM ID...",
@@ -208,7 +222,10 @@
       "daysRemaining": "{n} days remaining",
       "registrationFee": "Registration Fee",
       "totalLabel": "Total",
-      "collectReminder": "Please collect {amount} from the customer before confirming."
+      "collectReminder": "Please collect {amount} from the customer before confirming.",
+      "visitorPriceTitle": "Visitor / Walk-in Price",
+      "visitorPriceSave": "Save",
+      "visitorPriceSaving": "Saving..."
     }
   },
   "superadmin": {

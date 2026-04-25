@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import { requireAuth } from '../middleware/auth.js';
 import { injectGymId } from '../middleware/tenant.js';
 import { requireRole } from '../middleware/roles.js';
-import { processScan, MemberNotFoundError, DuplicateCheckInError, MemberExpiredError } from '../services/attendance.js';
+import { processScan, processVisitorCheckIn, MemberNotFoundError, DuplicateCheckInError, MemberExpiredError } from '../services/attendance.js';
 import pool from '../db/pool.js';
 import { generateGymMemberId } from '../utils/gymId.js';
 
@@ -143,6 +143,33 @@ router.post('/register', requireAuth, injectGymId, requireRole('admin', 'staff')
     next(err);
   } finally {
     client.release();
+  }
+});
+
+// POST /api/scan/visitor — walk-in check-in for non-member
+router.post('/visitor', requireAuth, injectGymId, requireRole('admin', 'staff'), async (req, res, next) => {
+  try {
+    const { name, phoneNumber } = req.body;
+    if (!name?.trim()) return res.status(400).json({ error: 'Name is required' });
+    if (phoneNumber && !/^\+62\d{8,13}$/.test(phoneNumber))
+      return res.status(400).json({ error: 'Invalid phone number format' });
+
+    const [result, gymResult] = await Promise.all([
+      processVisitorCheckIn(req.gymId, name.trim(), phoneNumber || null),
+      pool.query('SELECT visitor_price FROM gyms WHERE id = $1', [req.gymId]),
+    ]);
+    res.json({
+      success: true,
+      visitorName: result.visitorName,
+      checkedInAt: result.checkedInAt,
+      isNew: result.isNew,
+      visitorPrice: gymResult.rows[0].visitor_price,
+    });
+  } catch (err) {
+    if (err instanceof DuplicateCheckInError) {
+      return res.status(409).json({ error: err.message });
+    }
+    next(err);
   }
 });
 

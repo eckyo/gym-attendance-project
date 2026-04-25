@@ -3,6 +3,7 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import XLSX from 'xlsx';
 import pool from '../db/pool.js';
+import { generateVisitorId } from '../utils/gymId.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = join(__dirname, '../../data');
@@ -36,6 +37,78 @@ const appendToXlsx = ({ memberName, gymMemberId, checkedInAt }) => {
 
   XLSX.utils.sheet_add_aoa(worksheet, [newRow], { origin: -1 });
   XLSX.writeFile(workbook, XLSX_PATH);
+};
+
+export const processVisitorCheckIn = async (gymId, name, phoneNumber) => {
+  const client = await pool.connect();
+  let visitor;
+  let log;
+  let isNew = false;
+
+  try {
+    await client.query('BEGIN');
+
+    // Look up returning visitor by phone number
+    if (phoneNumber) {
+      const existing = await client.query(
+        `SELECT id, name FROM members
+         WHERE gym_id = $1 AND is_visitor = true AND phone_number = $2 AND deleted_at IS NULL
+         LIMIT 1`,
+        [gymId, phoneNumber]
+      );
+      if (existing.rows.length > 0) visitor = existing.rows[0];
+    }
+
+    // Create new visitor record if not found
+    if (!visitor) {
+      const gymResult = await client.query(
+        'SELECT visitor_id_counter FROM gyms WHERE id = $1 FOR UPDATE',
+        [gymId]
+      );
+      const newCounter = gymResult.rows[0].visitor_id_counter + 1;
+      const scanToken = generateVisitorId(newCounter);
+      await client.query('UPDATE gyms SET visitor_id_counter = $1 WHERE id = $2', [newCounter, gymId]);
+
+      const memberResult = await client.query(
+        `INSERT INTO members (gym_id, name, phone_number, is_visitor, scan_token)
+         VALUES ($1, $2, $3, true, $4)
+         RETURNING id, name`,
+        [gymId, name.trim(), phoneNumber || null, scanToken]
+      );
+      visitor = memberResult.rows[0];
+      isNew = true;
+    }
+
+    // Prevent duplicate check-in on the same day
+    const openCheckIn = await client.query(
+      `SELECT id FROM attendance_logs
+       WHERE member_id = $1 AND gym_id = $2
+         AND checked_out_at IS NULL
+         AND checked_in_at::date = CURRENT_DATE
+       LIMIT 1`,
+      [visitor.id, gymId]
+    );
+    if (openCheckIn.rows.length > 0) {
+      throw new DuplicateCheckInError('Visitor is already checked in today');
+    }
+
+    const logResult = await client.query(
+      `INSERT INTO attendance_logs (gym_id, member_id, checked_in_at)
+       VALUES ($1, $2, NOW())
+       RETURNING id, checked_in_at`,
+      [gymId, visitor.id]
+    );
+    log = logResult.rows[0];
+
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  return { visitorName: visitor.name, checkedInAt: log.checked_in_at, isNew };
 };
 
 export const processScan = async (gymId, scanToken) => {

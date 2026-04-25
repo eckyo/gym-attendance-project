@@ -50,23 +50,40 @@ router.get('/attendance', async (req, res, next) => {
     const date = req.query.date || new Date().toISOString().slice(0, 10);
     const search = req.query.search ? `%${req.query.search}%` : '%';
 
-    const result = await pool.query(
-      `SELECT
-         m.name        AS member_name,
-         m.scan_token  AS gym_id,
-         m.created_at  AS member_created_at,
-         al.checked_in_at
-       FROM attendance_logs al
-       JOIN members m ON m.id = al.member_id
-       WHERE al.gym_id = $1
-         AND al.checked_in_at::date = $2::date
-         AND (m.name ILIKE $3 OR m.scan_token ILIKE $3)
-       ORDER BY al.checked_in_at DESC
-       LIMIT 200`,
-      [req.gymId, date, search]
-    );
+    const [recordsResult, countResult] = await Promise.all([
+      pool.query(
+        `SELECT
+           m.name        AS member_name,
+           m.scan_token  AS gym_id,
+           m.is_visitor,
+           m.created_at  AS member_created_at,
+           al.checked_in_at
+         FROM attendance_logs al
+         JOIN members m ON m.id = al.member_id
+         WHERE al.gym_id = $1
+           AND al.checked_in_at::date = $2::date
+           AND (m.name ILIKE $3 OR m.scan_token ILIKE $3)
+         ORDER BY al.checked_in_at DESC
+         LIMIT 200`,
+        [req.gymId, date, search]
+      ),
+      pool.query(
+        `SELECT
+           COUNT(*) FILTER (WHERE m.is_visitor = false) AS member_count,
+           COUNT(*) FILTER (WHERE m.is_visitor = true)  AS visitor_count
+         FROM attendance_logs al
+         JOIN members m ON m.id = al.member_id
+         WHERE al.gym_id = $1
+           AND al.checked_in_at::date = $2::date`,
+        [req.gymId, date]
+      ),
+    ]);
 
-    res.json(result.rows);
+    res.json({
+      records: recordsResult.rows,
+      memberCount: parseInt(countResult.rows[0].member_count, 10),
+      visitorCount: parseInt(countResult.rows[0].visitor_count, 10),
+    });
   } catch (err) {
     next(err);
   }
@@ -78,7 +95,7 @@ router.get('/members/export', async (req, res, next) => {
     const today = new Date().toISOString().slice(0, 10);
     const result = await pool.query(
       `SELECT name, scan_token, expiry_date, created_at, phone_number
-       FROM members WHERE gym_id = $1 AND deleted_at IS NULL ORDER BY scan_token`,
+       FROM members WHERE gym_id = $1 AND deleted_at IS NULL AND is_visitor = false ORDER BY scan_token`,
       [req.gymId]
     );
 
@@ -325,6 +342,7 @@ router.get('/members', async (req, res, next) => {
        LEFT JOIN membership_packages p ON p.id = m.package_id
        WHERE m.gym_id = $1
          AND m.deleted_at IS NULL
+         AND m.is_visitor = false
          AND (m.name ILIKE $2 OR m.scan_token ILIKE $2)
          ${extraWhere}
        ORDER BY ${sortCol} ${sortOrd} NULLS LAST
@@ -599,6 +617,33 @@ router.put('/staff/:id/password', async (req, res, next) => {
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Staff not found' });
     res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/admin/settings
+router.get('/settings', async (req, res, next) => {
+  try {
+    const result = await pool.query('SELECT visitor_price FROM gyms WHERE id = $1', [req.gymId]);
+    res.json({ visitorPrice: result.rows[0].visitor_price });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PUT /api/admin/settings/visitor-price
+router.put('/settings/visitor-price', async (req, res, next) => {
+  try {
+    const { price } = req.body;
+    if (price === undefined || price === null || isNaN(Number(price))) {
+      return res.status(400).json({ error: 'Price is required and must be a number' });
+    }
+    await pool.query(
+      'UPDATE gyms SET visitor_price = $1, updated_at = NOW() WHERE id = $2',
+      [Number(price), req.gymId]
+    );
+    res.json({ visitorPrice: Number(price) });
   } catch (err) {
     next(err);
   }
