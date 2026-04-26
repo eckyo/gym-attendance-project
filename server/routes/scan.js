@@ -117,10 +117,11 @@ router.post('/register', requireAuth, injectGymId, requireRole('admin', 'staff')
     const scanToken = generateGymMemberId(newCounter);
     await client.query('UPDATE gyms SET member_id_counter = $1 WHERE id = $2', [newCounter, req.gymId]);
 
+    const defaultHash = await bcrypt.hash('password123', 10);
     const memberResult = await client.query(
-      `INSERT INTO members (gym_id, name, scan_token, expiry_date, package_id)
-       VALUES ($1, $2, $3, $4, $5) RETURNING id, name, scan_token, expiry_date`,
-      [req.gymId, name.trim(), scanToken, resolvedExpiry, resolvedPackageId]
+      `INSERT INTO members (gym_id, name, scan_token, expiry_date, package_id, password_hash)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, name, scan_token, expiry_date`,
+      [req.gymId, name.trim(), scanToken, resolvedExpiry, resolvedPackageId, defaultHash]
     );
     const member = memberResult.rows[0];
 
@@ -143,6 +144,20 @@ router.post('/register', requireAuth, injectGymId, requireRole('admin', 'staff')
     next(err);
   } finally {
     client.release();
+  }
+});
+
+// GET /api/scan/standby-qr — return gym's static check-in QR code data
+router.get('/standby-qr', requireAuth, injectGymId, requireRole('admin', 'staff'), async (req, res, next) => {
+  try {
+    const result = await pool.query(
+      'SELECT name, checkin_code FROM gyms WHERE id = $1',
+      [req.gymId]
+    );
+    const gym = result.rows[0];
+    res.json({ gymName: gym.name, checkinCode: gym.checkin_code });
+  } catch (err) {
+    next(err);
   }
 });
 

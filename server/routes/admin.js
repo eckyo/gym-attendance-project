@@ -249,9 +249,10 @@ router.post('/members/import/confirm', async (req, res, next) => {
 
     const inserted = [];
     for (const row of rows) {
+      const defaultHash = await bcrypt.hash('password123', 10);
       const result = await client.query(
-        `INSERT INTO members (gym_id, name, scan_token, expiry_date, phone_number, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $6)
+        `INSERT INTO members (gym_id, name, scan_token, expiry_date, phone_number, password_hash, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
          RETURNING id, name, scan_token, expiry_date, phone_number, created_at`,
         [
           req.gymId,
@@ -259,6 +260,7 @@ router.post('/members/import/confirm', async (req, res, next) => {
           row.gymId,
           row.expiryDate || null,
           row.phoneNumber || null,
+          defaultHash,
           row.joinedDate,
         ]
       );
@@ -411,11 +413,12 @@ router.post('/members', async (req, res, next) => {
       [newCounter, req.gymId]
     );
 
+    const defaultHash = await bcrypt.hash('password123', 10);
     const result = await client.query(
-      `INSERT INTO members (gym_id, name, scan_token, expiry_date, package_id, phone_number)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO members (gym_id, name, scan_token, expiry_date, package_id, phone_number, password_hash)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING id, name, scan_token, expiry_date, package_id, phone_number, created_at`,
-      [req.gymId, name.trim(), scanToken, resolvedExpiry, resolvedPackageId, phoneNumber || null]
+      [req.gymId, name.trim(), scanToken, resolvedExpiry, resolvedPackageId, phoneNumber || null, defaultHash]
     );
 
     await client.query('COMMIT');

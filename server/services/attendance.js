@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import bcrypt from 'bcryptjs';
 import XLSX from 'xlsx';
 import pool from '../db/pool.js';
 import { generateVisitorId } from '../utils/gymId.js';
@@ -69,11 +70,12 @@ export const processVisitorCheckIn = async (gymId, name, phoneNumber) => {
       const scanToken = generateVisitorId(newCounter);
       await client.query('UPDATE gyms SET visitor_id_counter = $1 WHERE id = $2', [newCounter, gymId]);
 
+      const defaultHash = await bcrypt.hash('password123', 10);
       const memberResult = await client.query(
-        `INSERT INTO members (gym_id, name, phone_number, is_visitor, scan_token)
-         VALUES ($1, $2, $3, true, $4)
+        `INSERT INTO members (gym_id, name, phone_number, is_visitor, scan_token, password_hash)
+         VALUES ($1, $2, $3, true, $4, $5)
          RETURNING id, name`,
-        [gymId, name.trim(), phoneNumber || null, scanToken]
+        [gymId, name.trim(), phoneNumber || null, scanToken, defaultHash]
       );
       visitor = memberResult.rows[0];
       isNew = true;
@@ -111,6 +113,40 @@ export const processVisitorCheckIn = async (gymId, name, phoneNumber) => {
   return { visitorName: visitor.name, checkedInAt: log.checked_in_at, isNew };
 };
 
+function validateMemberExpiry(member) {
+  if (member.expiry_date && new Date(member.expiry_date) < new Date()) {
+    const expiredOn = new Date(member.expiry_date).toLocaleDateString('en-US', {
+      year: 'numeric', month: 'long', day: 'numeric',
+    });
+    throw new MemberExpiredError(`Membership expired on ${expiredOn}`);
+  }
+}
+
+async function checkDuplicateCheckin(client, memberId, gymId) {
+  const openCheckIn = await client.query(
+    `SELECT id
+     FROM attendance_logs
+     WHERE member_id = $1 AND gym_id = $2
+       AND checked_out_at IS NULL
+       AND checked_in_at::date = CURRENT_DATE
+     LIMIT 1`,
+    [memberId, gymId]
+  );
+  if (openCheckIn.rows.length > 0) {
+    throw new DuplicateCheckInError('Member is already checked in');
+  }
+}
+
+async function insertCheckinLog(client, gymId, memberId) {
+  const logResult = await client.query(
+    `INSERT INTO attendance_logs (gym_id, member_id, checked_in_at)
+     VALUES ($1, $2, NOW())
+     RETURNING id, checked_in_at`,
+    [gymId, memberId]
+  );
+  return logResult.rows[0];
+}
+
 export const processScan = async (gymId, scanToken) => {
   const client = await pool.connect();
   let member;
@@ -119,7 +155,6 @@ export const processScan = async (gymId, scanToken) => {
   try {
     await client.query('BEGIN');
 
-    // 1. Resolve member by scan token (GYM ID), scoped to gym
     const memberResult = await client.query(
       `SELECT m.id, m.name, m.expiry_date, p.name AS package_name
        FROM members m
@@ -133,39 +168,10 @@ export const processScan = async (gymId, scanToken) => {
     }
 
     member = memberResult.rows[0];
+    validateMemberExpiry(member);
+    await checkDuplicateCheckin(client, member.id, gymId);
+    log = await insertCheckinLog(client, gymId, member.id);
 
-    // 2. Check membership expiry
-    if (member.expiry_date && new Date(member.expiry_date) < new Date()) {
-      const expiredOn = new Date(member.expiry_date).toLocaleDateString('en-US', {
-        year: 'numeric', month: 'long', day: 'numeric',
-      });
-      throw new MemberExpiredError(`Membership expired on ${expiredOn}`);
-    }
-
-    // 3. Check for open check-in today
-    const openCheckIn = await client.query(
-      `SELECT id
-       FROM attendance_logs
-       WHERE member_id = $1 AND gym_id = $2
-         AND checked_out_at IS NULL
-         AND checked_in_at::date = CURRENT_DATE
-       LIMIT 1`,
-      [member.id, gymId]
-    );
-
-    if (openCheckIn.rows.length > 0) {
-      throw new DuplicateCheckInError('Member is already checked in');
-    }
-
-    // 4. Insert attendance log (append-only)
-    const logResult = await client.query(
-      `INSERT INTO attendance_logs (gym_id, member_id, checked_in_at)
-       VALUES ($1, $2, NOW())
-       RETURNING id, checked_in_at`,
-      [gymId, member.id]
-    );
-
-    log = logResult.rows[0];
     await client.query('COMMIT');
   } catch (err) {
     await client.query('ROLLBACK');
@@ -174,13 +180,55 @@ export const processScan = async (gymId, scanToken) => {
     client.release();
   }
 
-  // 5. Write to XLSX after DB commit — failure here won't roll back the DB record
   appendToXlsx({ memberName: member.name, gymMemberId: scanToken, checkedInAt: log.checked_in_at });
 
   return {
     memberName: member.name,
     checkedInAt: log.checked_in_at,
     scanToken,
+    packageName: member.package_name || null,
+    expiryDate: member.expiry_date || null,
+  };
+};
+
+export const processMemberSelfCheckin = async (gymId, memberId) => {
+  const client = await pool.connect();
+  let member;
+  let log;
+
+  try {
+    await client.query('BEGIN');
+
+    const memberResult = await client.query(
+      `SELECT m.id, m.name, m.scan_token, m.expiry_date, p.name AS package_name
+       FROM members m
+       LEFT JOIN membership_packages p ON p.id = m.package_id
+       WHERE m.id = $1 AND m.gym_id = $2 AND m.deleted_at IS NULL`,
+      [memberId, gymId]
+    );
+
+    if (memberResult.rows.length === 0) {
+      throw new MemberNotFoundError('Member not found for this gym');
+    }
+
+    member = memberResult.rows[0];
+    validateMemberExpiry(member);
+    await checkDuplicateCheckin(client, member.id, gymId);
+    log = await insertCheckinLog(client, gymId, member.id);
+
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  appendToXlsx({ memberName: member.name, gymMemberId: member.scan_token, checkedInAt: log.checked_in_at });
+
+  return {
+    memberName: member.name,
+    checkedInAt: log.checked_in_at,
     packageName: member.package_name || null,
     expiryDate: member.expiry_date || null,
   };

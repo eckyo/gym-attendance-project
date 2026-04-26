@@ -14,7 +14,7 @@ const s = {
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  headerTitle: { fontSize: 18, fontWeight: 700, letterSpacing: 0.3 },
+  headerTitle: { fontSize: 18, fontWeight: 700, letterSpacing: 0.3, fontFamily: 'Impact, Arial Black, sans-serif' },
   headerRight: { display: 'flex', gap: 10, alignItems: 'center' },
   logoutBtn: {
     padding: '7px 16px',
@@ -29,8 +29,8 @@ const s = {
   toolbar: { display: 'flex', justifyContent: 'flex-end', marginBottom: 16 },
   createBtn: {
     padding: '10px 20px',
-    background: '#3b82f6',
-    color: '#fff',
+    background: '#BEFE00',
+    color: '#1a1a1a',
     border: 'none',
     borderRadius: 8,
     fontSize: 14,
@@ -171,7 +171,7 @@ function CreateKioskModal({ token, onCreated, onClose }) {
             required
           />
           <button
-            style={{ ...s.modalBtn, background: '#3b82f6', color: '#fff', opacity: loading ? 0.6 : 1 }}
+            style={{ ...s.modalBtn, background: '#BEFE00', color: '#1a1a1a', opacity: loading ? 0.6 : 1 }}
             type="submit"
             disabled={loading}
           >
@@ -239,7 +239,7 @@ function ResetPasswordModal({ token, gym, onClose }) {
             autoFocus
           />
           <button
-            style={{ ...s.modalBtn, background: '#3b82f6', color: '#fff', opacity: loading || success ? 0.6 : 1 }}
+            style={{ ...s.modalBtn, background: '#BEFE00', color: '#1a1a1a', opacity: loading || success ? 0.6 : 1 }}
             type="submit"
             disabled={loading || success}
           >
@@ -294,7 +294,10 @@ export default function SuperadminPage({ token, onLogout }) {
   return (
     <div style={s.page}>
       <div style={s.header}>
-        <div style={s.headerTitle}>{t('superadmin.title')}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <img src="/kiosgym-icon.svg" alt="KIOS GYM" style={{ height: 32, width: 'auto', display: 'block' }} />
+          <div style={s.headerTitle}>{t('superadmin.title')}</div>
+        </div>
         <div style={s.headerRight}>
           <LanguageSwitcher variant="light" />
           <button style={s.logoutBtn} onClick={onLogout}>{t('superadmin.logout')}</button>

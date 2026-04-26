@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
+import QRCode from 'qrcode';
 import Lottie from 'lottie-react';
 import successAnimation from '../assets/success.json';
 import errorAnimation from '../assets/error.json';
@@ -41,6 +42,7 @@ const st = {
     fontWeight: 700,
     color: '#fff',
     lineHeight: 1.2,
+    fontFamily: 'Impact, Arial Black, sans-serif',
   },
   kioskLabel: {
     fontSize: 12,
@@ -551,6 +553,46 @@ function VisitorCheckInModal({ token, onSuccess, onClose }) {
   );
 }
 
+// ── Standby QR Download ────────────────────────────────────────────────────────
+
+function downloadStandbyQR(gymName, qrDataUrl) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 600;
+  canvas.height = 780;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, 600, 780);
+
+  ctx.fillStyle = '#1a1a2e';
+  ctx.font = 'bold 30px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(gymName, 300, 58);
+
+  const img = new Image();
+  img.onload = () => {
+    ctx.drawImage(img, 100, 80, 400, 400);
+
+    ctx.fillStyle = '#1a1a2e';
+    ctx.font = 'bold 22px sans-serif';
+    ctx.fillText('Scan to check in', 300, 530);
+
+    ctx.fillStyle = '#374151';
+    ctx.font = '20px sans-serif';
+    ctx.fillText('Pindai untuk absen', 300, 566);
+
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '13px sans-serif';
+    ctx.fillText('Tunjukkan QR ini kepada anggota  /  Show this QR to members', 300, 620);
+
+    const link = document.createElement('a');
+    link.download = `${gymName.replace(/\s+/g, '-')}-checkin-qr.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  };
+  img.src = qrDataUrl;
+}
+
 // ── Scan Page ──────────────────────────────────────────────────────────────────
 
 export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess }) {
@@ -563,6 +605,9 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
   const [showVisitorPin, setShowVisitorPin] = useState(false);
   const [showVisitorForm, setShowVisitorForm] = useState(false);
   const [countdown, setCountdown] = useState(5);
+  const [showStandbyQr, setShowStandbyQr] = useState(false);
+  const [standbyQrData, setStandbyQrData] = useState(null);
+  const [standbyQrLoading, setStandbyQrLoading] = useState(false);
 
   const lastScanRef = useRef(null);
   const isProcessingRef = useRef(false);
@@ -655,16 +700,43 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
   const formatTime = (iso) =>
     new Date(iso).toLocaleTimeString(lang === 'id' ? 'id-ID' : 'en-US', { hour12: false });
 
+  const loadStandbyQr = async () => {
+    setStandbyQrLoading(true);
+    try {
+      const res = await fetch('/api/scan/standby-qr', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      const qrDataUrl = await QRCode.toDataURL(data.checkinCode, { width: 400, margin: 2 });
+      setStandbyQrData({ gymName: data.gymName, checkinCode: data.checkinCode, qrDataUrl });
+      setShowStandbyQr(true);
+    } catch {
+      // silently fail — camera still works
+    } finally {
+      setStandbyQrLoading(false);
+    }
+  };
+
   return (
     <div style={st.page}>
       {/* ── Header ── */}
       <div style={st.header}>
-        <div style={st.headerLeft}>
-          <div style={st.gymName}>{gymName ?? 'Gym'}</div>
-          <div style={st.kioskLabel}>{t('scan.title')}</div>
+        <div style={{ ...st.headerLeft, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <img src="/kiosgym-icon.svg" alt="KIOS GYM" style={{ height: 30, width: 'auto', display: 'block' }} />
+          <div>
+            <div style={st.gymName}>{gymName ?? 'Gym'}</div>
+            <div style={st.kioskLabel}>{t('scan.title')}</div>
+          </div>
         </div>
         <div style={st.headerRight}>
           <LanguageSwitcher variant="light" />
+          <button
+            style={{ ...st.adminBtn, ...(standbyQrLoading ? { opacity: 0.6, cursor: 'not-allowed' } : {}) }}
+            onClick={loadStandbyQr}
+            disabled={standbyQrLoading}
+          >
+            {standbyQrLoading ? t('standbyQr.loading') : t('standbyQr.button')}
+          </button>
           {role === 'admin' && (
             <button style={st.adminBtn} onClick={onAdminAccess}>
               {t('scan.adminDashboard')}
@@ -803,6 +875,49 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
             <p style={st.errorHint}>{t('scan.expiredHint')}</p>
             <button style={st.returnBtn} onClick={() => setFeedback(null)}>
               {t('scan.returnToScan')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Standby QR full-screen overlay ── */}
+      {showStandbyQr && standbyQrData && (
+        <div style={{
+          position: 'fixed', inset: 0, background: '#ffffff',
+          zIndex: 9999, display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center', gap: 20,
+          padding: 24,
+        }}>
+          <div style={{ fontSize: 26, fontWeight: 800, color: '#1a1a2e', textAlign: 'center' }}>
+            {standbyQrData.gymName}
+          </div>
+          <img
+            src={standbyQrData.qrDataUrl}
+            alt="Check-in QR"
+            style={{ width: 320, height: 320, display: 'block' }}
+          />
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 20, fontWeight: 600, color: '#1a1a2e' }}>Scan to check in</div>
+            <div style={{ fontSize: 18, color: '#374151', marginTop: 4 }}>Pindai untuk absen</div>
+          </div>
+          <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+            <button
+              onClick={() => downloadStandbyQR(standbyQrData.gymName, standbyQrData.qrDataUrl)}
+              style={{
+                padding: '12px 24px', background: '#1a1a2e', color: '#fff',
+                border: 'none', borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              {t('standbyQr.download')}
+            </button>
+            <button
+              onClick={() => { setShowStandbyQr(false); setStandbyQrData(null); }}
+              style={{
+                padding: '12px 24px', background: '#f1f5f9', color: '#475569',
+                border: '2px solid #e2e8f0', borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              {t('standbyQr.close')}
             </button>
           </div>
         </div>
