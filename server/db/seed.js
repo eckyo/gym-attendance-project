@@ -66,16 +66,16 @@ const seed = async () => {
     `, [demoGymId, passwordHash]);
 
     await client.query(`
-      INSERT INTO members (gym_id, name, scan_token, expiry_date)
-      VALUES ($1, 'Alice Johnson', 'A0001', $2)
+      INSERT INTO members (gym_id, name, scan_token, expiry_date, password_hash)
+      VALUES ($1, 'Alice Johnson', 'A0001', $2, $3)
       ON CONFLICT (gym_id, scan_token) DO NOTHING
-    `, [demoGymId, expiryDate]);
+    `, [demoGymId, expiryDate, passwordHash]);
 
     await client.query(`
-      INSERT INTO members (gym_id, name, scan_token, expiry_date)
-      VALUES ($1, 'Bob Smith', 'A0002', $2)
+      INSERT INTO members (gym_id, name, scan_token, expiry_date, password_hash)
+      VALUES ($1, 'Bob Smith', 'A0002', $2, $3)
       ON CONFLICT (gym_id, scan_token) DO NOTHING
-    `, [demoGymId, expiryDate]);
+    `, [demoGymId, expiryDate, passwordHash]);
 
     await client.query(
       `UPDATE gyms SET member_id_counter = GREATEST(member_id_counter, 2) WHERE id = $1`,
