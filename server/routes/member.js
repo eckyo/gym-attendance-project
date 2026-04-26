@@ -29,7 +29,7 @@ router.post('/login', async (req, res, next) => {
       `SELECT m.id, m.gym_id, m.name, m.phone_number, m.password_hash
        FROM members m
        JOIN gyms g ON g.id = m.gym_id
-       WHERE m.phone_number = $1 AND m.deleted_at IS NULL AND g.is_active = true
+       WHERE REPLACE(m.phone_number, ' ', '') = $1 AND m.deleted_at IS NULL AND g.is_active = true
        LIMIT 2`,
       [phoneNumber.trim()]
     );
