@@ -21,7 +21,7 @@ const s = {
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  headerTitle: { fontSize: 18, fontWeight: 700 },
+  headerTitle: { fontSize: 18, fontWeight: 700, fontFamily: 'Impact, Arial Black, sans-serif' },
   headerRight: { display: 'flex', gap: 10, alignItems: 'center' },
   backBtn: {
     padding: '7px 16px',
@@ -54,7 +54,7 @@ const s = {
     borderBottom: '2px solid transparent',
     marginBottom: -2,
   },
-  tabActive: { color: '#3b82f6', borderBottomColor: '#3b82f6', fontWeight: 700 },
+  tabActive: { color: '#1a1a1a', borderBottomColor: '#BEFE00', fontWeight: 700 },
   toolbar: { display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' },
   searchInput: {
     padding: '9px 14px',
@@ -75,8 +75,8 @@ const s = {
   },
   addBtn: {
     padding: '9px 18px',
-    background: '#3b82f6',
-    color: '#fff',
+    background: '#BEFE00',
+    color: '#1a1a1a',
     border: 'none',
     borderRadius: 8,
     fontSize: 14,
@@ -497,7 +497,7 @@ function ImportModal({ token, onImported, onClose }) {
 
             {validRows.length > 0 && (
               <button
-                style={{ ...s.modalBtn, background: '#3b82f6', color: '#fff', opacity: loading ? 0.6 : 1, marginBottom: 10 }}
+                style={{ ...s.modalBtn, background: '#BEFE00', color: '#1a1a1a', opacity: loading ? 0.6 : 1, marginBottom: 10 }}
                 onClick={handleConfirm}
                 disabled={loading}
               >
@@ -565,7 +565,7 @@ function ChangePinModal({ token, onClose }) {
           <input style={s.modalInput} type="password" inputMode="numeric"
             value={confirmPin} onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
             placeholder={t('admin.changepin.confirmPin')} required />
-          <button style={{ ...s.modalBtn, background: '#3b82f6', color: '#fff', opacity: loading ? 0.6 : 1 }}
+          <button style={{ ...s.modalBtn, background: '#BEFE00', color: '#1a1a1a', opacity: loading ? 0.6 : 1 }}
             type="submit" disabled={loading}>
             {loading ? t('admin.changepin.saving') : t('admin.changepin.savePin')}
           </button>
@@ -722,7 +722,7 @@ function AddMemberModal({ token, onAdded, onClose }) {
             />
           </div>
           {phoneError && <div style={{ ...s.error, marginBottom: 8 }}>{phoneError}</div>}
-          <button style={{ ...s.modalBtn, background: '#3b82f6', color: '#fff', opacity: loading ? 0.6 : 1 }}
+          <button style={{ ...s.modalBtn, background: '#BEFE00', color: '#1a1a1a', opacity: loading ? 0.6 : 1 }}
             type="submit" disabled={loading}>
             {loading ? t('admin.add.adding') : t('admin.add.addMember')}
           </button>
@@ -829,7 +829,7 @@ function AddStaffModal({ token, onAdded, onClose }) {
           <input style={s.modalInput} type="password"
             value={password} onChange={(e) => setPassword(e.target.value)}
             placeholder={t('admin.staff.passwordPlaceholder')} required />
-          <button style={{ ...s.modalBtn, background: '#3b82f6', color: '#fff', opacity: loading ? 0.6 : 1 }}
+          <button style={{ ...s.modalBtn, background: '#BEFE00', color: '#1a1a1a', opacity: loading ? 0.6 : 1 }}
             type="submit" disabled={loading}>
             {loading ? t('admin.staff.adding') : t('admin.staff.addTitle')}
           </button>
@@ -970,7 +970,7 @@ function ChangeStaffPasswordModal({ token, staff, onClose }) {
             required
           />
           <button
-            style={{ ...s.modalBtn, background: '#3b82f6', color: '#fff', opacity: loading ? 0.6 : 1 }}
+            style={{ ...s.modalBtn, background: '#BEFE00', color: '#1a1a1a', opacity: loading ? 0.6 : 1 }}
             type="submit" disabled={loading}>
             {loading ? t('admin.changepin.saving') : t('admin.staff.changePassword')}
           </button>
@@ -1131,9 +1131,9 @@ function AttendanceTab({ token }) {
       {/* Daily summary counters */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
         {[
-          { label: t('admin.attendance.memberCount'), value: memberCount, accent: '#3b82f6', bg: '#eff6ff', iconBg: '#dbeafe', icon: '👤' },
+          { label: t('admin.attendance.memberCount'), value: memberCount, accent: '#BEFE00', bg: '#f7ffe0', iconBg: '#e9ffa0', icon: '👤' },
           { label: t('admin.attendance.visitorCount'), value: visitorCount, accent: '#f59e0b', bg: '#fffbeb', iconBg: '#fde68a', icon: '🚶' },
-          { label: t('admin.attendance.totalToday'),  value: memberCount + visitorCount, accent: '#10b981', bg: '#f0fdf4', iconBg: '#d1fae5', icon: '📊' },
+          { label: t('admin.attendance.totalToday'),  value: memberCount + visitorCount, accent: '#BEFE00', bg: '#f7ffe0', iconBg: '#e9ffa0', icon: '📊' },
         ].map(({ label, value, accent, bg, iconBg, icon }) => (
           <div key={label} style={{
             background: bg,
@@ -1169,10 +1169,10 @@ function AttendanceTab({ token }) {
             style={{
               ...s.actionBtn,
               padding: '5px 16px',
-              background: visitorFilter === f ? '#3b82f6' : '#fff',
-              color: visitorFilter === f ? '#fff' : '#475569',
+              background: visitorFilter === f ? '#BEFE00' : '#fff',
+              color: visitorFilter === f ? '#1a1a1a' : '#475569',
               border: '1.5px solid',
-              borderColor: visitorFilter === f ? '#3b82f6' : '#e2e8f0',
+              borderColor: visitorFilter === f ? '#BEFE00' : '#e2e8f0',
             }}
             onClick={() => setVisitorFilter(f)}
           >
@@ -1945,10 +1945,13 @@ export default function AdminPage({ token, role, gymName, onBack }) {
   return (
     <div style={s.page}>
       <div style={s.header}>
-        <div>
-          <div style={s.headerTitle}>{gymName ?? t('admin.title')}</div>
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', marginTop: 2, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-            {t('admin.title')}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <img src="/kiosgym-icon.svg" alt="KIOS GYM" style={{ height: 32, width: 'auto', display: 'block' }} />
+          <div>
+            <div style={s.headerTitle}>{gymName ?? t('admin.title')}</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', marginTop: 2, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+              {t('admin.title')}
+            </div>
           </div>
         </div>
         <div style={s.headerRight}>

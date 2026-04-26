@@ -1,6 +1,7 @@
 import { readFileSync, mkdirSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import bcrypt from 'bcryptjs';
 import pool from './pool.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -61,6 +62,15 @@ const migrate = async () => {
 
       console.log(`Migrated ${membersResult.rows.length} member(s) in gym ${gym.id} → up to ${generateGymId(counter)}`);
     }
+
+    // Backfill password_hash for existing members using default password
+    const defaultHash = await bcrypt.hash('password123', 10);
+    await client.query(
+      `UPDATE members SET password_hash = $1 WHERE password_hash IS NULL`,
+      [defaultHash]
+    );
+    await client.query(`ALTER TABLE members ALTER COLUMN password_hash SET NOT NULL`);
+    console.log('Member password_hash backfill complete.');
 
     await client.query('COMMIT');
     console.log('Migration complete.');

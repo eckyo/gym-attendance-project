@@ -117,3 +117,10 @@ ALTER TABLE membership_packages ADD COLUMN IF NOT EXISTS registration_fee INTEGE
 ALTER TABLE members ADD COLUMN IF NOT EXISTS is_visitor BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE gyms ADD COLUMN IF NOT EXISTS visitor_price INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE gyms ADD COLUMN IF NOT EXISTS visitor_id_counter INTEGER NOT NULL DEFAULT 0;
+
+-- Standby check-in QR code per gym (static, admin can reset via DB if needed)
+ALTER TABLE gyms ADD COLUMN IF NOT EXISTS checkin_code UUID UNIQUE DEFAULT gen_random_uuid();
+UPDATE gyms SET checkin_code = gen_random_uuid() WHERE checkin_code IS NULL;
+
+-- Member self-service password (backfilled via migrate.js)
+ALTER TABLE members ADD COLUMN IF NOT EXISTS password_hash TEXT;
