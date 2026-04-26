@@ -250,6 +250,7 @@
     "switchToMember": "Login as Member",
     "switchToStaff": "← Back",
     "noPhoneError": "No phone number registered. Ask staff to update your profile.",
+    "keepSignedIn": "Keep me signed in until I sign out",
 "profile": "Home",
     "package": "Package",
     "expiry": "Expires",

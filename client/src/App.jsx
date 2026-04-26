@@ -8,6 +8,39 @@ import SuperadminPage from './pages/SuperadminPage.jsx';
 import MemberPage from './pages/MemberPage.jsx';
 import { useTranslation, LanguageSwitcher } from './i18n/LanguageContext.jsx';
 
+const SESSION_KEY = 'memberSession';
+
+function saveSession(token, member) {
+  localStorage.setItem(SESSION_KEY, JSON.stringify({ token, member }));
+}
+
+function loadSession() {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const { token, member } = JSON.parse(raw);
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    if (payload.exp * 1000 < Date.now()) {
+      localStorage.removeItem(SESSION_KEY);
+      return null;
+    }
+    return { token, member };
+  } catch {
+    localStorage.removeItem(SESSION_KEY);
+    return null;
+  }
+}
+
+function clearSession() {
+  localStorage.removeItem(SESSION_KEY);
+}
+
+function normalizePhone(digits) {
+  const d = digits.trim().replace(/\D/g, '');
+  if (!d) return '';
+  return '+62' + (d.startsWith('0') ? d.slice(1) : d);
+}
+
 const s = {
   // ── Login page ──────────────────────────────────────────────────────────────
   container: {
@@ -146,6 +179,18 @@ const s = {
     color: 'rgba(255,255,255,0.3)',
     whiteSpace: 'nowrap',
   },
+  phonePrefix: {
+    padding: '12px 14px',
+    background: 'rgba(255,255,255,0.12)',
+    border: '1.5px solid rgba(255,255,255,0.12)',
+    borderRight: 'none',
+    borderRadius: '10px 0 0 10px',
+    fontSize: 15,
+    color: 'rgba(255,255,255,0.7)',
+    whiteSpace: 'nowrap',
+    display: 'flex',
+    alignItems: 'center',
+  },
   // ── PIN modal ───────────────────────────────────────────────────────────────
   overlay: {
     position: 'fixed',
@@ -217,6 +262,7 @@ function LoginForm({ onLogin, onMemberLogin }) {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [remember, setRemember] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { t } = useTranslation();
@@ -240,9 +286,9 @@ function LoginForm({ onLogin, onMemberLogin }) {
     setError('');
     setLoading(true);
     try {
-      const data = await memberLogin(phone, password);
+      const data = await memberLogin(normalizePhone(phone), password, remember);
       if (data.error) throw new Error(data.error);
-      onMemberLogin(data.token, data.member);
+      onMemberLogin(data.token, data.member, remember);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -285,16 +331,20 @@ function LoginForm({ onLogin, onMemberLogin }) {
         {mode === 'member' ? (
           <form onSubmit={handleMemberSubmit}>
             <label style={s.label}>{t('member.phoneLabel')}</label>
-            <input
-              className="login-dark-input"
-              style={s.input}
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder={t('member.phonePlaceholder')}
-              required
-              autoComplete="tel"
-            />
+            <div style={{ display: 'flex', marginBottom: 14 }}>
+              <div style={s.phonePrefix}>+62</div>
+              <input
+                className="login-dark-input"
+                style={{ ...s.input, marginBottom: 0, borderLeft: 'none', borderRadius: '0 10px 10px 0' }}
+                type="tel"
+                inputMode="numeric"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
+                placeholder="81234567890"
+                required
+                autoComplete="tel"
+              />
+            </div>
             <label style={s.label}>{t('login.passwordLabel')}</label>
             <input
               className="login-dark-input"
@@ -306,6 +356,17 @@ function LoginForm({ onLogin, onMemberLogin }) {
               required
               autoComplete="current-password"
             />
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={(e) => setRemember(e.target.checked)}
+                style={{ accentColor: '#BEFE00', width: 16, height: 16 }}
+              />
+              <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)' }}>
+                {t('member.keepSignedIn')}
+              </span>
+            </label>
             <button
               style={{ ...s.btn, ...(loading ? s.btnDisabled : {}) }}
               type="submit"
@@ -433,7 +494,11 @@ function PinModal({ token, onSuccess, onCancel }) {
 }
 
 export default function App() {
-  const [auth, setAuth] = useState(null); // { token, role, gymName }
+  const [auth, setAuth] = useState(() => {
+    const session = loadSession();
+    if (!session) return null;
+    return { token: session.token, role: 'member', gymName: '', memberName: session.member.name };
+  });
   const [page, setPage] = useState('scan');
   const [showPinModal, setShowPinModal] = useState(false);
 
@@ -442,11 +507,12 @@ export default function App() {
     setAuth({ token, role, gymName });
   };
 
-  const handleMemberLogin = (token, member) => {
+  const handleMemberLogin = (token, member, remember) => {
+    if (remember) saveSession(token, member);
     setAuth({ token, role: 'member', gymName: '', memberName: member.name });
   };
 
-  const handleLogout = () => { setAuth(null); setPage('scan'); };
+  const handleLogout = () => { clearSession(); setAuth(null); setPage('scan'); };
 
   if (!auth) {
     return <LoginForm onLogin={handleLogin} onMemberLogin={handleMemberLogin} />;

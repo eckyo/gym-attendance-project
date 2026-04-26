@@ -250,6 +250,7 @@
     "switchToMember": "Login sebagai Anggota",
     "switchToStaff": "← Kembali",
     "noPhoneError": "Nomor telepon belum terdaftar. Minta staf untuk memperbarui profil Anda.",
+    "keepSignedIn": "Tetap masuk hingga saya keluar",
 "profile": "Beranda",
     "package": "Paket",
     "expiry": "Kedaluwarsa",

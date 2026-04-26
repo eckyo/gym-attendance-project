@@ -19,7 +19,7 @@ const requireMember = [requireAuth, injectGymId, requireRole('member')];
 // POST /api/member/login — public, no auth required
 router.post('/login', async (req, res, next) => {
   try {
-    const { phoneNumber, password } = req.body;
+    const { phoneNumber, password, remember } = req.body;
 
     if (!phoneNumber?.trim() || !password?.trim()) {
       return res.status(400).json({ error: 'Phone number and password are required' });
@@ -56,7 +56,7 @@ router.post('/login', async (req, res, next) => {
     const token = jwt.sign(
       { userId: member.id, gymId: member.gym_id, role: 'member' },
       process.env.JWT_SECRET,
-      { expiresIn: '8h' }
+      { expiresIn: remember ? '30d' : '8h' }
     );
 
     res.json({ token, member: { id: member.id, name: member.name, gymId: member.gym_id } });
