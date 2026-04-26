@@ -239,14 +239,8 @@ function LoginForm({ onLogin, onMemberLogin }) {
     e.preventDefault();
     setError('');
     setLoading(true);
-    const gymId = localStorage.getItem('gymId');
-    if (!gymId) {
-      setError(t('member.noGymContext'));
-      setLoading(false);
-      return;
-    }
     try {
-      const data = await memberLogin(phone, password, gymId);
+      const data = await memberLogin(phone, password);
       if (data.error) throw new Error(data.error);
       onMemberLogin(data.token, data.member);
     } catch (err) {

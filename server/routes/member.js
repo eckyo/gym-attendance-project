@@ -19,22 +19,24 @@ const requireMember = [requireAuth, injectGymId, requireRole('member')];
 // POST /api/member/login — public, no auth required
 router.post('/login', async (req, res, next) => {
   try {
-    const { phoneNumber, password, gymId } = req.body;
+    const { phoneNumber, password } = req.body;
 
     if (!phoneNumber?.trim() || !password?.trim()) {
       return res.status(400).json({ error: 'Phone number and password are required' });
     }
-    if (!gymId) {
-      return res.status(400).json({ error: 'Gym context missing. Please access this from your gym kiosk.' });
-    }
 
     const result = await pool.query(
-      `SELECT id, gym_id, name, phone_number, password_hash
-       FROM members
-       WHERE phone_number = $1 AND gym_id = $2 AND deleted_at IS NULL
-       LIMIT 1`,
-      [phoneNumber.trim(), gymId]
+      `SELECT m.id, m.gym_id, m.name, m.phone_number, m.password_hash
+       FROM members m
+       JOIN gyms g ON g.id = m.gym_id
+       WHERE m.phone_number = $1 AND m.deleted_at IS NULL AND g.is_active = true
+       LIMIT 2`,
+      [phoneNumber.trim()]
     );
+
+    if (result.rows.length > 1) {
+      return res.status(400).json({ error: 'Multiple accounts found with this number. Please contact your gym.' });
+    }
 
     const member = result.rows[0];
 
