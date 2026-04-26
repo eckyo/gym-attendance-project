@@ -33,8 +33,15 @@ router.post('/login', async (req, res, next) => {
       `SELECT m.id, m.gym_id, m.name, m.phone_number, m.password_hash
        FROM members m
        JOIN gyms g ON g.id = m.gym_id
-       WHERE REGEXP_REPLACE(REGEXP_REPLACE(m.phone_number, '[^0-9]', '', 'g'), '^0', '62')
-             = $1 AND m.deleted_at IS NULL AND g.is_active = true
+       WHERE CASE
+               WHEN REGEXP_REPLACE(m.phone_number, '[^0-9]', '', 'g') LIKE '62%'
+                 THEN REGEXP_REPLACE(m.phone_number, '[^0-9]', '', 'g')
+               WHEN REGEXP_REPLACE(m.phone_number, '[^0-9]', '', 'g') LIKE '0%'
+                 THEN '62' || SUBSTRING(REGEXP_REPLACE(m.phone_number, '[^0-9]', '', 'g') FROM 2)
+               ELSE
+                 '62' || REGEXP_REPLACE(m.phone_number, '[^0-9]', '', 'g')
+             END = $1
+             AND m.deleted_at IS NULL AND g.is_active = true
        LIMIT 2`,
       [normalizedInput]
     );
