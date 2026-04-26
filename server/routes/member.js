@@ -25,13 +25,18 @@ router.post('/login', async (req, res, next) => {
       return res.status(400).json({ error: 'Phone number and password are required' });
     }
 
+    // Normalize input: strip all non-digits, then re-add +62 prefix
+    const digitsOnly = phoneNumber.replace(/\D/g, '');
+    const normalizedInput = '62' + (digitsOnly.startsWith('62') ? digitsOnly.slice(2) : digitsOnly.startsWith('0') ? digitsOnly.slice(1) : digitsOnly);
+
     const result = await pool.query(
       `SELECT m.id, m.gym_id, m.name, m.phone_number, m.password_hash
        FROM members m
        JOIN gyms g ON g.id = m.gym_id
-       WHERE REPLACE(m.phone_number, ' ', '') = $1 AND m.deleted_at IS NULL AND g.is_active = true
+       WHERE REGEXP_REPLACE(REGEXP_REPLACE(m.phone_number, '[^0-9]', '', 'g'), '^0', '62')
+             = $1 AND m.deleted_at IS NULL AND g.is_active = true
        LIMIT 2`,
-      [phoneNumber.trim()]
+      [normalizedInput]
     );
 
     if (result.rows.length > 1) {
