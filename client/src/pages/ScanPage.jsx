@@ -555,42 +555,128 @@ function VisitorCheckInModal({ token, onSuccess, onClose }) {
 
 // ── Standby QR Download ────────────────────────────────────────────────────────
 
+function loadImage(src) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.src = src;
+  });
+}
+
+function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+  const words = text.split(' ');
+  let line = '';
+  let currentY = y;
+  for (const word of words) {
+    const test = line ? line + ' ' + word : word;
+    if (ctx.measureText(test).width > maxWidth && line) {
+      ctx.fillText(line, x, currentY);
+      line = word;
+      currentY += lineHeight;
+    } else {
+      line = test;
+    }
+  }
+  ctx.fillText(line, x, currentY);
+  return currentY;
+}
+
 function downloadStandbyQR(gymName, qrDataUrl) {
+  const W = 600;
+  const H = 940;
   const canvas = document.createElement('canvas');
-  canvas.width = 600;
-  canvas.height = 780;
+  canvas.width = W;
+  canvas.height = H;
   const ctx = canvas.getContext('2d');
 
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, 600, 780);
+  Promise.all([loadImage(qrDataUrl), loadImage('/kiosgym-icon.svg')]).then(([qrImg, logoImg]) => {
+    // ── Background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, W, H);
 
-  ctx.fillStyle = '#1a1a2e';
-  ctx.font = 'bold 30px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText(gymName, 300, 58);
-
-  const img = new Image();
-  img.onload = () => {
-    ctx.drawImage(img, 100, 80, 400, 400);
-
+    // ── Gym name
     ctx.fillStyle = '#1a1a2e';
-    ctx.font = 'bold 22px sans-serif';
-    ctx.fillText('Scan to check in', 300, 530);
+    ctx.font = 'bold 26px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(gymName, 300, 52);
 
+    // ── QR code
+    ctx.drawImage(qrImg, 125, 76, 350, 350);
+
+    // ── Divider
+    const drawDivider = (y) => {
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(W, y);
+      ctx.stroke();
+    };
+    drawDivider(442);
+
+    // ── Cara Check-in section (light gray bg)
+    ctx.fillStyle = '#f8fafc';
+    ctx.fillRect(0, 442, W, 190);
+
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#1a1a2e';
+    ctx.font = 'bold 14px sans-serif';
+    ctx.fillText('Cara Check-in', 40, 468);
+
+    const checkinSteps = [
+      '1. Buka kiosgym.com',
+      '2. Login dengan nomor HP & kata sandi',
+      "3. Pilih 'Absen Sekarang' lalu arahkan kamera ke QR ini",
+      '4. Selesai! Kamu berhasil check-in',
+    ];
     ctx.fillStyle = '#374151';
-    ctx.font = '20px sans-serif';
-    ctx.fillText('Pindai untuk absen', 300, 566);
-
-    ctx.fillStyle = '#94a3b8';
     ctx.font = '13px sans-serif';
-    ctx.fillText('Tunjukkan QR ini kepada anggota  /  Show this QR to members', 300, 620);
+    let y = 494;
+    for (const step of checkinSteps) {
+      y = wrapText(ctx, step, 40, y, 520, 20) + 24;
+    }
 
+    drawDivider(632);
+
+    // ── Belum terdaftar? section (white bg)
+    ctx.fillStyle = '#1a1a2e';
+    ctx.font = 'bold 14px sans-serif';
+    ctx.fillText('Belum terdaftar?', 40, 658);
+
+    const registerSteps = [
+      '1. Hubungi staff gym',
+      '2. Staff daftarkan nomor HP kamu',
+      '3. Kamu akan mendapat kata sandi sementara',
+      '4. Login dan ikuti langkah di atas',
+    ];
+    ctx.fillStyle = '#374151';
+    ctx.font = '13px sans-serif';
+    y = 682;
+    for (const step of registerSteps) {
+      y = wrapText(ctx, step, 40, y, 520, 20) + 24;
+    }
+
+    drawDivider(800);
+
+    // ── Footer: logo icon + "Powered by" text
+    const iconSize = 24;
+    const label = 'Powered by';
+    ctx.font = '12px sans-serif';
+    ctx.fillStyle = '#94a3b8';
+    const labelW = ctx.measureText(label).width;
+    const gap = 6;
+    const totalW = labelW + gap + iconSize;
+    const startX = (W - totalW) / 2;
+    ctx.textAlign = 'left';
+    ctx.fillText(label, startX, 828);
+    ctx.drawImage(logoImg, startX + labelW + gap, 828 - iconSize + 4, iconSize, iconSize);
+
+    // ── Trigger download
     const link = document.createElement('a');
     link.download = `${gymName.replace(/\s+/g, '-')}-checkin-qr.png`;
     link.href = canvas.toDataURL('image/png');
     link.click();
-  };
-  img.src = qrDataUrl;
+  });
 }
 
 // ── Scan Page ──────────────────────────────────────────────────────────────────
