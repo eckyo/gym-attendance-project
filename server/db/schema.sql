@@ -124,3 +124,7 @@ UPDATE gyms SET checkin_code = gen_random_uuid() WHERE checkin_code IS NULL;
 
 -- Member self-service password (backfilled via migrate.js)
 ALTER TABLE members ADD COLUMN IF NOT EXISTS password_hash TEXT;
+
+-- Registration fee grace period rule per gym
+ALTER TABLE gyms ADD COLUMN IF NOT EXISTS reg_fee_rule_enabled BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE gyms ADD COLUMN IF NOT EXISTS reg_fee_grace_months INTEGER NOT NULL DEFAULT 3;

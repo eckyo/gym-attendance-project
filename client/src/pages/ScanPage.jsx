@@ -1,4 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
+
+function useIsMobile() {
+  const [mobile, setMobile] = useState(() => window.innerWidth < 640);
+  useEffect(() => {
+    const fn = () => setMobile(window.innerWidth < 640);
+    window.addEventListener('resize', fn);
+    return () => window.removeEventListener('resize', fn);
+  }, []);
+  return mobile;
+}
 import { Html5Qrcode } from 'html5-qrcode';
 import QRCode from 'qrcode';
 import Lottie from 'lottie-react';
@@ -682,6 +692,7 @@ function downloadStandbyQR(gymName, qrDataUrl) {
 // ── Scan Page ──────────────────────────────────────────────────────────────────
 
 export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess }) {
+  const isMobile = useIsMobile();
   const [feedback, setFeedback] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [cameraError, setCameraError] = useState(false);
@@ -694,6 +705,7 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
   const [showStandbyQr, setShowStandbyQr] = useState(false);
   const [standbyQrData, setStandbyQrData] = useState(null);
   const [standbyQrLoading, setStandbyQrLoading] = useState(false);
+  const [kebabOpen, setKebabOpen] = useState(false);
 
   const lastScanRef = useRef(null);
   const isProcessingRef = useRef(false);
@@ -815,20 +827,47 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
           </div>
         </div>
         <div style={st.headerRight}>
-          <LanguageSwitcher variant="light" />
-          <button
-            style={{ ...st.adminBtn, ...(standbyQrLoading ? { opacity: 0.6, cursor: 'not-allowed' } : {}) }}
-            onClick={loadStandbyQr}
-            disabled={standbyQrLoading}
-          >
-            {standbyQrLoading ? t('standbyQr.loading') : t('standbyQr.button')}
-          </button>
-          {role === 'admin' && (
-            <button style={st.adminBtn} onClick={onAdminAccess}>
-              {t('scan.adminDashboard')}
-            </button>
+          {isMobile ? (
+            <>
+              <button style={st.logoutBtn} onClick={onLogout}>{t('scan.logout')}</button>
+              <div style={{ position: 'relative' }}>
+                <button
+                  style={{ width: 34, height: 34, background: 'transparent', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 8, color: '#fff', cursor: 'pointer', fontSize: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
+                  onClick={() => setKebabOpen((p) => !p)}
+                >
+                  ⋮
+                </button>
+                {kebabOpen && (
+                  <>
+                    <div style={{ position: 'fixed', inset: 0, zIndex: 199 }} onClick={() => setKebabOpen(false)} />
+                    <div style={{ position: 'absolute', right: 0, top: '100%', zIndex: 200, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.12)', minWidth: 200, overflow: 'hidden' }}>
+                      <div style={{ padding: '10px 16px', borderBottom: '1px solid #f1f5f9' }}>
+                        <LanguageSwitcher variant="dark" />
+                      </div>
+                      {role === 'admin' && (
+                        <button
+                          style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', background: 'none', border: 'none', borderTop: '1px solid #f1f5f9', cursor: 'pointer', fontSize: 13, color: '#1e293b' }}
+                          onClick={() => { onAdminAccess(); setKebabOpen(false); }}
+                        >
+                          {t('scan.adminDashboard')}
+                        </button>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <LanguageSwitcher variant="light" />
+              {role === 'admin' && (
+                <button style={st.adminBtn} onClick={onAdminAccess}>
+                  {t('scan.adminDashboard')}
+                </button>
+              )}
+              <button style={st.logoutBtn} onClick={onLogout}>{t('scan.logout')}</button>
+            </>
           )}
-          <button style={st.logoutBtn} onClick={onLogout}>{t('scan.logout')}</button>
         </div>
       </div>
 
@@ -850,8 +889,17 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
           <div style={st.feedbackError}>{feedback.message}</div>
         )}
 
+        {/* Show Attendance QR button — always below camera */}
+        <button
+          style={{ ...st.imageBtn, ...(standbyQrLoading ? { opacity: 0.6, cursor: 'not-allowed' } : {}) }}
+          onClick={loadStandbyQr}
+          disabled={standbyQrLoading}
+        >
+          🔳 {standbyQrLoading ? t('standbyQr.loading') : t('standbyQr.button')}
+        </button>
+
         {/* Scan image file button */}
-        <button style={st.imageBtn} onClick={() => setShowImagePin(true)}>
+        <button style={{ ...st.imageBtn, marginTop: 8 }} onClick={() => setShowImagePin(true)}>
           📂 {t('scan.scanImage')}
         </button>
 

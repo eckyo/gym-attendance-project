@@ -172,3 +172,10 @@ export const setVisitorPrice = (token, price) =>
     headers: authHeaders(token),
     body: JSON.stringify({ price }),
   }).then(handleResponse);
+
+export const setRegFeeRule = (token, enabled, graceMonths) =>
+  fetch(`${API_BASE}/api/admin/settings/reg-fee-rule`, {
+    method: 'PUT',
+    headers: authHeaders(token),
+    body: JSON.stringify({ enabled, graceMonths }),
+  }).then(handleResponse);
