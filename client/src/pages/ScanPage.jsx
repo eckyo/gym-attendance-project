@@ -14,8 +14,9 @@ import QRCode from 'qrcode';
 import Lottie from 'lottie-react';
 import successAnimation from '../assets/success.json';
 import errorAnimation from '../assets/error.json';
-import { postScan, verifyScanPin, registerMember, checkInVisitor } from '../api/scan.js';
+import { postScan, verifyScanPin, registerMember, checkInVisitor, lookupMember, extendMember } from '../api/scan.js';
 import { getPackages } from '../api/admin.js';
+
 import { useTranslation, LanguageSwitcher } from '../i18n/LanguageContext.jsx';
 
 const daysUntilExpiry = (dateStr) => Math.ceil((new Date(dateStr) - new Date()) / 86400000);
@@ -317,7 +318,7 @@ const st = {
 
 // ── Image PIN Modal ────────────────────────────────────────────────────────────
 
-function ImagePinModal({ token, onVerified, onClose, subtitle, isPassword }) {
+function ImagePinModal({ token, onVerified, onClose, title, subtitle, isPassword }) {
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -340,7 +341,7 @@ function ImagePinModal({ token, onVerified, onClose, subtitle, isPassword }) {
   return (
     <div style={st.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div style={st.pinCard}>
-        <div style={st.pinTitle}>📂 {t('scan.scanImage')}</div>
+        <div style={st.pinTitle}>{title ?? `📂 ${t('scan.scanImage')}`}</div>
         <div style={st.pinSubtitle}>{subtitle ?? t('scan.pinForImage')}</div>
         {error && <div style={st.pinError}>{error}</div>}
         <form onSubmit={handleSubmit}>
@@ -689,6 +690,184 @@ function downloadStandbyQR(gymName, qrDataUrl) {
   });
 }
 
+// ── Extend Member Modal ────────────────────────────────────────────────────────
+
+function ExtendMemberModal({ token, initialTarget, onSuccess, onClose }) {
+  const { t, lang } = useTranslation();
+
+  const [packages, setPackages] = useState([]);
+  const [scanTokenInput, setScanTokenInput] = useState(initialTarget?.scanToken || '');
+  const [member, setMember] = useState(
+    initialTarget?.memberId
+      ? { id: initialTarget.memberId, name: initialTarget.memberName, scan_token: initialTarget.scanToken, expiry_date: initialTarget.expiryDate }
+      : null
+  );
+  const [selectedPackageId, setSelectedPackageId] = useState('');
+  const [staffPassword, setStaffPassword] = useState('');
+  const [searching, setSearching] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const fromExpiredScan = initialTarget?.fromExpiredScan ?? false;
+
+  // Determine preview expiry
+  const calcPreview = (expiryDate, durationDays) => {
+    const base = expiryDate && new Date(expiryDate) > new Date() ? new Date(expiryDate) : new Date();
+    base.setDate(base.getDate() + durationDays);
+    return base.toISOString().slice(0, 10);
+  };
+
+  const selectedPkg = packages.find((p) => p.id === selectedPackageId);
+  const previewExpiry = member && selectedPkg ? calcPreview(member.expiry_date, selectedPkg.duration_days) : null;
+
+  useEffect(() => {
+    getPackages(token).then(setPackages).catch(() => {});
+  }, [token]);
+
+  const handleSearch = async () => {
+    if (!scanTokenInput.trim()) return;
+    setSearching(true);
+    setError('');
+    setMember(null);
+    try {
+      const m = await lookupMember(token, scanTokenInput.trim());
+      setMember(m);
+    } catch (err) {
+      setError(err.message || t('scan.extendMemberNotFound'));
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const handleConfirm = async () => {
+    if (!member || !selectedPackageId || !staffPassword) return;
+    setSubmitting(true);
+    setError('');
+    try {
+      const result = await extendMember(token, member.id, selectedPackageId, staffPassword);
+      onSuccess({ ...result, memberName: member.name }, fromExpiredScan, member.scan_token);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const cardStyle = { background: '#fff', borderRadius: 16, padding: '28px 24px', width: '100%', maxWidth: 360, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' };
+  const labelStyle = { display: 'block', fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' };
+  const inputStyle = { width: '100%', padding: '10px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, outline: 'none', boxSizing: 'border-box' };
+  const btnPrimary = { width: '100%', padding: '12px', background: '#BEFE00', color: '#1a1a1a', border: 'none', borderRadius: 8, fontSize: 15, fontWeight: 700, cursor: 'pointer', marginTop: 14 };
+  const btnSecondary = { width: '100%', padding: '11px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer', marginTop: 8 };
+
+  return (
+    <div style={st.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={cardStyle}>
+        <div style={{ fontSize: 18, fontWeight: 700, color: '#1a1a2e', marginBottom: 18, textAlign: 'center', fontFamily: 'Impact, Arial Black, sans-serif' }}>
+          {t('scan.extendTitle')}
+        </div>
+
+        {error && (
+          <div style={{ background: '#fee2e2', color: '#991b1b', borderRadius: 8, padding: '9px 12px', fontSize: 13, marginBottom: 14, textAlign: 'center' }}>
+            {error}
+          </div>
+        )}
+
+        {/* Step 1: search by GYM ID (skip if pre-filled from expired scan) */}
+        {!fromExpiredScan && (
+          <div style={{ marginBottom: 16 }}>
+            <label style={labelStyle}>{t('scan.extendSearchLabel')}</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                style={{ ...inputStyle, flex: 1 }}
+                value={scanTokenInput}
+                onChange={(e) => setScanTokenInput(e.target.value.toUpperCase())}
+                placeholder={t('scan.extendSearchPlaceholder')}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              />
+              <button
+                style={{ padding: '10px 14px', background: '#1a1a2e', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                onClick={handleSearch}
+                disabled={searching}
+              >
+                {searching ? '…' : t('scan.extendSearch')}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Member info */}
+        {member && (
+          <div style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
+            <div style={{ fontWeight: 700, fontSize: 15, color: '#1e293b' }}>{member.name}</div>
+            <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{member.scan_token}</div>
+            <div style={{ fontSize: 12, color: member.expiry_date && new Date(member.expiry_date) < new Date() ? '#dc2626' : '#64748b', marginTop: 2 }}>
+              {member.expiry_date
+                ? `Expires: ${new Date(member.expiry_date).toLocaleDateString(lang === 'id' ? 'id-ID' : 'en-US')}`
+                : 'No expiry set'}
+            </div>
+          </div>
+        )}
+
+        {/* Step 2: package + password (only shown when member is found) */}
+        {member && (
+          <>
+            <div style={{ marginBottom: 14 }}>
+              <label style={labelStyle}>{t('admin.packages.packageLabel')}</label>
+              <select
+                style={{ ...inputStyle, background: '#fff' }}
+                value={selectedPackageId}
+                onChange={(e) => setSelectedPackageId(e.target.value)}
+              >
+                <option value="">{t('scan.extendSelectPackage')}</option>
+                {packages.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} — Rp {Number(p.price).toLocaleString('id-ID')}
+                  </option>
+                ))}
+              </select>
+              {previewExpiry && (
+                <div style={{ fontSize: 12, color: '#64748b', marginTop: 5 }}>
+                  {t('admin.packages.expiresOn', { date: new Date(previewExpiry).toLocaleDateString(lang === 'id' ? 'id-ID' : 'en-US') })}
+                </div>
+              )}
+            </div>
+
+            <div style={{ marginBottom: 4 }}>
+              <label style={labelStyle}>{t('scan.extendPassword')}</label>
+              <input
+                style={inputStyle}
+                type="password"
+                value={staffPassword}
+                onChange={(e) => setStaffPassword(e.target.value)}
+                placeholder="••••••••"
+                autoComplete="current-password"
+              />
+            </div>
+
+            {selectedPkg && (
+              <div style={{ background: '#fef9c3', border: '1.5px solid #fde68a', borderRadius: 8, padding: '10px 14px', marginTop: 12, textAlign: 'center' }}>
+                <div style={{ fontSize: 11, color: '#92400e', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('scan.collectPayment')}</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: '#b45309' }}>
+                  Rp {Number(selectedPkg.price).toLocaleString('id-ID')}
+                </div>
+              </div>
+            )}
+
+            <button
+              style={{ ...btnPrimary, opacity: (!selectedPackageId || !staffPassword || submitting) ? 0.5 : 1, cursor: (!selectedPackageId || !staffPassword || submitting) ? 'not-allowed' : 'pointer' }}
+              onClick={handleConfirm}
+              disabled={!selectedPackageId || !staffPassword || submitting}
+            >
+              {submitting ? t('scan.extendConfirming') : t('scan.extendConfirm')}
+            </button>
+          </>
+        )}
+
+        <button style={btnSecondary} onClick={onClose}>{t('common.cancel')}</button>
+      </div>
+    </div>
+  );
+}
+
 // ── Scan Page ──────────────────────────────────────────────────────────────────
 
 export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess }) {
@@ -706,6 +885,8 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
   const [standbyQrData, setStandbyQrData] = useState(null);
   const [standbyQrLoading, setStandbyQrLoading] = useState(false);
   const [kebabOpen, setKebabOpen] = useState(false);
+  const [extendTarget, setExtendTarget] = useState(null);
+  const [manageMemberOpen, setManageMemberOpen] = useState(false);
 
   const lastScanRef = useRef(null);
   const isProcessingRef = useRef(false);
@@ -713,9 +894,9 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
   const fileInputRef = useRef(null);
   const { lang, t } = useTranslation();
 
-  // Countdown auto-close for success overlay — resets on each new check-in
+  // Countdown auto-close for success overlay — resets on each new check-in (not for extend-only)
   useEffect(() => {
-    if (feedback?.type !== 'success') return;
+    if (feedback?.type !== 'success' || feedback?.extendOnly) return;
     setCountdown(5);
     const intervalId = setInterval(() => setCountdown((c) => Math.max(0, c - 1)), 1000);
     const timeoutId = setTimeout(() => setFeedback(null), 5000);
@@ -748,7 +929,14 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
       });
     } catch (err) {
       const isExpired = err.message?.toLowerCase().includes('expired');
-      setFeedback({ type: isExpired ? 'expired' : 'error', message: err.message });
+      setFeedback({
+        type: isExpired ? 'expired' : 'error',
+        message: err.message,
+        memberId: err.data?.memberId,
+        memberName: err.data?.memberName,
+        scanToken: err.data?.scanToken,
+        expiryDate: err.data?.expiryDate,
+      });
     } finally {
       isProcessingRef.current = false;
       setIsProcessing(false);
@@ -903,10 +1091,34 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
           📂 {t('scan.scanImage')}
         </button>
 
-        {/* Register new member button */}
-        <button style={{ ...st.imageBtn, marginTop: 8 }} onClick={() => setShowRegisterPin(true)}>
-          📋 {t('scan.registerMember')}
-        </button>
+        {/* Manage Member dropdown — Register + Extend */}
+        <div style={{ position: 'relative', marginTop: 8 }}>
+          <button
+            style={st.imageBtn}
+            onClick={() => setManageMemberOpen((p) => !p)}
+          >
+            👥 {t('scan.manageMember')} <span style={{ fontSize: 11, opacity: 0.6, marginLeft: 4 }}>{manageMemberOpen ? '▲' : '▼'}</span>
+          </button>
+          {manageMemberOpen && (
+            <>
+              <div style={{ position: 'fixed', inset: 0, zIndex: 49 }} onClick={() => setManageMemberOpen(false)} />
+              <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', zIndex: 50, background: '#fff', border: '1.5px solid #e2e8f0', borderTop: 'none', borderRadius: '0 0 10px 10px', overflow: 'hidden' }}>
+                <button
+                  style={{ display: 'block', width: '100%', textAlign: 'left', padding: '12px 16px', background: 'none', border: 'none', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#475569' }}
+                  onClick={() => { setManageMemberOpen(false); setShowRegisterPin(true); }}
+                >
+                  📋 {t('scan.registerMember')}
+                </button>
+                <button
+                  style={{ display: 'block', width: '100%', textAlign: 'left', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#475569' }}
+                  onClick={() => { setManageMemberOpen(false); setExtendTarget({}); }}
+                >
+                  🔄 {t('scan.extendMembership')}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
 
         {/* Walk-in visitor button */}
         <button style={{ ...st.imageBtn, marginTop: 8 }} onClick={() => setShowVisitorPin(true)}>
@@ -938,7 +1150,8 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
       {showRegisterPin && (
         <ImagePinModal
           token={token}
-          subtitle={role === 'staff' ? t('scan.registerPinSubtitle') : t('scan.registerPinSubtitle')}
+          title={`📋 ${t('scan.registerTitle')}`}
+          subtitle={t('scan.registerPinSubtitle')}
           onVerified={() => { setShowRegisterPin(false); setShowRegisterForm(true); }}
           onClose={() => setShowRegisterPin(false)}
           isPassword={role === 'staff'}
@@ -969,6 +1182,7 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
       {showVisitorPin && (
         <ImagePinModal
           token={token}
+          title={`🚶 ${t('scan.walkInTitle')}`}
           subtitle={t('scan.walkInPinSubtitle')}
           onVerified={() => { setShowVisitorPin(false); setShowVisitorForm(true); }}
           onClose={() => setShowVisitorPin(false)}
@@ -995,6 +1209,35 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
         />
       )}
 
+      {/* ── Extend Member modal ── */}
+      {extendTarget !== null && (
+        <ExtendMemberModal
+          token={token}
+          initialTarget={extendTarget}
+          onSuccess={(result, fromExpiredScan, scanToken) => {
+            setExtendTarget(null);
+            if (fromExpiredScan && scanToken) {
+              postScan(token, scanToken).then((r) => {
+                setFeedback({
+                  type: 'success',
+                  memberName: r.memberName,
+                  gymId: r.gymId,
+                  checkedInAt: r.checkedInAt,
+                  packageName: r.packageName || null,
+                  expiryDate: r.expiryDate || null,
+                  extendCheckin: true,
+                });
+              }).catch(() => {
+                setFeedback({ type: 'success', extendOnly: true, memberName: result.memberName || '', packageName: result.packageName, totalAmount: result.totalAmount });
+              });
+            } else {
+              setFeedback({ type: 'success', extendOnly: true, memberName: result.memberName || '', packageName: result.packageName, totalAmount: result.totalAmount });
+            }
+          }}
+          onClose={() => setExtendTarget(null)}
+        />
+      )}
+
       {/* ── Expired overlay ── */}
       {feedback?.type === 'expired' && (
         <div style={st.overlay}>
@@ -1006,7 +1249,25 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
             />
             <p style={st.errorHeading}>{t('scan.membershipExpired')}</p>
             <p style={st.errorMessage}>{feedback.message}</p>
-            <p style={st.errorHint}>{t('scan.expiredHint')}</p>
+            {feedback.memberId ? (
+              <button
+                style={{ ...st.returnBtn, background: '#BEFE00', color: '#1a1a1a', marginBottom: 10 }}
+                onClick={() => {
+                  setExtendTarget({
+                    memberId: feedback.memberId,
+                    memberName: feedback.memberName,
+                    scanToken: feedback.scanToken,
+                    expiryDate: feedback.expiryDate,
+                    fromExpiredScan: true,
+                  });
+                  setFeedback(null);
+                }}
+              >
+                {t('scan.extendMembership')}
+              </button>
+            ) : (
+              <p style={st.errorHint}>{t('scan.expiredHint')}</p>
+            )}
             <button style={st.returnBtn} onClick={() => setFeedback(null)}>
               {t('scan.returnToScan')}
             </button>
@@ -1067,11 +1328,19 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
               style={{ width: 160, height: 160, margin: '0 auto' }}
             />
             <p style={st.cardHeading}>
-              {feedback.isNewMember ? t('scan.registerSuccess') : feedback.isVisitor ? t('scan.walkInSuccess') : t('scan.checkinSuccess')}
+              {feedback.extendOnly
+                ? t('scan.extendSuccess')
+                : feedback.extendCheckin
+                  ? t('scan.extendCheckinSuccess')
+                  : feedback.isNewMember
+                    ? t('scan.registerSuccess')
+                    : feedback.isVisitor
+                      ? t('scan.walkInSuccess')
+                      : t('scan.checkinSuccess')}
             </p>
             <div style={st.cardName}>{feedback.memberName}</div>
-            {!feedback.isVisitor && <div style={st.cardGymId}>{t('scan.gymId')}: {feedback.gymId}</div>}
-            <div style={st.cardTime}>{t('scan.clockedIn', { time: formatTime(feedback.checkedInAt) })}</div>
+            {!feedback.isVisitor && !feedback.extendOnly && <div style={st.cardGymId}>{t('scan.gymId')}: {feedback.gymId}</div>}
+            {!feedback.extendOnly && <div style={st.cardTime}>{t('scan.clockedIn', { time: formatTime(feedback.checkedInAt) })}</div>}
             {feedback.packageName && (
               <div style={st.cardPackage}>{feedback.packageName}</div>
             )}
@@ -1099,7 +1368,22 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
               </div>
             )}
 
-            {/* Countdown close button */}
+            {/* Extend payment reminder */}
+            {(feedback.extendOnly || feedback.extendCheckin) && feedback.totalAmount > 0 && (
+              <div style={{
+                background: '#fef9c3', border: '1.5px solid #fde68a',
+                borderRadius: 10, padding: '10px 16px', marginTop: 14,
+              }}>
+                <div style={{ fontSize: 11, color: '#92400e', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>
+                  {t('scan.collectPayment')}
+                </div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: '#b45309' }}>
+                  Rp {Number(feedback.totalAmount).toLocaleString('id-ID')}
+                </div>
+              </div>
+            )}
+
+            {/* Close button — countdown shown only for check-in successes */}
             <button
               onClick={() => setFeedback(null)}
               style={{
@@ -1109,14 +1393,16 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
                 borderRadius: 12, cursor: 'pointer', fontSize: 15, fontWeight: 600, color: '#475569',
               }}
             >
-              <span style={{
-                width: 30, height: 30, borderRadius: '50%',
-                background: '#1a1a2e', color: '#fff',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 14, fontWeight: 800, flexShrink: 0,
-              }}>
-                {countdown}
-              </span>
+              {!feedback.extendOnly && (
+                <span style={{
+                  width: 30, height: 30, borderRadius: '50%',
+                  background: '#1a1a2e', color: '#fff',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 14, fontWeight: 800, flexShrink: 0,
+                }}>
+                  {countdown}
+                </span>
+              )}
               {t('scan.closeOverlay')}
             </button>
           </div>

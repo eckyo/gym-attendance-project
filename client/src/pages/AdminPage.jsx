@@ -15,7 +15,7 @@ import {
   deleteMember, changePin, exportMembers, downloadTemplate,
   previewImport, confirmImport, getStaff, addStaff, removeStaff, verifyPin, changeStaffPassword,
   getPackages, createPackage, updatePackage, deletePackage, setDefaultPackage,
-  addMemberWithPackage, getSettings, setVisitorPrice, setRegFeeRule,
+  addMemberWithPackage, getSettings, setVisitorPrice, setRegFeeRule, changeAdminPassword,
 } from '../api/admin.js';
 import { useTranslation, LanguageSwitcher } from '../i18n/LanguageContext.jsx';
 
@@ -259,6 +259,12 @@ const s = {
     background: '#fff', cursor: 'pointer',
     display: 'inline-flex', alignItems: 'center', gap: 4,
     whiteSpace: 'nowrap',
+  },
+  settingsMenuRow: {
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    width: '100%', padding: '14px 0', background: 'none', border: 'none',
+    borderBottom: '1px solid #f1f5f9', cursor: 'pointer',
+    fontSize: 15, color: '#1e293b', textAlign: 'left',
   },
 };
 
@@ -2116,9 +2122,66 @@ function PackagesTab({ token }) {
   );
 }
 
-// ─── Settings Modal ───────────────────────────────────────────────────────────
+// ─── Change Admin Password Modal ──────────────────────────────────────────────
 
-function SettingsModal({ token, gymSettings, onSaved, onClose }) {
+function ChangeAdminPasswordModal({ token, onClose }) {
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { t } = useTranslation();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    if (newPassword.length < 6) { setError(t('admin.changePassword.tooShort')); return; }
+    if (newPassword !== confirmPassword) { setError(t('admin.changePassword.mismatch')); return; }
+    setLoading(true);
+    try {
+      await changeAdminPassword(token, currentPassword, newPassword);
+      setSuccess(t('admin.changePassword.success'));
+      setTimeout(onClose, 1500);
+    } catch (err) {
+      setError(err.message);
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={s.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={s.modal}>
+        <div style={s.modalTitle}>{t('admin.changePassword.title')}</div>
+        {error && <div style={s.error}>{error}</div>}
+        {success && <div style={s.success}>{success}</div>}
+        <form onSubmit={handleSubmit}>
+          <label style={s.modalLabel}>{t('admin.changePassword.current')}</label>
+          <input style={s.modalInput} type="password" value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)} required autoFocus />
+          <label style={s.modalLabel}>{t('admin.changePassword.new')}</label>
+          <input style={s.modalInput} type="password" value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)} required />
+          <label style={s.modalLabel}>{t('admin.changePassword.confirm')}</label>
+          <input style={s.modalInput} type="password" value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)} required />
+          <button
+            style={{ ...s.modalBtn, background: '#BEFE00', color: '#1a1a1a', opacity: loading ? 0.6 : 1 }}
+            type="submit" disabled={loading}>
+            {loading ? t('admin.changePassword.saving') : t('admin.changePassword.save')}
+          </button>
+          <button type="button"
+            style={{ ...s.modalBtn, background: '#e2e8f0', color: '#475569', marginTop: 10 }}
+            onClick={onClose}>{t('common.cancel')}</button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Reg Fee Modal ────────────────────────────────────────────────────────────
+
+function RegFeeModal({ token, gymSettings, onSaved, onClose }) {
   const [ruleEnabled, setRuleEnabled] = useState(gymSettings?.regFeeRuleEnabled ?? false);
   const [graceMonths, setGraceMonths] = useState(String(gymSettings?.regFeeGraceMonths ?? 3));
   const [loading, setLoading] = useState(false);
@@ -2149,7 +2212,7 @@ function SettingsModal({ token, gymSettings, onSaved, onClose }) {
   return (
     <div style={s.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div style={{ ...s.modal, maxWidth: 420 }}>
-        <div style={s.modalTitle}>{t('admin.settings.title')}</div>
+        <div style={s.modalTitle}>{t('admin.settings.regFeeMenuLabel')}</div>
         {error && <div style={s.error}>{error}</div>}
 
         <div style={{ marginBottom: 20 }}>
@@ -2206,6 +2269,50 @@ function SettingsModal({ token, gymSettings, onSaved, onClose }) {
   );
 }
 
+// ─── Settings Modal ───────────────────────────────────────────────────────────
+
+function SettingsModal({ token, gymSettings, onSaved, onClose }) {
+  const [activeSection, setActiveSection] = useState(null);
+  const { t } = useTranslation();
+
+  const menuRow = (label, section) => (
+    <button style={s.settingsMenuRow} onClick={() => setActiveSection(section)}>
+      <span>{label}</span>
+      <span style={{ color: '#94a3b8', fontSize: 18 }}>›</span>
+    </button>
+  );
+
+  return (
+    <>
+      <div style={s.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
+        <div style={{ ...s.modal, maxWidth: 420 }}>
+          <div style={s.modalTitle}>{t('admin.settings.title')}</div>
+          {menuRow(t('admin.changePassword.menuLabel'), 'password')}
+          {menuRow(t('admin.changePin'), 'changepin')}
+          {menuRow(t('admin.settings.regFeeMenuLabel'), 'regfee')}
+          <button
+            style={{ ...s.modalBtn, background: '#e2e8f0', color: '#475569', marginTop: 16 }}
+            onClick={onClose}
+          >
+            {t('common.cancel')}
+          </button>
+        </div>
+      </div>
+
+      {activeSection === 'password' && (
+        <ChangeAdminPasswordModal token={token} onClose={() => setActiveSection(null)} />
+      )}
+      {activeSection === 'changepin' && (
+        <ChangePinModal token={token} onClose={() => setActiveSection(null)} />
+      )}
+      {activeSection === 'regfee' && (
+        <RegFeeModal token={token} gymSettings={gymSettings} onSaved={onSaved}
+          onClose={() => setActiveSection(null)} />
+      )}
+    </>
+  );
+}
+
 // ─── Admin Page ───────────────────────────────────────────────────────────────
 
 const kebabDropStyle = {
@@ -2222,7 +2329,6 @@ const kebabBtnStyle = {
 
 export default function AdminPage({ token, role, gymName, onBack }) {
   const [tab, setTab] = useState('attendance');
-  const [showChangePin, setShowChangePin] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [gymSettings, setGymSettings] = useState(null);
   const [kebabOpen, setKebabOpen] = useState(false);
@@ -2265,9 +2371,6 @@ export default function AdminPage({ token, role, gymName, onBack }) {
                             ⚙ {t('admin.settings.title')}
                           </button>
                         )}
-                        <button style={kebabBtnStyle} onClick={() => { setShowChangePin(true); setKebabOpen(false); }}>
-                          {t('admin.changePin')}
-                        </button>
                       </div>
                     </>
                   )}
@@ -2279,7 +2382,6 @@ export default function AdminPage({ token, role, gymName, onBack }) {
                 {role === 'admin' && (
                   <button style={s.iconBtn} onClick={() => setShowSettings(true)} title={t('admin.settings.title')}>⚙</button>
                 )}
-                <button style={s.changePinBtn} onClick={() => setShowChangePin(true)}>{t('admin.changePin')}</button>
                 <button style={s.backBtn} onClick={onBack}>{t('admin.backToScanner')}</button>
               </>
             )}
@@ -2315,9 +2417,6 @@ export default function AdminPage({ token, role, gymName, onBack }) {
         {tab === 'packages' && role === 'admin' && <PackagesTab token={token} />}
       </div>
 
-      {showChangePin && (
-        <ChangePinModal token={token} onClose={() => setShowChangePin(false)} />
-      )}
       {showSettings && (
         <SettingsModal
           token={token}

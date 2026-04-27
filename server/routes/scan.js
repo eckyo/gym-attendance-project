@@ -34,7 +34,13 @@ router.post('/', requireAuth, injectGymId, requireRole('admin', 'staff'), async 
       return res.status(409).json({ error: err.message });
     }
     if (err instanceof MemberExpiredError) {
-      return res.status(403).json({ error: err.message });
+      return res.status(403).json({
+        error: err.message,
+        memberId: err.memberData?.memberId,
+        memberName: err.memberData?.memberName,
+        scanToken: err.memberData?.scanToken,
+        expiryDate: err.memberData?.expiryDate,
+      });
     }
     next(err);
   }
@@ -184,6 +190,89 @@ router.post('/visitor', requireAuth, injectGymId, requireRole('admin', 'staff'),
     if (err instanceof DuplicateCheckInError) {
       return res.status(409).json({ error: err.message });
     }
+    next(err);
+  }
+});
+
+// GET /api/scan/member-lookup — look up a member by scan_token (staff + admin)
+router.get('/member-lookup', requireAuth, injectGymId, requireRole('admin', 'staff'), async (req, res, next) => {
+  try {
+    const { scanToken } = req.query;
+    if (!scanToken?.trim()) return res.status(400).json({ error: 'scanToken is required' });
+    const result = await pool.query(
+      `SELECT m.id, m.name, m.scan_token, m.expiry_date,
+              mp.name AS package_name, mp.id AS package_id
+       FROM members m
+       LEFT JOIN membership_packages mp ON m.package_id = mp.id
+       WHERE m.gym_id = $1 AND m.scan_token = $2 AND m.deleted_at IS NULL AND m.is_visitor = false`,
+      [req.gymId, scanToken.trim()]
+    );
+    if (!result.rows[0]) return res.status(404).json({ error: 'Member not found' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/scan/extend-member — staff/admin extends a member's membership
+router.post('/extend-member', requireAuth, injectGymId, requireRole('admin', 'staff'), async (req, res, next) => {
+  try {
+    const { memberId, packageId, staffPassword } = req.body;
+    if (!memberId || !packageId || !staffPassword) {
+      return res.status(400).json({ error: 'memberId, packageId and staffPassword are required' });
+    }
+
+    // Verify password of the authenticated user (staff or admin)
+    const userResult = await pool.query(
+      'SELECT password_hash FROM users WHERE id = $1 AND gym_id = $2',
+      [req.user.userId, req.gymId]
+    );
+    if (!userResult.rows[0]) return res.status(401).json({ error: 'User not found' });
+    const isValid = await bcrypt.compare(String(staffPassword), userResult.rows[0].password_hash);
+    if (!isValid) return res.status(401).json({ error: 'Incorrect password' });
+
+    // Fetch member, package, and gym settings in parallel
+    const [memberRes, pkgRes, gymRes] = await Promise.all([
+      pool.query(
+        'SELECT expiry_date FROM members WHERE id = $1 AND gym_id = $2 AND deleted_at IS NULL',
+        [memberId, req.gymId]
+      ),
+      pool.query(
+        'SELECT id, name, duration_days, price, has_registration_fee, registration_fee FROM membership_packages WHERE id = $1 AND gym_id = $2',
+        [packageId, req.gymId]
+      ),
+      pool.query(
+        'SELECT reg_fee_rule_enabled, reg_fee_grace_months FROM gyms WHERE id = $1',
+        [req.gymId]
+      ),
+    ]);
+
+    if (!memberRes.rows[0]) return res.status(404).json({ error: 'Member not found' });
+    if (!pkgRes.rows[0]) return res.status(404).json({ error: 'Package not found' });
+
+    const member = memberRes.rows[0];
+    const pkg = pkgRes.rows[0];
+    const gym = gymRes.rows[0];
+
+    const newExpiry = calcExpiry(member.expiry_date, pkg.duration_days);
+
+    const expiredMonths = member.expiry_date
+      ? (Date.now() - new Date(member.expiry_date).getTime()) / (1000 * 60 * 60 * 24 * 30.44)
+      : Infinity;
+    const chargeRegFee =
+      pkg.has_registration_fee &&
+      pkg.registration_fee > 0 &&
+      gym.reg_fee_rule_enabled &&
+      expiredMonths > gym.reg_fee_grace_months;
+    const totalAmount = pkg.price + (chargeRegFee ? Number(pkg.registration_fee) : 0);
+
+    await pool.query(
+      'UPDATE members SET expiry_date = $1, package_id = $2, updated_at = NOW() WHERE id = $3 AND gym_id = $4',
+      [newExpiry, pkg.id, memberId, req.gymId]
+    );
+
+    res.json({ newExpiry, packageName: pkg.name, totalAmount, regFeeCharged: chargeRegFee });
+  } catch (err) {
     next(err);
   }
 });

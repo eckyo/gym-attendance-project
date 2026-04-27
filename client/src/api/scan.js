@@ -54,6 +54,30 @@ export const postScan = async (token, scanToken) => {
     body: JSON.stringify({ scanToken }),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Scan failed');
+  if (!res.ok) {
+    const err = new Error(data.error || 'Scan failed');
+    err.data = data;
+    throw err;
+  }
+  return data;
+};
+
+export const lookupMember = async (token, scanToken) => {
+  const res = await fetch(`${API_BASE}/api/scan/member-lookup?scanToken=${encodeURIComponent(scanToken)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Member not found');
+  return data;
+};
+
+export const extendMember = async (token, memberId, packageId, staffPassword) => {
+  const res = await fetch(`${API_BASE}/api/scan/extend-member`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ memberId, packageId, staffPassword }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Extension failed');
   return data;
 };

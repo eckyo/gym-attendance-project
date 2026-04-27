@@ -49,7 +49,21 @@
     "walkInSuccess": "Walk-in Checked In!",
     "walkInPinSubtitle": "Enter your PIN to record a walk-in visit",
     "collectPayment": "Collect Payment",
-    "closeOverlay": "Close"
+    "closeOverlay": "Close",
+    "manageMember": "Manage Member",
+    "extendMembership": "Extend Membership",
+    "extendTitle": "Extend Membership",
+    "extendSearchLabel": "Member GYM ID",
+    "extendSearchPlaceholder": "e.g. G-001",
+    "extendSearch": "Search",
+    "extendMemberNotFound": "Member not found",
+    "extendSelectPackage": "Select a package...",
+    "extendPassword": "Your Password",
+    "extendConfirm": "Confirm Extension",
+    "extendConfirming": "Extending...",
+    "extendSuccess": "Membership Extended!",
+    "extendCollect": "Please collect Rp {amount} from the member.",
+    "extendCheckinSuccess": "Membership extended — checked in!"
   },
   "admin": {
     "title": "Admin Dashboard",
@@ -241,6 +255,7 @@
     },
     "settings": {
       "title": "Settings",
+      "regFeeMenuLabel": "Registration Fee Grace Period",
       "regFeeRule": "Charge registration fee after grace period",
       "regFeeRuleHint": "When ON: expired members who renew after the grace period will be charged the registration fee again.",
       "graceMonths": "Grace period",
@@ -250,6 +265,18 @@
       "saving": "Saving...",
       "saved": "Saved!",
       "save": "Save Settings"
+    },
+    "changePassword": {
+      "menuLabel": "Change Password",
+      "title": "Change Admin Password",
+      "current": "Current Password",
+      "new": "New Password",
+      "confirm": "Confirm New Password",
+      "saving": "Saving...",
+      "save": "Save Password",
+      "mismatch": "Passwords do not match",
+      "tooShort": "Password must be at least 6 characters",
+      "success": "Password changed successfully!"
     }
   },
   "standbyQr": {
