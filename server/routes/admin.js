@@ -713,4 +713,31 @@ router.put('/pin', async (req, res, next) => {
   }
 });
 
+router.put('/password', async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword) return res.status(400).json({ error: 'Current password is required' });
+    if (!newPassword || newPassword.length < 6)
+      return res.status(400).json({ error: 'New password must be at least 6 characters' });
+
+    const result = await pool.query(
+      "SELECT password_hash FROM users WHERE id = $1 AND gym_id = $2 AND role = 'admin'",
+      [req.user.userId, req.gymId]
+    );
+    if (!result.rows.length) return res.status(404).json({ error: 'Admin not found' });
+
+    const isValid = await bcrypt.compare(currentPassword, result.rows[0].password_hash);
+    if (!isValid) return res.status(403).json({ error: 'Current password is incorrect' });
+
+    const hash = await bcrypt.hash(newPassword, 10);
+    await pool.query(
+      'UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2 AND gym_id = $3',
+      [hash, req.user.userId, req.gymId]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;

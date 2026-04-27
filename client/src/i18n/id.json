@@ -255,6 +255,7 @@
     },
     "settings": {
       "title": "Pengaturan",
+      "regFeeMenuLabel": "Masa Tenggang Biaya Pendaftaran",
       "regFeeRule": "Tagih biaya daftar setelah masa tenggang",
       "regFeeRuleHint": "Jika aktif: anggota yang perpanjang setelah masa tenggang akan dikenakan biaya pendaftaran lagi.",
       "graceMonths": "Masa tenggang",
@@ -264,6 +265,18 @@
       "saving": "Menyimpan...",
       "saved": "Tersimpan!",
       "save": "Simpan Pengaturan"
+    },
+    "changePassword": {
+      "menuLabel": "Ubah Kata Sandi",
+      "title": "Ubah Kata Sandi Admin",
+      "current": "Kata Sandi Saat Ini",
+      "new": "Kata Sandi Baru",
+      "confirm": "Konfirmasi Kata Sandi Baru",
+      "saving": "Menyimpan...",
+      "save": "Simpan Kata Sandi",
+      "mismatch": "Kata sandi tidak cocok",
+      "tooShort": "Kata sandi minimal 6 karakter",
+      "success": "Kata sandi berhasil diubah!"
     }
   },
   "standbyQr": {

@@ -123,6 +123,13 @@ export const changeStaffPassword = (token, id, newPassword, pin) =>
     body: JSON.stringify({ newPassword, pin }),
   }).then(handleResponse);
 
+export const changeAdminPassword = (token, currentPassword, newPassword) =>
+  fetch(`${API_BASE}/api/admin/password`, {
+    method: 'PUT',
+    headers: authHeaders(token),
+    body: JSON.stringify({ currentPassword, newPassword }),
+  }).then(handleResponse);
+
 export const getPackages = (token) =>
   fetch(`${API_BASE}/api/packages`, {
     headers: authHeaders(token),

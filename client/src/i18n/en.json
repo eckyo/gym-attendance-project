@@ -255,6 +255,7 @@
     },
     "settings": {
       "title": "Settings",
+      "regFeeMenuLabel": "Registration Fee Grace Period",
       "regFeeRule": "Charge registration fee after grace period",
       "regFeeRuleHint": "When ON: expired members who renew after the grace period will be charged the registration fee again.",
       "graceMonths": "Grace period",
@@ -264,6 +265,18 @@
       "saving": "Saving...",
       "saved": "Saved!",
       "save": "Save Settings"
+    },
+    "changePassword": {
+      "menuLabel": "Change Password",
+      "title": "Change Admin Password",
+      "current": "Current Password",
+      "new": "New Password",
+      "confirm": "Confirm New Password",
+      "saving": "Saving...",
+      "save": "Save Password",
+      "mismatch": "Passwords do not match",
+      "tooShort": "Password must be at least 6 characters",
+      "success": "Password changed successfully!"
     }
   },
   "standbyQr": {
