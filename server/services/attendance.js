@@ -13,7 +13,12 @@ const HEADERS = ['Member Name', 'GYM ID', 'Clock In Date & Time'];
 
 export class MemberNotFoundError extends Error {}
 export class DuplicateCheckInError extends Error {}
-export class MemberExpiredError extends Error {}
+export class MemberExpiredError extends Error {
+  constructor(message, memberData) {
+    super(message);
+    this.memberData = memberData;
+  }
+}
 
 const appendToXlsx = ({ memberName, gymMemberId, checkedInAt }) => {
   mkdirSync(DATA_DIR, { recursive: true });
@@ -113,12 +118,17 @@ export const processVisitorCheckIn = async (gymId, name, phoneNumber) => {
   return { visitorName: visitor.name, checkedInAt: log.checked_in_at, isNew };
 };
 
-function validateMemberExpiry(member) {
+function validateMemberExpiry(member, scanToken) {
   if (member.expiry_date && new Date(member.expiry_date) < new Date()) {
     const expiredOn = new Date(member.expiry_date).toLocaleDateString('en-US', {
       year: 'numeric', month: 'long', day: 'numeric',
     });
-    throw new MemberExpiredError(`Membership expired on ${expiredOn}`);
+    throw new MemberExpiredError(`Membership expired on ${expiredOn}`, {
+      memberId: member.id,
+      memberName: member.name,
+      scanToken,
+      expiryDate: member.expiry_date,
+    });
   }
 }
 
@@ -168,7 +178,7 @@ export const processScan = async (gymId, scanToken) => {
     }
 
     member = memberResult.rows[0];
-    validateMemberExpiry(member);
+    validateMemberExpiry(member, scanToken);
     await checkDuplicateCheckin(client, member.id, gymId);
     log = await insertCheckinLog(client, gymId, member.id);
 

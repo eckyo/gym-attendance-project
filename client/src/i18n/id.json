@@ -49,7 +49,21 @@
     "walkInSuccess": "Walk-in Berhasil Check-in!",
     "walkInPinSubtitle": "Masukkan PIN untuk mencatat kunjungan walk-in",
     "collectPayment": "Tagih Pembayaran",
-    "closeOverlay": "Tutup"
+    "closeOverlay": "Tutup",
+    "manageMember": "Kelola Anggota",
+    "extendMembership": "Perpanjang Keanggotaan",
+    "extendTitle": "Perpanjang Keanggotaan",
+    "extendSearchLabel": "ID GYM Anggota",
+    "extendSearchPlaceholder": "misal G-001",
+    "extendSearch": "Cari",
+    "extendMemberNotFound": "Anggota tidak ditemukan",
+    "extendSelectPackage": "Pilih paket...",
+    "extendPassword": "Kata Sandi Anda",
+    "extendConfirm": "Konfirmasi Perpanjangan",
+    "extendConfirming": "Memproses...",
+    "extendSuccess": "Keanggotaan Diperpanjang!",
+    "extendCollect": "Tagih Rp {amount} dari anggota.",
+    "extendCheckinSuccess": "Keanggotaan diperpanjang — berhasil check-in!"
   },
   "admin": {
     "title": "Dasbor Admin",
