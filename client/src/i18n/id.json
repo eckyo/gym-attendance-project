@@ -109,7 +109,16 @@
       "filterNewAll": "Semua",
       "filterNewOnly": "Baru (7 hari)",
       "clearFilters": "Hapus filter",
-      "filterCountSelected": "{n} dipilih"
+      "filterCountSelected": "{n} dipilih",
+      "manage": "Kelola Anggota",
+      "extend": "Perpanjang Keanggotaan",
+      "extendTitle": "Perpanjang Keanggotaan",
+      "extendCurrentExpiry": "Kedaluwarsa saat ini",
+      "extendNewExpiry": "Kedaluwarsa baru setelah perpanjangan",
+      "extendSelectPackage": "Pilih paket...",
+      "extendNoExpiry": "Belum ada tanggal kedaluwarsa",
+      "extendConfirm": "Konfirmasi Perpanjangan",
+      "extendConfirming": "Memproses..."
     },
     "qr": {
       "howToShare": "📋 Cara berbagi kode QR ini",
@@ -229,6 +238,18 @@
       "visitorPriceTitle": "Harga Kunjungan Walk-in",
       "visitorPriceSave": "Simpan",
       "visitorPriceSaving": "Menyimpan..."
+    },
+    "settings": {
+      "title": "Pengaturan",
+      "regFeeRule": "Tagih biaya daftar setelah masa tenggang",
+      "regFeeRuleHint": "Jika aktif: anggota yang perpanjang setelah masa tenggang akan dikenakan biaya pendaftaran lagi.",
+      "graceMonths": "Masa tenggang",
+      "months": "bulan",
+      "ruleOn": "Aktif",
+      "ruleOff": "Nonaktif",
+      "saving": "Menyimpan...",
+      "saved": "Tersimpan!",
+      "save": "Simpan Pengaturan"
     }
   },
   "standbyQr": {

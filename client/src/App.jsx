@@ -9,6 +9,8 @@ import MemberPage from './pages/MemberPage.jsx';
 import { useTranslation, LanguageSwitcher } from './i18n/LanguageContext.jsx';
 
 const SESSION_KEY = 'memberSession';
+const STAFF_SESSION_KEY = 'staffSession';
+const PIN_UNLOCK_KEY = 'adminPinUnlocked';
 
 function saveSession(token, member) {
   localStorage.setItem(SESSION_KEY, JSON.stringify({ token, member }));
@@ -33,6 +35,27 @@ function loadSession() {
 
 function clearSession() {
   localStorage.removeItem(SESSION_KEY);
+}
+
+function saveStaffSession(token, role, gymName) {
+  localStorage.setItem(STAFF_SESSION_KEY, JSON.stringify({ token, role, gymName }));
+}
+
+function loadStaffSession() {
+  try {
+    const raw = localStorage.getItem(STAFF_SESSION_KEY);
+    if (!raw) return null;
+    const { token, role, gymName } = JSON.parse(raw);
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    if (payload.exp * 1000 < Date.now()) {
+      localStorage.removeItem(STAFF_SESSION_KEY);
+      return null;
+    }
+    return { token, role, gymName };
+  } catch {
+    localStorage.removeItem(STAFF_SESSION_KEY);
+    return null;
+  }
 }
 
 function normalizePhone(digits) {
@@ -495,6 +518,8 @@ function PinModal({ token, onSuccess, onCancel }) {
 
 export default function App() {
   const [auth, setAuth] = useState(() => {
+    const staff = loadStaffSession();
+    if (staff) return { token: staff.token, role: staff.role, gymName: staff.gymName };
     const session = loadSession();
     if (!session) return null;
     return { token: session.token, role: 'member', gymName: '', memberName: session.member.name };
@@ -504,6 +529,7 @@ export default function App() {
 
   const handleLogin = (token, role, gymName, gymId) => {
     if (gymId) localStorage.setItem('gymId', gymId);
+    saveStaffSession(token, role, gymName);
     setAuth({ token, role, gymName });
   };
 
@@ -512,7 +538,13 @@ export default function App() {
     setAuth({ token, role: 'member', gymName: '', memberName: member.name });
   };
 
-  const handleLogout = () => { clearSession(); setAuth(null); setPage('scan'); };
+  const handleLogout = () => {
+    clearSession();
+    localStorage.removeItem(STAFF_SESSION_KEY);
+    localStorage.removeItem(PIN_UNLOCK_KEY);
+    setAuth(null);
+    setPage('scan');
+  };
 
   if (!auth) {
     return <LoginForm onLogin={handleLogin} onMemberLogin={handleMemberLogin} />;
@@ -534,7 +566,13 @@ export default function App() {
           role={auth.role}
           gymName={auth.gymName}
           onLogout={handleLogout}
-          onAdminAccess={() => setShowPinModal(true)}
+          onAdminAccess={() => {
+            if (localStorage.getItem(PIN_UNLOCK_KEY) === auth.token) {
+              setPage('admin');
+            } else {
+              setShowPinModal(true);
+            }
+          }}
         />
       )}
       {page === 'admin' && (
@@ -548,7 +586,11 @@ export default function App() {
       {showPinModal && (
         <PinModal
           token={auth.token}
-          onSuccess={() => { setShowPinModal(false); setPage('admin'); }}
+          onSuccess={() => {
+            localStorage.setItem(PIN_UNLOCK_KEY, auth.token);
+            setShowPinModal(false);
+            setPage('admin');
+          }}
           onCancel={() => setShowPinModal(false)}
         />
       )}

@@ -628,8 +628,16 @@ router.put('/staff/:id/password', async (req, res, next) => {
 // GET /api/admin/settings
 router.get('/settings', async (req, res, next) => {
   try {
-    const result = await pool.query('SELECT visitor_price FROM gyms WHERE id = $1', [req.gymId]);
-    res.json({ visitorPrice: result.rows[0].visitor_price });
+    const result = await pool.query(
+      'SELECT visitor_price, reg_fee_rule_enabled, reg_fee_grace_months FROM gyms WHERE id = $1',
+      [req.gymId]
+    );
+    const row = result.rows[0];
+    res.json({
+      visitorPrice: row.visitor_price,
+      regFeeRuleEnabled: row.reg_fee_rule_enabled,
+      regFeeGraceMonths: row.reg_fee_grace_months,
+    });
   } catch (err) {
     next(err);
   }
@@ -647,6 +655,27 @@ router.put('/settings/visitor-price', async (req, res, next) => {
       [Number(price), req.gymId]
     );
     res.json({ visitorPrice: Number(price) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PUT /api/admin/settings/reg-fee-rule
+router.put('/settings/reg-fee-rule', async (req, res, next) => {
+  try {
+    const { enabled, graceMonths } = req.body;
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({ error: 'enabled must be a boolean' });
+    }
+    const months = parseInt(graceMonths);
+    if (enabled && (!graceMonths || isNaN(months) || months < 1)) {
+      return res.status(400).json({ error: 'graceMonths must be an integer >= 1' });
+    }
+    await pool.query(
+      'UPDATE gyms SET reg_fee_rule_enabled = $1, reg_fee_grace_months = $2, updated_at = NOW() WHERE id = $3',
+      [enabled, enabled ? months : (months || 3), req.gymId]
+    );
+    res.json({ regFeeRuleEnabled: enabled, regFeeGraceMonths: enabled ? months : (months || 3) });
   } catch (err) {
     next(err);
   }

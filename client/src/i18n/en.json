@@ -109,7 +109,16 @@
       "filterNewAll": "All",
       "filterNewOnly": "New (7 days)",
       "clearFilters": "Clear filters",
-      "filterCountSelected": "{n} selected"
+      "filterCountSelected": "{n} selected",
+      "manage": "Manage Member",
+      "extend": "Extend Membership",
+      "extendTitle": "Extend Membership",
+      "extendCurrentExpiry": "Current expiry",
+      "extendNewExpiry": "New expiry after extension",
+      "extendSelectPackage": "Select a package...",
+      "extendNoExpiry": "No expiry set",
+      "extendConfirm": "Confirm Extension",
+      "extendConfirming": "Extending..."
     },
     "qr": {
       "howToShare": "📋 How to share this QR code",
@@ -229,6 +238,18 @@
       "visitorPriceTitle": "Visitor / Walk-in Price",
       "visitorPriceSave": "Save",
       "visitorPriceSaving": "Saving..."
+    },
+    "settings": {
+      "title": "Settings",
+      "regFeeRule": "Charge registration fee after grace period",
+      "regFeeRuleHint": "When ON: expired members who renew after the grace period will be charged the registration fee again.",
+      "graceMonths": "Grace period",
+      "months": "months",
+      "ruleOn": "Enabled",
+      "ruleOff": "Disabled",
+      "saving": "Saving...",
+      "saved": "Saved!",
+      "save": "Save Settings"
     }
   },
   "standbyQr": {
