@@ -67,7 +67,7 @@ const s = {
     lineHeight: 1,
   },
   body: { maxWidth: 900, margin: '0 auto', padding: '24px 16px' },
-  tabs: { display: 'flex', gap: 4, borderBottom: '2px solid #e2e8f0' },
+  tabs: { display: 'flex', gap: 4, borderBottom: '2px solid #e2e8f0', overflowX: 'auto', overflowY: 'visible', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none' },
   tab: {
     padding: '10px 24px',
     border: 'none',
@@ -78,6 +78,8 @@ const s = {
     fontWeight: 500,
     borderBottom: '2px solid transparent',
     marginBottom: -2,
+    flexShrink: 0,
+    whiteSpace: 'nowrap',
   },
   tabActive: { color: '#1a1a1a', borderBottomColor: '#BEFE00', fontWeight: 700 },
   toolbar: { display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' },
@@ -2573,7 +2575,7 @@ export default function AdminPage({ token, role, gymName, onBack }) {
         </div>
         <div style={{ background: '#fff' }}>
           <div style={{ maxWidth: 900, margin: '0 auto', padding: '0 16px' }}>
-            <div style={s.tabs}>
+            <div style={s.tabs} className="tabs-scroll">
               <button style={{ ...s.tab, ...(tab === 'attendance' ? s.tabActive : {}) }} onClick={() => setTab('attendance')}>
                 {t('admin.tabs.attendance')}
               </button>
