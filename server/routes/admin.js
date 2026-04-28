@@ -247,9 +247,9 @@ router.post('/members/import/confirm', async (req, res, next) => {
       counter = Math.max(counter, Math.max(...standardCounters));
     }
 
+    const defaultHash = await bcrypt.hash('password123', 10);
     const inserted = [];
     for (const row of rows) {
-      const defaultHash = await bcrypt.hash('password123', 10);
       const result = await client.query(
         `INSERT INTO members (gym_id, name, scan_token, expiry_date, phone_number, password_hash, created_at, updated_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
