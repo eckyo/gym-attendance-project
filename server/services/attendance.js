@@ -115,7 +115,7 @@ export const processVisitorCheckIn = async (gymId, name, phoneNumber) => {
     client.release();
   }
 
-  return { visitorName: visitor.name, checkedInAt: log.checked_in_at, isNew };
+  return { visitorName: visitor.name, checkedInAt: log.checked_in_at, isNew, visitorMemberId: visitor.id };
 };
 
 function validateMemberExpiry(member, scanToken) {

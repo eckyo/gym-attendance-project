@@ -101,13 +101,14 @@ router.post('/register', requireAuth, injectGymId, requireRole('admin', 'staff')
     let resolvedPackageId = null;
     let packageName = null;
 
+    let pkg = null;
     if (packageId) {
       const pkgResult = await client.query(
-        'SELECT id, name, duration_days FROM membership_packages WHERE id = $1 AND gym_id = $2',
+        'SELECT id, name, duration_days, price FROM membership_packages WHERE id = $1 AND gym_id = $2',
         [packageId, req.gymId]
       );
       if (pkgResult.rows.length === 0) return res.status(400).json({ error: 'Package not found' });
-      const pkg = pkgResult.rows[0];
+      pkg = pkgResult.rows[0];
       resolvedExpiry = calcExpiry(null, pkg.duration_days);
       resolvedPackageId = pkg.id;
       packageName = pkg.name;
@@ -135,6 +136,12 @@ router.post('/register', requireAuth, injectGymId, requireRole('admin', 'staff')
       `INSERT INTO attendance_logs (gym_id, member_id, checked_in_at)
        VALUES ($1, $2, NOW()) RETURNING checked_in_at`,
       [req.gymId, member.id]
+    );
+
+    await client.query(
+      `INSERT INTO transactions (gym_id, member_id, type, amount, package_id)
+       VALUES ($1, $2, 'new_member', $3, $4)`,
+      [req.gymId, member.id, pkg?.price ?? 0, resolvedPackageId]
     );
 
     await client.query('COMMIT');
@@ -179,12 +186,18 @@ router.post('/visitor', requireAuth, injectGymId, requireRole('admin', 'staff'),
       processVisitorCheckIn(req.gymId, name.trim(), phoneNumber || null),
       pool.query('SELECT visitor_price FROM gyms WHERE id = $1', [req.gymId]),
     ]);
+    const visitorPrice = gymResult.rows[0].visitor_price;
+    await pool.query(
+      `INSERT INTO transactions (gym_id, member_id, type, amount, package_id)
+       VALUES ($1, $2, 'walk_in', $3, NULL)`,
+      [req.gymId, result.visitorMemberId, visitorPrice]
+    );
     res.json({
       success: true,
       visitorName: result.visitorName,
       checkedInAt: result.checkedInAt,
       isNew: result.isNew,
-      visitorPrice: gymResult.rows[0].visitor_price,
+      visitorPrice,
     });
   } catch (err) {
     if (err instanceof DuplicateCheckInError) {
@@ -266,10 +279,25 @@ router.post('/extend-member', requireAuth, injectGymId, requireRole('admin', 'st
       expiredMonths > gym.reg_fee_grace_months;
     const totalAmount = pkg.price + (chargeRegFee ? Number(pkg.registration_fee) : 0);
 
-    await pool.query(
-      'UPDATE members SET expiry_date = $1, package_id = $2, updated_at = NOW() WHERE id = $3 AND gym_id = $4',
-      [newExpiry, pkg.id, memberId, req.gymId]
-    );
+    const extClient = await pool.connect();
+    try {
+      await extClient.query('BEGIN');
+      await extClient.query(
+        'UPDATE members SET expiry_date = $1, package_id = $2, updated_at = NOW() WHERE id = $3 AND gym_id = $4',
+        [newExpiry, pkg.id, memberId, req.gymId]
+      );
+      await extClient.query(
+        `INSERT INTO transactions (gym_id, member_id, type, amount, package_id)
+         VALUES ($1, $2, 'renewal', $3, $4)`,
+        [req.gymId, memberId, totalAmount, pkg.id]
+      );
+      await extClient.query('COMMIT');
+    } catch (err) {
+      await extClient.query('ROLLBACK');
+      throw err;
+    } finally {
+      extClient.release();
+    }
 
     res.json({ newExpiry, packageName: pkg.name, totalAmount, regFeeCharged: chargeRegFee });
   } catch (err) {
