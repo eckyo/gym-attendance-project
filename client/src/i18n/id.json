@@ -13,7 +13,9 @@
     "passwordLabel": "Kata Sandi",
     "signingIn": "Sedang masuk...",
     "signIn": "Masuk",
-    "staffAccessLink": "Akses Staf / Admin"
+    "staffAccessLink": "Akses Staf / Admin",
+    "contactUsLabel": "Hubungi Kami",
+    "contactUsVia": "via WhatsApp"
   },
   "pin": {
     "title": "Dasbor Admin",
@@ -63,7 +65,8 @@
     "extendConfirming": "Memproses...",
     "extendSuccess": "Keanggotaan Diperpanjang!",
     "extendCollect": "Tagih Rp {amount} dari anggota.",
-    "extendCheckinSuccess": "Keanggotaan diperpanjang — berhasil check-in!"
+    "extendCheckinSuccess": "Keanggotaan diperpanjang — berhasil check-in!",
+    "instruction": "Arahkan kamera ke kode QR anggota untuk absen secara otomatis."
   },
   "admin": {
     "title": "Dasbor Admin",

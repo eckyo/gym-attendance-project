@@ -13,7 +13,9 @@
     "passwordLabel": "Password",
     "signingIn": "Signing in...",
     "signIn": "Sign In",
-    "staffAccessLink": "Staff / Admin Access"
+    "staffAccessLink": "Staff / Admin Access",
+    "contactUsLabel": "Contact Us",
+    "contactUsVia": "via WhatsApp"
   },
   "pin": {
     "title": "Admin Dashboard",
@@ -63,7 +65,8 @@
     "extendConfirming": "Extending...",
     "extendSuccess": "Membership Extended!",
     "extendCollect": "Please collect Rp {amount} from the member.",
-    "extendCheckinSuccess": "Membership extended — checked in!"
+    "extendCheckinSuccess": "Membership extended — checked in!",
+    "instruction": "Point the camera at the member's QR code to check them in automatically."
   },
   "admin": {
     "title": "Admin Dashboard",
