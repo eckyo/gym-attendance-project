@@ -117,6 +117,13 @@ const st = {
     padding: '10px 0',
     fontSize: 14,
   },
+  instruction: {
+    textAlign: 'center',
+    fontSize: 13,
+    color: '#94a3b8',
+    margin: '12px 0 4px',
+    lineHeight: 1.5,
+  },
   feedbackError: {
     background: '#fee2e2',
     border: '1px solid #fca5a5',
@@ -1068,6 +1075,9 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
           )}
           <div id="qr-reader" style={{ width: '100%' }} />
         </div>
+
+        {/* Scan instruction */}
+        <p style={st.instruction}>{t('scan.instruction')}</p>
 
         {/* Processing */}
         {isProcessing && <p style={st.processing}>{t('scan.processing')}</p>}

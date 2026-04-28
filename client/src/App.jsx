@@ -170,6 +170,14 @@ const s = {
     marginBottom: 14,
     textAlign: 'center',
   },
+  contactLink: {
+    display: 'block',
+    textAlign: 'center',
+    marginTop: 20,
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.55)',
+    textDecoration: 'none',
+  },
   staffLink: {
     display: 'block',
     textAlign: 'center',
@@ -452,6 +460,14 @@ function LoginForm({ onLogin, onMemberLogin }) {
             </button>
           </form>
         )}
+        <a
+          href="https://wa.me/628131465088"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={s.contactLink}
+        >
+          💬 <strong style={{ color: '#BEFE00', fontWeight: 700 }}>{t('login.contactUsLabel')}</strong> {t('login.contactUsVia')}
+        </a>
       </div>
     </div>
   );

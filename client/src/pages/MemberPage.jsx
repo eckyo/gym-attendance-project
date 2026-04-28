@@ -360,8 +360,8 @@ const s = {
     fontWeight: active ? 700 : 500,
     cursor: 'pointer',
     border: 'none',
-    background: active ? '#10b981' : 'rgba(255,255,255,0.05)',
-    color: active ? '#fff' : 'rgba(255,255,255,0.5)',
+    background: active ? '#BEFE00' : 'rgba(255,255,255,0.05)',
+    color: active ? '#1a1a1a' : 'rgba(255,255,255,0.5)',
   }),
   checkinResultSuccess: {
     background: 'rgba(16,185,129,0.15)',
@@ -650,7 +650,6 @@ export default function MemberPage({ token, onLogout }) {
                   : profile.status === 'expiring_soon' ? t('member.statusExpiringSoon')
                   : t('member.statusExpired')}
               </span>
-              <span style={s.gymTag}>{profile.gymName}</span>
             </div>
 
             <div style={s.memberDetail}>
