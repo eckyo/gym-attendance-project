@@ -186,3 +186,12 @@ export const setRegFeeRule = (token, enabled, graceMonths) =>
     headers: authHeaders(token),
     body: JSON.stringify({ enabled, graceMonths }),
   }).then(handleResponse);
+
+export const getDashboard = (token, { start, end } = {}) => {
+  const params = new URLSearchParams();
+  if (start) params.set('start', start);
+  if (end)   params.set('end', end);
+  return fetch(`${API_BASE}/api/admin/dashboard?${params}`, {
+    headers: authHeaders(token),
+  }).then(handleResponse);
+};

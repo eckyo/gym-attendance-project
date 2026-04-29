@@ -128,3 +128,29 @@ ALTER TABLE members ADD COLUMN IF NOT EXISTS password_hash TEXT;
 -- Registration fee grace period rule per gym
 ALTER TABLE gyms ADD COLUMN IF NOT EXISTS reg_fee_rule_enabled BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE gyms ADD COLUMN IF NOT EXISTS reg_fee_grace_months INTEGER NOT NULL DEFAULT 3;
+
+-- ─── Transactions (revenue ledger) ───────────────────────────────────────────
+-- Append-only. No updated_at by design. Amount in IDR (integer).
+-- member_id nullable for walk-ins using ephemeral visitor records.
+
+DO $$ BEGIN
+  CREATE TYPE transaction_type AS ENUM ('new_member', 'renewal', 'walk_in');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+CREATE TABLE IF NOT EXISTS transactions (
+  id         UUID             PRIMARY KEY DEFAULT gen_random_uuid(),
+  gym_id     UUID             NOT NULL REFERENCES gyms(id),
+  member_id  UUID             REFERENCES members(id),
+  type       transaction_type NOT NULL,
+  amount     INTEGER          NOT NULL CHECK (amount >= 0),
+  package_id UUID             REFERENCES membership_packages(id),
+  created_at TIMESTAMPTZ      NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_transactions_gym_created
+  ON transactions(gym_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_transactions_gym_type_created
+  ON transactions(gym_id, type, created_at);
+CREATE INDEX IF NOT EXISTS idx_transactions_member
+  ON transactions(member_id) WHERE member_id IS NOT NULL;

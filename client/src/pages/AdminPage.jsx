@@ -15,8 +15,9 @@ import {
   deleteMember, changePin, exportMembers, downloadTemplate,
   previewImport, confirmImport, getStaff, addStaff, removeStaff, verifyPin, changeStaffPassword,
   getPackages, createPackage, updatePackage, deletePackage, setDefaultPackage,
-  addMemberWithPackage, getSettings, setVisitorPrice, setRegFeeRule, changeAdminPassword,
+  addMemberWithPackage, getSettings, setVisitorPrice, setRegFeeRule, changeAdminPassword, getDashboard,
 } from '../api/admin.js';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useTranslation, LanguageSwitcher } from '../i18n/LanguageContext.jsx';
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
@@ -66,7 +67,7 @@ const s = {
     lineHeight: 1,
   },
   body: { maxWidth: 900, margin: '0 auto', padding: '24px 16px' },
-  tabs: { display: 'flex', gap: 4, borderBottom: '2px solid #e2e8f0' },
+  tabs: { display: 'flex', gap: 4, borderBottom: '2px solid #e2e8f0', overflowX: 'auto', overflowY: 'visible', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none' },
   tab: {
     padding: '10px 24px',
     border: 'none',
@@ -77,6 +78,8 @@ const s = {
     fontWeight: 500,
     borderBottom: '2px solid transparent',
     marginBottom: -2,
+    flexShrink: 0,
+    whiteSpace: 'nowrap',
   },
   tabActive: { color: '#1a1a1a', borderBottomColor: '#BEFE00', fontWeight: 700 },
   toolbar: { display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' },
@@ -266,6 +269,25 @@ const s = {
     borderBottom: '1px solid #f1f5f9', cursor: 'pointer',
     fontSize: 15, color: '#1e293b', textAlign: 'left',
   },
+  // Business Dashboard
+  statCard: {
+    background: '#fff', borderRadius: 12, padding: '20px 24px',
+    boxShadow: '0 1px 6px rgba(0,0,0,0.07)', flex: 1, minWidth: 180,
+  },
+  statValue: { fontSize: 28, fontWeight: 800, color: '#1a1a2e', lineHeight: 1.2 },
+  statLabel: { fontSize: 13, color: '#64748b', marginTop: 4 },
+  statSub:   { fontSize: 12, color: '#94a3b8', marginTop: 2 },
+  sectionTitle: { fontSize: 16, fontWeight: 700, color: '#1e293b', marginBottom: 16 },
+  cardRow: { display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 24 },
+  chartCard: {
+    background: '#fff', borderRadius: 12, padding: '20px 24px',
+    boxShadow: '0 1px 6px rgba(0,0,0,0.07)', marginBottom: 24,
+  },
+  periodBtn: {
+    padding: '7px 16px', borderRadius: 8, border: '1.5px solid #e2e8f0',
+    background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 500, color: '#475569',
+  },
+  periodBtnActive: { background: '#BEFE00', borderColor: '#BEFE00', color: '#1a1a1a' },
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -2122,6 +2144,170 @@ function PackagesTab({ token }) {
   );
 }
 
+// ─── Business Dashboard Tab ───────────────────────────────────────────────────
+
+const MONTH_LABELS = { '01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun','07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec' };
+
+const formatRp = (v) => {
+  if (v >= 1_000_000) return `Rp ${(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000)     return `Rp ${(v / 1_000).toFixed(0)}K`;
+  return `Rp ${v}`;
+};
+
+const getMonday = (d) => {
+  const dt = new Date(d);
+  const day = dt.getDay();
+  const diff = dt.getDate() - day + (day === 0 ? -6 : 1);
+  return new Date(dt.setDate(diff)).toISOString().slice(0, 10);
+};
+
+function StatCard({ label, value, sub }) {
+  return (
+    <div style={s.statCard}>
+      <div style={s.statValue}>{value}</div>
+      <div style={s.statLabel}>{label}</div>
+      {sub && <div style={s.statSub}>{sub}</div>}
+    </div>
+  );
+}
+
+function BusinessTab({ token }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [period, setPeriod] = useState('month');
+  const [customStart, setCustomStart] = useState(today);
+  const [customEnd, setCustomEnd] = useState(today);
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const { t } = useTranslation();
+
+  const getRange = (p) => {
+    const now = new Date();
+    if (p === 'today') return { start: today, end: today };
+    if (p === 'week')  return { start: getMonday(today), end: today };
+    if (p === 'month') return { start: `${today.slice(0, 7)}-01`, end: today };
+    return { start: customStart, end: customEnd };
+  };
+
+  const load = useCallback(async (p = period) => {
+    setLoading(true);
+    setError('');
+    try {
+      const range = getRange(p);
+      const result = await getDashboard(token, range);
+      setData(result);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [token, period, customStart, customEnd]);
+
+  useEffect(() => { load(); }, []);
+
+  const handlePeriod = (p) => { setPeriod(p); load(p); };
+
+  const trend = (data?.trend || []).map((r) => ({
+    ...r,
+    monthLabel: MONTH_LABELS[r.month?.slice(5, 7)] || r.month,
+  }));
+
+  const rp = (v) => `Rp ${Number(v).toLocaleString('id-ID')}`;
+
+  return (
+    <div>
+      {/* Period picker */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 24, alignItems: 'center' }}>
+        {[['today', t('admin.business.periodToday')], ['week', t('admin.business.periodWeek')], ['month', t('admin.business.periodMonth')]].map(([key, label]) => (
+          <button key={key} style={{ ...s.periodBtn, ...(period === key ? s.periodBtnActive : {}) }}
+            onClick={() => handlePeriod(key)}>{label}</button>
+        ))}
+        <button style={{ ...s.periodBtn, ...(period === 'custom' ? s.periodBtnActive : {}) }}
+          onClick={() => setPeriod('custom')}>{t('admin.business.periodCustom')}</button>
+        {period === 'custom' && (
+          <>
+            <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)}
+              style={{ ...s.dateInput, fontSize: 13 }} />
+            <span style={{ fontSize: 13, color: '#64748b' }}>–</span>
+            <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)}
+              style={{ ...s.dateInput, fontSize: 13 }} />
+            <button style={{ ...s.periodBtn, background: '#1a1a2e', color: '#BEFE00', borderColor: '#1a1a2e' }}
+              onClick={() => load('custom')}>{t('admin.business.applyRange')}</button>
+          </>
+        )}
+      </div>
+
+      {error && <div style={{ ...s.error, marginBottom: 16 }}>{error}</div>}
+
+      {loading && <div style={s.empty}>{t('admin.business.loading')}</div>}
+
+      {!loading && data && (
+        <>
+          {/* Revenue Snapshot */}
+          <div style={s.sectionTitle}>{t('admin.business.revenueSnapshot')}</div>
+          <div style={s.cardRow}>
+            <StatCard
+              label={t('admin.business.totalRevenue')}
+              value={formatRp(data.revenue.total)}
+              sub={`${t('admin.business.newMemberships')}: ${formatRp(data.revenue.new_member)} · Renewals: ${formatRp(data.revenue.renewal)} · Walk-ins: ${formatRp(data.revenue.walk_in)}`}
+            />
+            <StatCard
+              label={t('admin.business.newMemberships')}
+              value={data.memberships.new_count}
+              sub={`${formatRp(data.memberships.new_value)} · ${data.memberships.renewal_count} renewals`}
+            />
+            <StatCard
+              label={t('admin.business.activeMembers')}
+              value={data.snapshot.active_members}
+            />
+          </div>
+
+          {/* Revenue Trend */}
+          <div style={s.sectionTitle}>{t('admin.business.trendTitle')}</div>
+          <div style={s.chartCard}>
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={trend} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                <XAxis dataKey="monthLabel" tick={{ fontSize: 12 }} />
+                <YAxis tickFormatter={(v) => v >= 1_000_000 ? `${(v/1_000_000).toFixed(1)}M` : v >= 1000 ? `${(v/1000).toFixed(0)}K` : v} tick={{ fontSize: 11 }} width={52} />
+                <Tooltip formatter={(v, name) => [rp(v), name]} />
+                <Legend />
+                <Bar dataKey="new_member" name="New Member" stackId="a" fill="#BEFE00" />
+                <Bar dataKey="renewal"    name="Renewal"    stackId="a" fill="#3b82f6" />
+                <Bar dataKey="walk_in"    name="Walk-in"    stackId="a" fill="#f59e0b" radius={[4,4,0,0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Retention Health */}
+          <div style={s.sectionTitle}>{t('admin.business.retentionTitle')}</div>
+          <div style={s.cardRow}>
+            <StatCard
+              label={t('admin.business.churnRate')}
+              value={data.rates.churn_rate != null ? `${data.rates.churn_rate}%` : '—'}
+              sub={data.rates.churn_numerator > 0 ? `${data.rates.churn_numerator} ${t('admin.business.of')} ${data.rates.churn_denominator} ${t('admin.business.membersChurned')}` : undefined}
+            />
+            <StatCard
+              label={t('admin.business.renewalRate')}
+              value={data.rates.renewal_rate != null ? `${data.rates.renewal_rate}%` : '—'}
+              sub={data.rates.renewal_denominator > 0 ? `${data.memberships.renewal_count} ${t('admin.business.of')} ${data.rates.renewal_denominator} ${t('admin.business.members')} renewed` : undefined}
+            />
+            <StatCard
+              label={t('admin.business.expiringSoon')}
+              value={data.snapshot.expiring_7_days + data.snapshot.expiring_8_30_days}
+              sub={`${data.snapshot.expiring_7_days} ${t('admin.business.expiring7')} · ${data.snapshot.expiring_8_30_days} ${t('admin.business.expiring30')}`}
+            />
+            <StatCard
+              label={t('admin.business.avgTenure')}
+              value={data.snapshot.avg_tenure_days != null ? `${data.snapshot.avg_tenure_days}` : '—'}
+              sub={data.snapshot.avg_tenure_days != null ? t('admin.business.days') : undefined}
+            />
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── Change Admin Password Modal ──────────────────────────────────────────────
 
 function ChangeAdminPasswordModal({ token, onClose }) {
@@ -2389,7 +2575,7 @@ export default function AdminPage({ token, role, gymName, onBack }) {
         </div>
         <div style={{ background: '#fff' }}>
           <div style={{ maxWidth: 900, margin: '0 auto', padding: '0 16px' }}>
-            <div style={s.tabs}>
+            <div style={s.tabs} className="tabs-scroll">
               <button style={{ ...s.tab, ...(tab === 'attendance' ? s.tabActive : {}) }} onClick={() => setTab('attendance')}>
                 {t('admin.tabs.attendance')}
               </button>
@@ -2404,6 +2590,11 @@ export default function AdminPage({ token, role, gymName, onBack }) {
                   {t('admin.packages.tab')}
                 </button>
               )}
+              {role === 'admin' && (
+                <button style={{ ...s.tab, ...(tab === 'business' ? s.tabActive : {}) }} onClick={() => setTab('business')}>
+                  {t('admin.tabs.business')}
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -2415,6 +2606,7 @@ export default function AdminPage({ token, role, gymName, onBack }) {
         {tab === 'members' && <MembersTab token={token} gymSettings={gymSettings} />}
         {tab === 'staff' && <StaffTab token={token} />}
         {tab === 'packages' && role === 'admin' && <PackagesTab token={token} />}
+        {tab === 'business' && role === 'admin' && <BusinessTab token={token} />}
       </div>
 
       {showSettings && (

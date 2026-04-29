@@ -384,13 +384,14 @@ router.post('/members', async (req, res, next) => {
     let resolvedPackageId = null;
     let packageName = null;
 
+    let pkg = null;
     if (packageId) {
       const pkgResult = await pool.query(
-        'SELECT id, name, duration_days FROM membership_packages WHERE id = $1 AND gym_id = $2',
+        'SELECT id, name, duration_days, price FROM membership_packages WHERE id = $1 AND gym_id = $2',
         [packageId, req.gymId]
       );
       if (pkgResult.rows.length === 0) return res.status(400).json({ error: 'Package not found' });
-      const pkg = pkgResult.rows[0];
+      pkg = pkgResult.rows[0];
       resolvedExpiry = calcExpiry(null, pkg.duration_days);
       resolvedPackageId = pkg.id;
       packageName = pkg.name;
@@ -419,6 +420,12 @@ router.post('/members', async (req, res, next) => {
        VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING id, name, scan_token, expiry_date, package_id, phone_number, created_at`,
       [req.gymId, name.trim(), scanToken, resolvedExpiry, resolvedPackageId, phoneNumber || null, defaultHash]
+    );
+
+    await client.query(
+      `INSERT INTO transactions (gym_id, member_id, type, amount, package_id)
+       VALUES ($1, $2, 'new_member', $3, $4)`,
+      [req.gymId, result.rows[0].id, pkg?.price ?? 0, resolvedPackageId]
     );
 
     await client.query('COMMIT');
@@ -710,6 +717,147 @@ router.put('/pin', async (req, res, next) => {
     res.json({ success: true });
   } catch (err) {
     next(err);
+  }
+});
+
+// GET /api/admin/dashboard?start=YYYY-MM-DD&end=YYYY-MM-DD
+router.get('/dashboard', async (req, res, next) => {
+  const today = new Date().toISOString().slice(0, 10);
+  const startDate = req.query.start || today;
+  const endDate   = req.query.end   || today;
+
+  const client = await pool.connect();
+  try {
+    const REVENUE_QUERY = `
+      WITH
+        tx_agg AS (
+          SELECT
+            COALESCE(SUM(amount) FILTER (WHERE type='new_member'),0) AS new_member_revenue,
+            COALESCE(SUM(amount) FILTER (WHERE type='renewal'),   0) AS renewal_revenue,
+            COALESCE(SUM(amount) FILTER (WHERE type='walk_in'),   0) AS walk_in_revenue,
+            COALESCE(SUM(amount),                                 0) AS total_revenue,
+            COUNT(*) FILTER (WHERE type='new_member')                AS new_member_count,
+            COUNT(*) FILTER (WHERE type='renewal')                   AS renewal_count
+          FROM transactions
+          WHERE gym_id = $1
+            AND created_at >= $2::date::timestamptz
+            AND created_at <  ($3::date + INTERVAL '1 day')::timestamptz
+        ),
+        churned AS (
+          SELECT COUNT(*) AS cnt FROM members
+          WHERE gym_id = $1 AND deleted_at IS NULL AND is_visitor = false
+            AND expiry_date BETWEEN $2::date AND $3::date
+            AND expiry_date < CURRENT_DATE
+        ),
+        active_at_start AS (
+          SELECT COUNT(*) AS cnt FROM members
+          WHERE gym_id = $1 AND deleted_at IS NULL AND is_visitor = false
+            AND expiry_date >= $2::date
+        ),
+        due_to_expire AS (
+          SELECT COUNT(*) AS cnt FROM members
+          WHERE gym_id = $1 AND deleted_at IS NULL AND is_visitor = false
+            AND expiry_date BETWEEN $2::date AND $3::date
+        )
+      SELECT
+        t.new_member_revenue, t.renewal_revenue, t.walk_in_revenue, t.total_revenue,
+        t.new_member_count, t.renewal_count,
+        ROUND(c.cnt::NUMERIC / NULLIF(a.cnt,0) * 100, 1) AS churn_rate,
+        c.cnt                                             AS churn_numerator,
+        a.cnt                                             AS churn_denominator,
+        ROUND(t.renewal_count::NUMERIC / NULLIF(d.cnt,0) * 100, 1) AS renewal_rate,
+        d.cnt                                             AS renewal_denominator
+      FROM tx_agg t, churned c, active_at_start a, due_to_expire d
+    `;
+
+    const SNAPSHOT_QUERY = `
+      SELECT
+        COUNT(*) FILTER (WHERE deleted_at IS NULL AND is_visitor=false AND expiry_date >= CURRENT_DATE) AS active_members,
+        AVG(EXTRACT(EPOCH FROM (NOW()-created_at))/86400.0)
+          FILTER (WHERE deleted_at IS NULL AND is_visitor=false AND expiry_date >= CURRENT_DATE)        AS avg_tenure_days
+      FROM members WHERE gym_id = $1
+    `;
+
+    const EXPIRING_QUERY = `
+      SELECT
+        COUNT(*) FILTER (WHERE expiry_date BETWEEN CURRENT_DATE AND CURRENT_DATE+INTERVAL '7 days')  AS expiring_7,
+        COUNT(*) FILTER (WHERE expiry_date > CURRENT_DATE+INTERVAL '7 days'
+                           AND expiry_date <= CURRENT_DATE+INTERVAL '30 days')                       AS expiring_8_30
+      FROM members WHERE gym_id=$1 AND deleted_at IS NULL AND is_visitor=false
+    `;
+
+    const TREND_QUERY = `
+      WITH months AS (
+        SELECT TO_CHAR(gs,'YYYY-MM') AS month
+        FROM generate_series(
+          DATE_TRUNC('month',NOW()) - INTERVAL '5 months',
+          DATE_TRUNC('month',NOW()), INTERVAL '1 month'
+        ) gs
+      ),
+      tx AS (
+        SELECT TO_CHAR(DATE_TRUNC('month',created_at),'YYYY-MM') AS month, type, amount
+        FROM transactions
+        WHERE gym_id=$1
+          AND created_at >= DATE_TRUNC('month',NOW()) - INTERVAL '5 months'
+      )
+      SELECT m.month,
+        COALESCE(SUM(t.amount) FILTER (WHERE t.type='new_member'),0) AS new_member_rev,
+        COALESCE(SUM(t.amount) FILTER (WHERE t.type='renewal'),   0) AS renewal_rev,
+        COALESCE(SUM(t.amount) FILTER (WHERE t.type='walk_in'),   0) AS walk_in_rev,
+        COALESCE(SUM(t.amount),                                   0) AS total_rev
+      FROM months m LEFT JOIN tx t ON t.month=m.month
+      GROUP BY m.month ORDER BY m.month ASC
+    `;
+
+    const [revRes, snapRes, expRes, trendRes] = await Promise.all([
+      client.query(REVENUE_QUERY, [req.gymId, startDate, endDate]),
+      client.query(SNAPSHOT_QUERY, [req.gymId]),
+      client.query(EXPIRING_QUERY, [req.gymId]),
+      client.query(TREND_QUERY, [req.gymId]),
+    ]);
+
+    const rev  = revRes.rows[0]  || {};
+    const snap = snapRes.rows[0] || {};
+    const exp  = expRes.rows[0]  || {};
+
+    res.json({
+      period: { start: startDate, end: endDate },
+      revenue: {
+        total:      parseInt(rev.total_revenue,      10) || 0,
+        new_member: parseInt(rev.new_member_revenue, 10) || 0,
+        renewal:    parseInt(rev.renewal_revenue,    10) || 0,
+        walk_in:    parseInt(rev.walk_in_revenue,    10) || 0,
+      },
+      memberships: {
+        new_count:     parseInt(rev.new_member_count, 10) || 0,
+        new_value:     parseInt(rev.new_member_revenue,10) || 0,
+        renewal_count: parseInt(rev.renewal_count,    10) || 0,
+      },
+      rates: {
+        churn_rate:          rev.churn_rate   != null ? parseFloat(rev.churn_rate)   : null,
+        renewal_rate:        rev.renewal_rate != null ? parseFloat(rev.renewal_rate) : null,
+        churn_numerator:     parseInt(rev.churn_numerator,     10) || 0,
+        churn_denominator:   parseInt(rev.churn_denominator,   10) || 0,
+        renewal_denominator: parseInt(rev.renewal_denominator, 10) || 0,
+      },
+      snapshot: {
+        active_members:     parseInt(snap.active_members,  10) || 0,
+        avg_tenure_days:    snap.avg_tenure_days != null ? Math.round(parseFloat(snap.avg_tenure_days)) : null,
+        expiring_7_days:    parseInt(exp.expiring_7,    10) || 0,
+        expiring_8_30_days: parseInt(exp.expiring_8_30, 10) || 0,
+      },
+      trend: trendRes.rows.map((r) => ({
+        month:      r.month,
+        new_member: parseInt(r.new_member_rev, 10) || 0,
+        renewal:    parseInt(r.renewal_rev,    10) || 0,
+        walk_in:    parseInt(r.walk_in_rev,    10) || 0,
+        total:      parseInt(r.total_rev,      10) || 0,
+      })),
+    });
+  } catch (err) {
+    next(err);
+  } finally {
+    client.release();
   }
 });
 
