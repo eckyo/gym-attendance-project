@@ -1,4 +1,5 @@
 {
+  "comingSoon": "Coming soon",
   "common": {
     "cancel": "Cancel",
     "loading": "Loading..."
@@ -75,7 +76,34 @@
     "tabs": {
       "attendance": "Attendance",
       "members": "Members",
-      "staff": "Staff"
+      "staff": "Staff",
+      "business": "Business"
+    },
+    "business": {
+      "title": "Business Dashboard",
+      "periodToday": "Today",
+      "periodWeek": "This Week",
+      "periodMonth": "This Month",
+      "periodCustom": "Custom",
+      "applyRange": "Apply",
+      "revenueSnapshot": "Revenue Snapshot",
+      "totalRevenue": "Total Revenue",
+      "newMemberships": "New Memberships",
+      "activeMembers": "Active Members",
+      "trendTitle": "Revenue Trend — Last 6 Months",
+      "retentionTitle": "Retention Health",
+      "churnRate": "Monthly Churn Rate",
+      "renewalRate": "Renewal Rate",
+      "expiringSoon": "Expiring Soon",
+      "expiring7": "Next 7 days",
+      "expiring30": "Next 8–30 days",
+      "avgTenure": "Avg Member Tenure",
+      "days": "days",
+      "members": "members",
+      "of": "of",
+      "membersChurned": "churned",
+      "noData": "No data for this period.",
+      "loading": "Loading dashboard..."
     },
     "attendance": {
       "searchPlaceholder": "Search by name or gym ID...",

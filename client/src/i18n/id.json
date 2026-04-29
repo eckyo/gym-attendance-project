@@ -1,4 +1,5 @@
 {
+  "comingSoon": "Segera hadir",
   "common": {
     "cancel": "Batal",
     "loading": "Memuat..."
@@ -75,7 +76,34 @@
     "tabs": {
       "attendance": "Absensi",
       "members": "Anggota",
-      "staff": "Staf"
+      "staff": "Staf",
+      "business": "Bisnis"
+    },
+    "business": {
+      "title": "Dasbor Bisnis",
+      "periodToday": "Hari Ini",
+      "periodWeek": "Minggu Ini",
+      "periodMonth": "Bulan Ini",
+      "periodCustom": "Kustom",
+      "applyRange": "Terapkan",
+      "revenueSnapshot": "Ringkasan Pendapatan",
+      "totalRevenue": "Total Pendapatan",
+      "newMemberships": "Keanggotaan Baru",
+      "activeMembers": "Anggota Aktif",
+      "trendTitle": "Tren Pendapatan — 6 Bulan Terakhir",
+      "retentionTitle": "Kesehatan Retensi",
+      "churnRate": "Tingkat Churn Bulanan",
+      "renewalRate": "Tingkat Perpanjangan",
+      "expiringSoon": "Segera Kedaluwarsa",
+      "expiring7": "7 hari ke depan",
+      "expiring30": "8–30 hari ke depan",
+      "avgTenure": "Rata-rata Masa Keanggotaan",
+      "days": "hari",
+      "members": "anggota",
+      "of": "dari",
+      "membersChurned": "churn",
+      "noData": "Tidak ada data untuk periode ini.",
+      "loading": "Memuat dasbor..."
     },
     "attendance": {
       "searchPlaceholder": "Cari nama atau ID gym...",
