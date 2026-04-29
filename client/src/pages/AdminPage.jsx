@@ -2591,8 +2591,31 @@ export default function AdminPage({ token, role, gymName, onBack }) {
                 </button>
               )}
               {role === 'admin' && (
-                <button style={{ ...s.tab, ...(tab === 'business' ? s.tabActive : {}) }} onClick={() => setTab('business')}>
+                <button
+                  disabled
+                  style={{
+                    ...s.tab,
+                    opacity: 0.5,
+                    cursor: 'not-allowed',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
+                >
                   {t('admin.tabs.business')}
+                  <span style={{
+                    fontSize: 9,
+                    fontWeight: 700,
+                    background: '#BEFE00',
+                    color: '#000',
+                    borderRadius: 4,
+                    padding: '1px 5px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.04em',
+                    lineHeight: 1.4,
+                  }}>
+                    {t('comingSoon')}
+                  </span>
                 </button>
               )}
             </div>
