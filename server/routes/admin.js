@@ -338,10 +338,12 @@ router.get('/members', async (req, res, next) => {
 
     const result = await pool.query(
       `SELECT m.id, m.name, m.scan_token, m.expiry_date, m.phone_number, m.created_at,
+              m.group_id, mg.name AS group_name,
               p.id AS package_id, p.name AS package_name, p.duration_days, p.price,
               COUNT(*) OVER() AS total_count
        FROM members m
        LEFT JOIN membership_packages p ON p.id = m.package_id
+       LEFT JOIN member_groups mg ON mg.id = m.group_id
        WHERE m.gym_id = $1
          AND m.deleted_at IS NULL
          AND m.is_visitor = false
@@ -441,7 +443,7 @@ router.post('/members', async (req, res, next) => {
 // PUT /api/admin/members/:id
 router.put('/members/:id', async (req, res, next) => {
   try {
-    const { name, expiryDate, packageId, phoneNumber } = req.body;
+    const { name, expiryDate, packageId, phoneNumber, detachFromGroup } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'Name is required' });
 
     const phoneRe = /^\+62\d{8,13}$/;
@@ -484,6 +486,10 @@ router.put('/members/:id', async (req, res, next) => {
     if (phoneNumber !== undefined) {
       setClauses.splice(2, 0, `phone_number = $${params.length + 1}`);
       params.push(phoneNumber || null);
+    }
+
+    if (detachFromGroup) {
+      setClauses.push(`group_id = NULL`);
     }
 
     params.push(req.params.id, req.gymId);

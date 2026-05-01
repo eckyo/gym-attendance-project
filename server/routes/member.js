@@ -19,7 +19,7 @@ const requireMember = [requireAuth, injectGymId, requireRole('member')];
 // POST /api/member/login — public, no auth required
 router.post('/login', async (req, res, next) => {
   try {
-    const { phoneNumber, password, remember } = req.body;
+    const { phoneNumber, password, remember, memberId } = req.body;
 
     if (!phoneNumber?.trim() || !password?.trim()) {
       return res.status(400).json({ error: 'Phone number and password are required' });
@@ -29,10 +29,16 @@ router.post('/login', async (req, res, next) => {
     const digitsOnly = phoneNumber.replace(/\D/g, '');
     const normalizedInput = '62' + (digitsOnly.startsWith('62') ? digitsOnly.slice(2) : digitsOnly.startsWith('0') ? digitsOnly.slice(1) : digitsOnly);
 
+    const params = [normalizedInput];
+    const memberFilter = memberId ? `AND m.id = $${params.push(memberId)}` : '';
+
     const result = await pool.query(
-      `SELECT m.id, m.gym_id, m.name, m.phone_number, m.password_hash
+      `SELECT m.id, m.gym_id, m.name, m.phone_number, m.password_hash, m.expiry_date, m.scan_token,
+              g.name AS gym_name,
+              p.name AS package_name
        FROM members m
        JOIN gyms g ON g.id = m.gym_id
+       LEFT JOIN membership_packages p ON p.id = m.package_id
        WHERE CASE
                WHEN REGEXP_REPLACE(m.phone_number, '[^0-9]', '', 'g') LIKE '62%'
                  THEN REGEXP_REPLACE(m.phone_number, '[^0-9]', '', 'g')
@@ -42,12 +48,38 @@ router.post('/login', async (req, res, next) => {
                  '62' || REGEXP_REPLACE(m.phone_number, '[^0-9]', '', 'g')
              END = $1
              AND m.deleted_at IS NULL AND g.is_active = true
-       LIMIT 2`,
-      [normalizedInput]
+             ${memberFilter}
+       LIMIT 10`,
+      params
     );
 
     if (result.rows.length > 1) {
-      return res.status(400).json({ error: 'Multiple accounts found with this number. Please contact your gym.' });
+      const checked = await Promise.all(
+        result.rows.map(async (row) => ({
+          ...row,
+          matches: row.password_hash ? await bcrypt.compare(password, row.password_hash) : false,
+        }))
+      );
+      const matches = checked.filter((r) => r.matches);
+
+      if (matches.length === 0) return res.status(401).json({ error: 'Invalid password' });
+
+      if (matches.length === 1) {
+        result.rows = [matches[0]];
+      } else {
+        return res.status(207).json({
+          requiresSelection: true,
+          accounts: matches.map((m) => ({
+            memberId: m.id,
+            gymId: m.gym_id,
+            memberName: m.name,
+            gymName: m.gym_name,
+            scanToken: m.scan_token,
+            packageName: m.package_name || null,
+            expiryDate: m.expiry_date ? m.expiry_date.toISOString().slice(0, 10) : null,
+          })),
+        });
+      }
     }
 
     const member = result.rows[0];
