@@ -642,7 +642,7 @@ router.put('/staff/:id/password', async (req, res, next) => {
 router.get('/settings', async (req, res, next) => {
   try {
     const result = await pool.query(
-      'SELECT visitor_price, reg_fee_rule_enabled, reg_fee_grace_months FROM gyms WHERE id = $1',
+      'SELECT visitor_price, reg_fee_rule_enabled, reg_fee_grace_months, gym_code FROM gyms WHERE id = $1',
       [req.gymId]
     );
     const row = result.rows[0];
@@ -650,6 +650,7 @@ router.get('/settings', async (req, res, next) => {
       visitorPrice: row.visitor_price,
       regFeeRuleEnabled: row.reg_fee_rule_enabled,
       regFeeGraceMonths: row.reg_fee_grace_months,
+      gymCode: row.gym_code ?? null,
     });
   } catch (err) {
     next(err);
@@ -689,6 +690,36 @@ router.put('/settings/reg-fee-rule', async (req, res, next) => {
       [enabled, enabled ? months : (months || 3), req.gymId]
     );
     res.json({ regFeeRuleEnabled: enabled, regFeeGraceMonths: enabled ? months : (months || 3) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PUT /api/admin/settings/gym-code
+router.put('/settings/gym-code', async (req, res, next) => {
+  try {
+    const { gymCode } = req.body;
+
+    if (gymCode === null || gymCode === undefined || gymCode === '') {
+      await pool.query('UPDATE gyms SET gym_code = NULL, updated_at = NOW() WHERE id = $1', [req.gymId]);
+      return res.json({ gymCode: null });
+    }
+
+    const code = String(gymCode).toLowerCase().trim();
+    if (!/^[a-z0-9-]{3,20}$/.test(code)) {
+      return res.status(400).json({ error: 'Gym code must be 3–20 characters: letters, numbers, and hyphens only.' });
+    }
+
+    const conflict = await pool.query(
+      'SELECT id FROM gyms WHERE gym_code = $1 AND id != $2',
+      [code, req.gymId]
+    );
+    if (conflict.rows.length > 0) {
+      return res.status(400).json({ error: 'This gym code is already taken. Please choose another.' });
+    }
+
+    await pool.query('UPDATE gyms SET gym_code = $1, updated_at = NOW() WHERE id = $2', [code, req.gymId]);
+    res.json({ gymCode: code });
   } catch (err) {
     next(err);
   }

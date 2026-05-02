@@ -16,6 +16,20 @@ export const memberLogin = async (phoneNumber, password, remember = false, membe
   return res.json();
 };
 
+export const gymCodeLogin = async (gymCode, scanToken, password, remember = false) => {
+  const res = await fetch(`${BASE}/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ gymCode: gymCode.toLowerCase().trim(), scanToken: scanToken.trim(), password, remember }),
+  });
+  return res.json();
+};
+
+export const lookupGym = async (code) => {
+  const res = await fetch(`/api/public/gym/${encodeURIComponent(code.toLowerCase().trim())}`);
+  return res.json();
+};
+
 export const getMemberProfile = async (token) => {
   const res = await fetch(`${BASE}/profile`, { headers: headers(token) });
   return res.json();

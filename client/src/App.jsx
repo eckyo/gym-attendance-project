@@ -1,7 +1,12 @@
 import { useState, useEffect } from 'react';
 import { login } from './api/scan.js';
-import { memberLogin } from './api/member.js';
+import { memberLogin, gymCodeLogin, lookupGym } from './api/member.js';
 import { verifyPin } from './api/admin.js';
+
+const gymSlugFromUrl = (() => {
+  const m = window.location.pathname.match(/^\/g\/([a-z0-9-]+)$/i);
+  return m ? m[1].toLowerCase() : null;
+})();
 import ScanPage from './pages/ScanPage.jsx';
 import AdminPage from './pages/AdminPage.jsx';
 import SuperadminPage from './pages/SuperadminPage.jsx';
@@ -277,7 +282,7 @@ const s = {
   },
 };
 
-function LoginForm({ onLogin, onMemberLogin }) {
+function LoginForm({ onLogin, onMemberLogin, gymSlug }) {
   const [mode, setMode] = useState('member'); // member is primary
 
   // Inject placeholder colour for dark inputs — runs once
@@ -298,7 +303,19 @@ function LoginForm({ onLogin, onMemberLogin }) {
   const [loading, setLoading] = useState(false);
   const [loginStep, setLoginStep] = useState('credentials'); // 'credentials' | 'select'
   const [accounts, setAccounts] = useState([]);
+  const [loginMethod, setLoginMethod] = useState('phone'); // 'phone' | 'gymCode'
+  const [scanToken, setScanToken] = useState('');
+  const [gymCodeInput, setGymCodeInput] = useState('');
+  const [gymNameFromSlug, setGymNameFromSlug] = useState(null);
   const { t } = useTranslation();
+
+  useEffect(() => {
+    if (!gymSlug) return;
+    lookupGym(gymSlug).then((data) => {
+      if (data.gymName) setGymNameFromSlug(data.gymName);
+      else setError(t('member.gymCodeNotFound'));
+    });
+  }, [gymSlug]);
 
   const handleStaffSubmit = async (e) => {
     e.preventDefault();
@@ -348,12 +365,38 @@ function LoginForm({ onLogin, onMemberLogin }) {
     }
   };
 
+  const handleGymCodeSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      const code = gymSlug || gymCodeInput;
+      const data = await gymCodeLogin(code, scanToken, password, remember);
+      if (data.error) throw new Error(data.error);
+      onMemberLogin(data.token, data.member, remember);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const switchLoginMethod = (method) => {
+    setLoginMethod(method);
+    setError('');
+    setScanToken('');
+    setGymCodeInput('');
+  };
+
   const switchMode = (newMode) => {
     setMode(newMode);
     setError('');
     setPassword('');
     setLoginStep('credentials');
     setAccounts([]);
+    setLoginMethod('phone');
+    setScanToken('');
+    setGymCodeInput('');
   };
 
   return (
@@ -375,7 +418,11 @@ function LoginForm({ onLogin, onMemberLogin }) {
       <div style={s.card}>
         <div style={s.title}>
           {mode === 'member'
-            ? (loginStep === 'select' ? t('member.selectAccountTitle') : t('login.heroHeading'))
+            ? (loginStep === 'select'
+                ? t('member.selectAccountTitle')
+                : gymSlug && gymNameFromSlug
+                  ? t('member.gymCodeLoginFor', { gymName: gymNameFromSlug })
+                  : t('login.heroHeading'))
             : t('login.title')}
         </div>
         <div style={s.subtitle}>
@@ -440,22 +487,71 @@ function LoginForm({ onLogin, onMemberLogin }) {
             </button>
           </div>
         ) : mode === 'member' ? (
-          <form onSubmit={handleMemberSubmit}>
-            <label style={s.label}>{t('member.phoneLabel')}</label>
-            <div style={{ display: 'flex', marginBottom: 14 }}>
-              <div style={s.phonePrefix}>+62</div>
-              <input
-                className="login-dark-input"
-                style={{ ...s.input, marginBottom: 0, borderLeft: 'none', borderRadius: '0 10px 10px 0' }}
-                type="tel"
-                inputMode="numeric"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
-                placeholder="81234567890"
-                required
-                autoComplete="tel"
-              />
-            </div>
+          <form onSubmit={gymSlug || loginMethod === 'gymCode' ? handleGymCodeSubmit : handleMemberSubmit}>
+            {/* Login method toggle — only on universal URL */}
+            {!gymSlug && (
+              <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: '1.5px solid rgba(255,255,255,0.15)', marginBottom: 20 }}>
+                <button type="button"
+                  style={{ flex: 1, padding: '9px 0', fontSize: 13, fontWeight: 600, border: 'none', cursor: 'pointer', background: loginMethod === 'phone' ? '#fff' : 'transparent', color: loginMethod === 'phone' ? '#1a1a2e' : 'rgba(255,255,255,0.55)', transition: 'all 0.15s' }}
+                  onClick={() => switchLoginMethod('phone')}
+                >{t('member.loginMethodPhone')}</button>
+                <button type="button"
+                  style={{ flex: 1, padding: '9px 0', fontSize: 13, fontWeight: 600, border: 'none', borderLeft: '1px solid rgba(255,255,255,0.15)', cursor: 'pointer', background: loginMethod === 'gymCode' ? '#fff' : 'transparent', color: loginMethod === 'gymCode' ? '#1a1a2e' : 'rgba(255,255,255,0.55)', transition: 'all 0.15s' }}
+                  onClick={() => switchLoginMethod('gymCode')}
+                >{t('member.loginMethodGymCode')}</button>
+              </div>
+            )}
+
+            {gymSlug || loginMethod === 'gymCode' ? (
+              <>
+                {!gymSlug && (
+                  <>
+                    <label style={s.label}>{t('member.gymCodeLabel')}</label>
+                    <input
+                      className="login-dark-input"
+                      style={s.input}
+                      type="text"
+                      value={gymCodeInput}
+                      onChange={(e) => setGymCodeInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                      placeholder={t('member.gymCodePlaceholder')}
+                      required
+                      autoComplete="off"
+                    />
+                  </>
+                )}
+                <label style={s.label}>{t('member.memberIdLabel')}</label>
+                <input
+                  className="login-dark-input"
+                  style={s.input}
+                  type="text"
+                  value={scanToken}
+                  onChange={(e) => setScanToken(e.target.value.toUpperCase())}
+                  placeholder={t('member.memberIdPlaceholder')}
+                  required
+                  autoComplete="off"
+                  autoFocus={!!gymSlug}
+                />
+              </>
+            ) : (
+              <>
+                <label style={s.label}>{t('member.phoneLabel')}</label>
+                <div style={{ display: 'flex', marginBottom: 14 }}>
+                  <div style={s.phonePrefix}>+62</div>
+                  <input
+                    className="login-dark-input"
+                    style={{ ...s.input, marginBottom: 0, borderLeft: 'none', borderRadius: '0 10px 10px 0' }}
+                    type="tel"
+                    inputMode="numeric"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
+                    placeholder="81234567890"
+                    required
+                    autoComplete="tel"
+                  />
+                </div>
+              </>
+            )}
+
             <label style={s.label}>{t('login.passwordLabel')}</label>
             <input
               className="login-dark-input"
@@ -486,19 +582,18 @@ function LoginForm({ onLogin, onMemberLogin }) {
               {loading ? t('member.loggingIn') : t('member.loginButton')}
             </button>
 
-            <div style={s.divider}>
-              <div style={s.dividerLine} />
-              <span style={s.dividerText}>or</span>
-              <div style={s.dividerLine} />
-            </div>
-
-            <button
-              type="button"
-              style={s.btnStaff}
-              onClick={() => switchMode('staff')}
-            >
-              {t('login.staffAccessLink')}
-            </button>
+            {!gymSlug && (
+              <>
+                <div style={s.divider}>
+                  <div style={s.dividerLine} />
+                  <span style={s.dividerText}>or</span>
+                  <div style={s.dividerLine} />
+                </div>
+                <button type="button" style={s.btnStaff} onClick={() => switchMode('staff')}>
+                  {t('login.staffAccessLink')}
+                </button>
+              </>
+            )}
           </form>
         ) : (
           <form onSubmit={handleStaffSubmit}>
@@ -643,7 +738,7 @@ export default function App() {
   };
 
   if (!auth) {
-    return <LoginForm onLogin={handleLogin} onMemberLogin={handleMemberLogin} />;
+    return <LoginForm onLogin={handleLogin} onMemberLogin={handleMemberLogin} gymSlug={gymSlugFromUrl} />;
   }
 
   if (auth.role === 'superadmin') {

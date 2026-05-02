@@ -17,6 +17,7 @@ import {
   getPackages, createPackage, updatePackage, deletePackage, setDefaultPackage,
   addMemberWithPackage, getSettings, setVisitorPrice, setRegFeeRule, changeAdminPassword, getDashboard,
   getGroups, createGroup, updateGroup, deleteGroup, addGroupMember, removeGroupMember, renewGroup,
+  setGymCode,
 } from '../api/admin.js';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useTranslation, LanguageSwitcher } from '../i18n/LanguageContext.jsx';
@@ -3134,6 +3135,123 @@ function RegFeeModal({ token, gymSettings, onSaved, onClose }) {
   );
 }
 
+// ─── Gym Code Modal ───────────────────────────────────────────────────────────
+
+function GymCodeModal({ token, gymSettings, onSaved, onClose }) {
+  const [codeInput, setCodeInput] = useState(gymSettings?.gymCode ?? '');
+  const [loading, setLoading] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState('');
+  const [copied, setCopied] = useState(false);
+  const { t } = useTranslation();
+
+  const handleCopyUrl = () => {
+    navigator.clipboard.writeText(urlPreview).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  const isChanging = gymSettings?.gymCode && codeInput !== gymSettings.gymCode && codeInput !== '';
+  const urlPreview = codeInput ? `${window.location.origin}/g/${codeInput}` : '';
+
+  const handleSave = async () => {
+    setError('');
+    const code = codeInput.trim().toLowerCase();
+    if (code && !/^[a-z0-9-]{3,20}$/.test(code)) {
+      setError(t('admin.settings.gymCodeHint'));
+      return;
+    }
+    setLoading(true);
+    try {
+      const updated = await setGymCode(token, code || null);
+      onSaved({ ...gymSettings, gymCode: updated.gymCode });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={s.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={{ ...s.modal, maxWidth: 420 }}>
+        <div style={s.modalTitle}>{t('admin.settings.gymCodeMenuLabel')}</div>
+        {error && <div style={s.error}>{error}</div>}
+
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>
+            {t('admin.settings.gymCodeLabel')}
+          </label>
+          <input
+            type="text"
+            value={codeInput}
+            onChange={(e) => { setCodeInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')); setSaved(false); }}
+            placeholder="e.g. fitzone"
+            style={{ ...s.modalInput, marginBottom: 6 }}
+            maxLength={20}
+          />
+          <div style={{ fontSize: 12, color: '#64748b' }}>{t('admin.settings.gymCodeHint')}</div>
+        </div>
+
+        {urlPreview && (
+          <div style={{ marginBottom: 16, padding: '10px 12px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+            <div style={{ fontSize: 12, color: '#64748b', marginBottom: 6 }}>{t('admin.settings.gymCodeUrlPreview')}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ fontSize: 13, color: '#1e293b', fontWeight: 500, wordBreak: 'break-all', flex: 1 }}>{urlPreview}</div>
+              <button
+                type="button"
+                onClick={handleCopyUrl}
+                title="Copy link"
+                style={{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 6, color: copied ? '#16a34a' : '#64748b', transition: 'color 0.15s' }}
+              >
+                {copied
+                  ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                }
+              </button>
+            </div>
+            {copied && (
+              <div style={{ fontSize: 12, color: '#16a34a', marginTop: 4, fontWeight: 500 }}>Link copied!</div>
+            )}
+          </div>
+        )}
+
+        {isChanging && (
+          <div style={{ marginBottom: 16, padding: '10px 12px', background: '#fffbeb', borderRadius: 8, border: '1px solid #fde68a', fontSize: 13, color: '#92400e' }}>
+            {t('admin.settings.gymCodeChangeWarning')}
+          </div>
+        )}
+
+        <button
+          style={{ ...s.modalBtn, background: '#BEFE00', color: '#1a1a1a', opacity: loading ? 0.6 : 1 }}
+          onClick={handleSave}
+          disabled={loading}
+        >
+          {loading ? t('admin.settings.gymCodeSaving') : saved ? t('admin.settings.saved') : t('admin.settings.gymCodeSave')}
+        </button>
+        {gymSettings?.gymCode && (
+          <button
+            style={{ ...s.modalBtn, background: '#fee2e2', color: '#b91c1c', marginTop: 10, opacity: loading ? 0.6 : 1 }}
+            onClick={() => { setCodeInput(''); }}
+            disabled={loading}
+          >
+            {t('admin.settings.gymCodeClear')}
+          </button>
+        )}
+        <button
+          style={{ ...s.modalBtn, background: '#e2e8f0', color: '#475569', marginTop: 10 }}
+          onClick={onClose}
+        >
+          {t('common.cancel')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Settings Modal ───────────────────────────────────────────────────────────
 
 function SettingsModal({ token, gymSettings, onSaved, onClose }) {
@@ -3155,6 +3273,7 @@ function SettingsModal({ token, gymSettings, onSaved, onClose }) {
           {menuRow(t('admin.changePassword.menuLabel'), 'password')}
           {menuRow(t('admin.changePin'), 'changepin')}
           {menuRow(t('admin.settings.regFeeMenuLabel'), 'regfee')}
+          {menuRow(t('admin.settings.gymCodeMenuLabel'), 'gymcode')}
           <button
             style={{ ...s.modalBtn, background: '#e2e8f0', color: '#475569', marginTop: 16 }}
             onClick={onClose}
@@ -3172,6 +3291,10 @@ function SettingsModal({ token, gymSettings, onSaved, onClose }) {
       )}
       {activeSection === 'regfee' && (
         <RegFeeModal token={token} gymSettings={gymSettings} onSaved={onSaved}
+          onClose={() => setActiveSection(null)} />
+      )}
+      {activeSection === 'gymcode' && (
+        <GymCodeModal token={token} gymSettings={gymSettings} onSaved={onSaved}
           onClose={() => setActiveSection(null)} />
       )}
     </>

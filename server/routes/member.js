@@ -19,9 +19,57 @@ const requireMember = [requireAuth, injectGymId, requireRole('member')];
 // POST /api/member/login — public, no auth required
 router.post('/login', async (req, res, next) => {
   try {
-    const { phoneNumber, password, remember, memberId } = req.body;
+    const { phoneNumber, password, remember, memberId, gymCode, scanToken } = req.body;
 
-    if (!phoneNumber?.trim() || !password?.trim()) {
+    if (!password?.trim()) {
+      return res.status(400).json({ error: 'Password is required' });
+    }
+
+    // ── Gym code path ─────────────────────────────────────────────────────────
+    if (gymCode?.trim()) {
+      if (!scanToken?.trim()) {
+        return res.status(400).json({ error: 'GYM ID is required' });
+      }
+
+      const gymResult = await pool.query(
+        'SELECT id FROM gyms WHERE gym_code = $1 AND is_active = true',
+        [gymCode.toLowerCase().trim()]
+      );
+      if (gymResult.rows.length === 0) {
+        return res.status(401).json({ error: 'Invalid gym code or GYM ID' });
+      }
+      const gymId = gymResult.rows[0].id;
+
+      const memberResult = await pool.query(
+        `SELECT m.id, m.name, m.password_hash, m.expiry_date, m.scan_token, m.gym_id,
+                g.name AS gym_name
+         FROM members m
+         JOIN gyms g ON g.id = m.gym_id
+         WHERE m.scan_token = $1 AND m.gym_id = $2 AND m.deleted_at IS NULL`,
+        [scanToken.trim().toUpperCase(), gymId]
+      );
+
+      const member = memberResult.rows[0];
+      if (!member || !member.password_hash) {
+        return res.status(401).json({ error: 'Invalid gym code or GYM ID' });
+      }
+
+      const isValid = await bcrypt.compare(password, member.password_hash);
+      if (!isValid) {
+        return res.status(401).json({ error: 'Invalid gym code or GYM ID' });
+      }
+
+      const token = jwt.sign(
+        { userId: member.id, gymId: member.gym_id, role: 'member' },
+        process.env.JWT_SECRET,
+        { expiresIn: remember ? '30d' : '8h' }
+      );
+
+      return res.json({ token, member: { id: member.id, name: member.name, gymId: member.gym_id } });
+    }
+
+    // ── Phone number path ─────────────────────────────────────────────────────
+    if (!phoneNumber?.trim()) {
       return res.status(400).json({ error: 'Phone number and password are required' });
     }
 

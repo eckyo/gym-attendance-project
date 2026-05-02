@@ -351,7 +351,15 @@
       "ruleOff": "Disabled",
       "saving": "Saving...",
       "saved": "Saved!",
-      "save": "Save Settings"
+      "save": "Save Settings",
+      "gymCodeMenuLabel": "Login URL & Gym Code",
+      "gymCodeLabel": "Gym Code",
+      "gymCodeHint": "Letters, numbers, hyphens only (3–20 chars). Used as login URL and code for member login.",
+      "gymCodeUrlPreview": "Member login URL:",
+      "gymCodeChangeWarning": "⚠ Changing this will break existing bookmarks and shared links.",
+      "gymCodeSave": "Save",
+      "gymCodeSaving": "Saving...",
+      "gymCodeClear": "Remove"
     },
     "changePassword": {
       "menuLabel": "Change Password",
@@ -437,7 +445,15 @@
     "greetingSubEvening": "Evening grind hits different 🌟",
     "greetingSubNight": "Champions train at all hours 🏆",
     "settings": "Settings",
-    "settingsTitle": "Account Settings"
+    "settingsTitle": "Account Settings",
+    "loginMethodPhone": "Phone Number",
+    "loginMethodGymCode": "Gym Code",
+    "gymCodeLabel": "Gym Code",
+    "gymCodePlaceholder": "e.g. fitzone",
+    "memberIdLabel": "GYM ID",
+    "memberIdPlaceholder": "e.g. G-001",
+    "gymCodeNotFound": "Gym not found. Please contact your gym admin for the correct login link.",
+    "gymCodeLoginFor": "Member login for {gymName}"
   },
   "superadmin": {
     "title": "Superadmin Dashboard",

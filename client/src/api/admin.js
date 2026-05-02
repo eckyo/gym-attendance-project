@@ -187,6 +187,13 @@ export const setRegFeeRule = (token, enabled, graceMonths) =>
     body: JSON.stringify({ enabled, graceMonths }),
   }).then(handleResponse);
 
+export const setGymCode = (token, gymCode) =>
+  fetch(`${API_BASE}/api/admin/settings/gym-code`, {
+    method: 'PUT',
+    headers: authHeaders(token),
+    body: JSON.stringify({ gymCode: gymCode || null }),
+  }).then(handleResponse);
+
 export const getDashboard = (token, { start, end } = {}) => {
   const params = new URLSearchParams();
   if (start) params.set('start', start);
