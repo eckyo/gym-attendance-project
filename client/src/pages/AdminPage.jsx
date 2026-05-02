@@ -18,6 +18,7 @@ import {
   addMemberWithPackage, getSettings, setVisitorPrice, setRegFeeRule, changeAdminPassword, getDashboard,
   getGroups, createGroup, updateGroup, deleteGroup, addGroupMember, removeGroupMember, renewGroup,
   setGymCode,
+  setPackagePrefix,
 } from '../api/admin.js';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useTranslation, LanguageSwitcher } from '../i18n/LanguageContext.jsx';
@@ -2537,12 +2538,14 @@ function PackagesTab({ token }) {
   const [editHasRegFee, setEditHasRegFee] = useState(false);
   const [editRegFee, setEditRegFee] = useState('');
   const [editIsGroup, setEditIsGroup] = useState(false);
+  const [editCode, setEditCode] = useState('');
   const [newName, setNewName] = useState('');
   const [newDuration, setNewDuration] = useState('');
   const [newPrice, setNewPrice] = useState('');
   const [newHasRegFee, setNewHasRegFee] = useState(false);
   const [newRegFee, setNewRegFee] = useState('');
   const [newIsGroup, setNewIsGroup] = useState(false);
+  const [newCode, setNewCode] = useState('');
   const [addLoading, setAddLoading] = useState(false);
   const [visitorPriceInput, setVisitorPriceInput] = useState('');
   const [visitorPriceLoaded, setVisitorPriceLoaded] = useState(false);
@@ -2593,9 +2596,10 @@ function PackagesTab({ token }) {
         hasRegistrationFee: newHasRegFee,
         registrationFee: newHasRegFee ? Number(newRegFee) : 0,
         isGroup: newIsGroup,
+        code: newCode || null,
       });
       setPackages((prev) => [...prev, pkg].sort((a, b) => a.price - b.price));
-      setNewName(''); setNewDuration(''); setNewPrice(''); setNewHasRegFee(false); setNewRegFee(''); setNewIsGroup(false);
+      setNewName(''); setNewDuration(''); setNewPrice(''); setNewHasRegFee(false); setNewRegFee(''); setNewIsGroup(false); setNewCode('');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -2611,11 +2615,12 @@ function PackagesTab({ token }) {
     setEditHasRegFee(!!pkg.has_registration_fee);
     setEditRegFee(String(pkg.registration_fee ?? 0));
     setEditIsGroup(!!pkg.is_group);
+    setEditCode(pkg.code ?? '');
   };
 
   const cancelEdit = () => {
     setEditingId(null); setEditName(''); setEditDuration(''); setEditPrice('');
-    setEditHasRegFee(false); setEditRegFee(''); setEditIsGroup(false);
+    setEditHasRegFee(false); setEditRegFee(''); setEditIsGroup(false); setEditCode('');
   };
 
   const saveEdit = async (id) => {
@@ -2628,6 +2633,7 @@ function PackagesTab({ token }) {
         hasRegistrationFee: editHasRegFee,
         registrationFee: editHasRegFee ? Number(editRegFee) : 0,
         isGroup: editIsGroup,
+        code: editCode || null,
       });
       setPackages((prev) => prev.map((p) => p.id === id ? updated : p).sort((a, b) => a.price - b.price));
       setEditingId(null);
@@ -2695,15 +2701,16 @@ function PackagesTab({ token }) {
             <th style={s.th}>{t('admin.packages.colPrice')}</th>
             <th style={s.th}>{t('admin.packages.colRegFee')}</th>
             <th style={s.th}>{t('admin.packages.colGroup')}</th>
+            <th style={s.th}>{t('admin.packages.codeLabel')}</th>
             <th style={s.th}>{t('admin.packages.colDefault')}</th>
             <th style={s.th}>{t('admin.packages.colActions')}</th>
           </tr>
         </thead>
         <tbody>
           {loading ? (
-            <tr><td colSpan={7} style={s.empty}>{t('common.loading')}</td></tr>
+            <tr><td colSpan={8} style={s.empty}>{t('common.loading')}</td></tr>
           ) : packages.length === 0 ? (
-            <tr><td colSpan={7} style={s.empty}>{t('admin.packages.noPackages')}</td></tr>
+            <tr><td colSpan={8} style={s.empty}>{t('admin.packages.noPackages')}</td></tr>
           ) : packages.map((pkg) => (
             <tr key={pkg.id}>
               <td style={s.td}>
@@ -2755,6 +2762,19 @@ function PackagesTab({ token }) {
                   <span style={{ ...s.badge, background: '#f1f5f9', color: '#64748b' }}>{t('admin.packages.typeIndividual')}</span>
                 )}
               </td>
+              <td style={{ ...s.td, textAlign: 'center' }}>
+                {editingId === pkg.id ? (
+                  <input
+                    style={{ ...s.inlineInput, maxWidth: 60, textTransform: 'uppercase' }}
+                    value={editCode}
+                    onChange={(e) => setEditCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 3))}
+                    placeholder="L"
+                    title={t('admin.packages.codeHint')}
+                  />
+                ) : pkg.code ? (
+                  <span style={{ ...s.badge, background: '#e0f2fe', color: '#0369a1', fontWeight: 700 }}>{pkg.code}</span>
+                ) : '—'}
+              </td>
               <td style={s.td}>
                 {pkg.is_default
                   ? <span style={s.defaultBadge}>{t('admin.packages.isDefault')}</span>
@@ -2805,6 +2825,15 @@ function PackagesTab({ token }) {
                   onClick={() => setNewIsGroup(true)}
                 >{t('admin.packages.typeGroup')}</button>
               </div>
+            </td>
+            <td style={{ ...s.td, textAlign: 'center' }}>
+              <input
+                style={{ ...s.inlineInput, maxWidth: 60, textTransform: 'uppercase' }}
+                value={newCode}
+                onChange={(e) => setNewCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 3))}
+                placeholder="L"
+                title={t('admin.packages.codeHint')}
+              />
             </td>
             <td style={s.td} />
             <td style={s.td}>
@@ -3252,6 +3281,79 @@ function GymCodeModal({ token, gymSettings, onSaved, onClose }) {
   );
 }
 
+// ─── Package Prefix Modal ─────────────────────────────────────────────────────
+
+function PackagePrefixModal({ token, gymSettings, onSaved, onClose }) {
+  const [enabled, setEnabled] = useState(!!gymSettings?.usePackagePrefix);
+  const [loading, setLoading] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState('');
+  const { t } = useTranslation();
+
+  const isDirty = enabled !== !!gymSettings?.usePackagePrefix;
+
+  const handleSave = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      const updated = await setPackagePrefix(token, enabled);
+      onSaved({ ...gymSettings, ...updated });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={s.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={{ ...s.modal, maxWidth: 420 }}>
+        <div style={s.modalTitle}>{t('admin.settings.packagePrefixMenuLabel')}</div>
+        {error && <div style={s.error}>{error}</div>}
+
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={enabled}
+              onChange={(e) => { setEnabled(e.target.checked); setSaved(false); }}
+              style={{ width: 18, height: 18, accentColor: '#BEFE00', cursor: 'pointer' }}
+            />
+            <span style={{ fontSize: 14, color: '#1e293b' }}>
+              {t('admin.settings.packagePrefixLabel')}
+            </span>
+          </label>
+          <div style={{ fontSize: 12, color: '#64748b', marginTop: 8, lineHeight: 1.5 }}>
+            {t('admin.settings.packagePrefixHint')}
+          </div>
+        </div>
+
+        {isDirty && enabled && (
+          <div style={{ background: '#fefce8', border: '1px solid #fde68a', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#92400e', marginBottom: 14 }}>
+            {t('admin.settings.packagePrefixWarning')}
+          </div>
+        )}
+
+        <button
+          style={{ ...s.modalBtn, background: '#BEFE00', color: '#1a1a1a', opacity: loading ? 0.6 : 1 }}
+          onClick={handleSave}
+          disabled={loading}
+        >
+          {loading ? t('admin.settings.saving') : saved ? t('admin.settings.saved') : t('admin.settings.save')}
+        </button>
+        <button
+          style={{ ...s.modalBtn, background: '#e2e8f0', color: '#475569', marginTop: 10 }}
+          onClick={onClose}
+        >
+          {t('common.cancel')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Settings Modal ───────────────────────────────────────────────────────────
 
 function SettingsModal({ token, gymSettings, onSaved, onClose }) {
@@ -3274,6 +3376,7 @@ function SettingsModal({ token, gymSettings, onSaved, onClose }) {
           {menuRow(t('admin.changePin'), 'changepin')}
           {menuRow(t('admin.settings.regFeeMenuLabel'), 'regfee')}
           {menuRow(t('admin.settings.gymCodeMenuLabel'), 'gymcode')}
+          {menuRow(t('admin.settings.packagePrefixMenuLabel'), 'packageprefix')}
           <button
             style={{ ...s.modalBtn, background: '#e2e8f0', color: '#475569', marginTop: 16 }}
             onClick={onClose}
@@ -3295,6 +3398,10 @@ function SettingsModal({ token, gymSettings, onSaved, onClose }) {
       )}
       {activeSection === 'gymcode' && (
         <GymCodeModal token={token} gymSettings={gymSettings} onSaved={onSaved}
+          onClose={() => setActiveSection(null)} />
+      )}
+      {activeSection === 'packageprefix' && (
+        <PackagePrefixModal token={token} gymSettings={gymSettings} onSaved={onSaved}
           onClose={() => setActiveSection(null)} />
       )}
     </>

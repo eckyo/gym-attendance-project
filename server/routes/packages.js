@@ -10,7 +10,7 @@ const router = Router();
 router.get('/', requireAuth, injectGymId, requireRole('admin', 'staff'), async (req, res, next) => {
   try {
     const result = await pool.query(
-      `SELECT id, name, duration_days, price, is_default, has_registration_fee, registration_fee, is_group, created_at
+      `SELECT id, name, duration_days, price, is_default, has_registration_fee, registration_fee, is_group, code, created_at
        FROM membership_packages WHERE gym_id = $1 ORDER BY price ASC`,
       [req.gymId]
     );
@@ -24,13 +24,26 @@ router.get('/', requireAuth, injectGymId, requireRole('admin', 'staff'), async (
 router.post('/', requireAuth, injectGymId, requireRole('admin'), async (req, res, next) => {
   const client = await pool.connect();
   try {
-    const { name, durationDays, price, isDefault, hasRegistrationFee, registrationFee, isGroup } = req.body;
+    const { name, durationDays, price, isDefault, hasRegistrationFee, registrationFee, isGroup, code } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'Name is required' });
     if (!durationDays || durationDays < 1) return res.status(400).json({ error: 'Duration must be at least 1 day' });
     if (price == null || price < 0) return res.status(400).json({ error: 'Price must be 0 or more' });
     if (registrationFee != null && registrationFee < 0) return res.status(400).json({ error: 'Registration fee must be 0 or more' });
 
     const regFee = hasRegistrationFee ? (registrationFee ?? 0) : 0;
+
+    let packageCode = null;
+    if (code?.trim()) {
+      packageCode = code.trim().toUpperCase();
+      if (!/^[A-Z0-9]{1,3}$/.test(packageCode)) {
+        return res.status(400).json({ error: 'Package code must be 1–3 alphanumeric characters' });
+      }
+      const clash = await pool.query(
+        'SELECT id FROM membership_packages WHERE gym_id = $1 AND UPPER(code) = $2',
+        [req.gymId, packageCode]
+      );
+      if (clash.rows.length > 0) return res.status(400).json({ error: `Package code "${packageCode}" is already in use` });
+    }
 
     await client.query('BEGIN');
     if (isDefault) {
@@ -40,10 +53,10 @@ router.post('/', requireAuth, injectGymId, requireRole('admin'), async (req, res
       );
     }
     const result = await client.query(
-      `INSERT INTO membership_packages (gym_id, name, duration_days, price, is_default, has_registration_fee, registration_fee, is_group)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       RETURNING id, name, duration_days, price, is_default, has_registration_fee, registration_fee, is_group, created_at`,
-      [req.gymId, name.trim(), durationDays, price, !!isDefault, !!hasRegistrationFee, regFee, !!isGroup]
+      `INSERT INTO membership_packages (gym_id, name, duration_days, price, is_default, has_registration_fee, registration_fee, is_group, code)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       RETURNING id, name, duration_days, price, is_default, has_registration_fee, registration_fee, is_group, code, created_at`,
+      [req.gymId, name.trim(), durationDays, price, !!isDefault, !!hasRegistrationFee, regFee, !!isGroup, packageCode]
     );
     await client.query('COMMIT');
     res.status(201).json(result.rows[0]);
@@ -58,7 +71,7 @@ router.post('/', requireAuth, injectGymId, requireRole('admin'), async (req, res
 // PUT /:id — admin only
 router.put('/:id', requireAuth, injectGymId, requireRole('admin'), async (req, res, next) => {
   try {
-    const { name, durationDays, price, hasRegistrationFee, registrationFee, isGroup } = req.body;
+    const { name, durationDays, price, hasRegistrationFee, registrationFee, isGroup, code } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'Name is required' });
     if (!durationDays || durationDays < 1) return res.status(400).json({ error: 'Duration must be at least 1 day' });
     if (price == null || price < 0) return res.status(400).json({ error: 'Price must be 0 or more' });
@@ -66,12 +79,25 @@ router.put('/:id', requireAuth, injectGymId, requireRole('admin'), async (req, r
 
     const regFee = hasRegistrationFee ? (registrationFee ?? 0) : 0;
 
+    let packageCode = null;
+    if (code?.trim()) {
+      packageCode = code.trim().toUpperCase();
+      if (!/^[A-Z0-9]{1,3}$/.test(packageCode)) {
+        return res.status(400).json({ error: 'Package code must be 1–3 alphanumeric characters' });
+      }
+      const clash = await pool.query(
+        'SELECT id FROM membership_packages WHERE gym_id = $1 AND UPPER(code) = $2 AND id != $3',
+        [req.gymId, packageCode, req.params.id]
+      );
+      if (clash.rows.length > 0) return res.status(400).json({ error: `Package code "${packageCode}" is already in use` });
+    }
+
     const result = await pool.query(
       `UPDATE membership_packages
-       SET name = $1, duration_days = $2, price = $3, has_registration_fee = $4, registration_fee = $5, is_group = $6, updated_at = NOW()
-       WHERE id = $7 AND gym_id = $8
-       RETURNING id, name, duration_days, price, is_default, has_registration_fee, registration_fee, is_group, created_at`,
-      [name.trim(), durationDays, price, !!hasRegistrationFee, regFee, !!isGroup, req.params.id, req.gymId]
+       SET name = $1, duration_days = $2, price = $3, has_registration_fee = $4, registration_fee = $5, is_group = $6, code = $7, updated_at = NOW()
+       WHERE id = $8 AND gym_id = $9
+       RETURNING id, name, duration_days, price, is_default, has_registration_fee, registration_fee, is_group, code, created_at`,
+      [name.trim(), durationDays, price, !!hasRegistrationFee, regFee, !!isGroup, packageCode, req.params.id, req.gymId]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Package not found' });
     res.json(result.rows[0]);

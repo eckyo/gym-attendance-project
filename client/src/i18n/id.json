@@ -294,7 +294,10 @@
       "visitorPriceSaving": "Menyimpan...",
       "colGroup": "Tipe",
       "typeGroup": "Grup",
-      "typeIndividual": "Individu"
+      "typeIndividual": "Individu",
+      "codeLabel": "Kode ID",
+      "codeHint": "1–3 karakter, huruf/angka. Digunakan sebagai awalan ID anggota jika Awalan ID Paket diaktifkan.",
+      "codePlaceholder": "cth. L"
     },
     "groups": {
       "sectionTitle": "Grup",
@@ -359,7 +362,11 @@
       "gymCodeChangeWarning": "⚠ Mengubah ini akan merusak tautan lama yang sudah dibagikan.",
       "gymCodeSave": "Simpan",
       "gymCodeSaving": "Menyimpan...",
-      "gymCodeClear": "Hapus"
+      "gymCodeClear": "Hapus",
+      "packagePrefixMenuLabel": "Awalan ID Paket",
+      "packagePrefixLabel": "Aktifkan Awalan ID Paket",
+      "packagePrefixHint": "Jika aktif, ID anggota menyertakan awalan paket (cth. L0001 untuk Laki-laki). Tetapkan kode ke setiap paket di tab Paket.",
+      "packagePrefixWarning": "Mengaktifkan ini akan memperbarui ID GYM semua anggota yang memiliki kode paket. Anggota tanpa paket tetap menggunakan ID saat ini."
     },
     "changePassword": {
       "menuLabel": "Ubah Kata Sandi",

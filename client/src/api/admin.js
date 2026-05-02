@@ -194,6 +194,13 @@ export const setGymCode = (token, gymCode) =>
     body: JSON.stringify({ gymCode: gymCode || null }),
   }).then(handleResponse);
 
+export const setPackagePrefix = (token, enabled) =>
+  fetch(`${API_BASE}/api/admin/settings/package-prefix`, {
+    method: 'PUT',
+    headers: authHeaders(token),
+    body: JSON.stringify({ enabled }),
+  }).then(handleResponse);
+
 export const getDashboard = (token, { start, end } = {}) => {
   const params = new URLSearchParams();
   if (start) params.set('start', start);

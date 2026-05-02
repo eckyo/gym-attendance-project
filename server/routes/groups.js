@@ -75,7 +75,7 @@ router.post('/', requireRole('admin'), async (req, res, next) => {
     }
 
     const pkgResult = await pool.query(
-      'SELECT id, name, duration_days, price FROM membership_packages WHERE id = $1 AND gym_id = $2 AND is_group = true',
+      'SELECT id, name, duration_days, price, code FROM membership_packages WHERE id = $1 AND gym_id = $2 AND is_group = true',
       [packageId, req.gymId]
     );
     if (pkgResult.rows.length === 0) {
@@ -95,22 +95,24 @@ router.post('/', requireRole('admin'), async (req, res, next) => {
     const groupId = groupResult.rows[0].id;
 
     const gymResult = await client.query(
-      'SELECT member_id_counter FROM gyms WHERE id = $1 FOR UPDATE',
+      'SELECT member_id_counter, use_package_prefix FROM gyms WHERE id = $1 FOR UPDATE',
       [req.gymId]
     );
     let counter = gymResult.rows[0].member_id_counter;
+    const usePrefix = gymResult.rows[0].use_package_prefix;
+    const packageCode = (usePrefix && pkg.code) ? pkg.code : null;
 
     const defaultHash = await bcrypt.hash('password123', 10);
     const createdMembers = [];
 
     for (const m of members) {
       counter += 1;
-      const scanToken = generateGymMemberId(counter);
+      const scanToken = generateGymMemberId(counter, packageCode);
       const memberResult = await client.query(
-        `INSERT INTO members (gym_id, name, scan_token, expiry_date, package_id, phone_number, password_hash, group_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        `INSERT INTO members (gym_id, name, scan_token, expiry_date, package_id, phone_number, password_hash, group_id, member_number)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          RETURNING id, name, scan_token, phone_number`,
-        [req.gymId, m.name.trim(), scanToken, expiryDate, pkg.id, m.phoneNumber || null, defaultHash, groupId]
+        [req.gymId, m.name.trim(), scanToken, expiryDate, pkg.id, m.phoneNumber || null, defaultHash, groupId, counter]
       );
       createdMembers.push(memberResult.rows[0]);
     }
@@ -227,8 +229,10 @@ router.post('/:id/members', requireRole('admin', 'staff'), async (req, res, next
     }
 
     const groupResult = await pool.query(
-      `SELECT g.id, g.expiry_date, g.package_id
-       FROM member_groups g WHERE g.id = $1 AND g.gym_id = $2`,
+      `SELECT g.id, g.expiry_date, g.package_id, p.code AS package_code
+       FROM member_groups g
+       JOIN membership_packages p ON p.id = g.package_id
+       WHERE g.id = $1 AND g.gym_id = $2`,
       [req.params.id, req.gymId]
     );
     if (groupResult.rows.length === 0) return res.status(404).json({ error: 'Group not found' });
@@ -237,20 +241,41 @@ router.post('/:id/members', requireRole('admin', 'staff'), async (req, res, next
     await client.query('BEGIN');
 
     const gymResult = await client.query(
-      'SELECT member_id_counter FROM gyms WHERE id = $1 FOR UPDATE',
+      'SELECT member_id_counter, use_package_prefix FROM gyms WHERE id = $1 FOR UPDATE',
       [req.gymId]
     );
-    const newCounter = gymResult.rows[0].member_id_counter + 1;
-    const scanToken = generateGymMemberId(newCounter);
+    const usePrefix = gymResult.rows[0].use_package_prefix;
+    const packageCode = (usePrefix && group.package_code) ? group.package_code : null;
 
-    await client.query('UPDATE gyms SET member_id_counter = $1 WHERE id = $2', [newCounter, req.gymId]);
+    let memberNumber;
+    let scanToken;
+
+    if (packageCode && phoneNumber) {
+      const existing = await client.query(
+        `SELECT member_number FROM members
+         WHERE phone_number = $1 AND gym_id = $2 AND deleted_at IS NULL AND member_number IS NOT NULL
+         LIMIT 1`,
+        [phoneNumber, req.gymId]
+      );
+      if (existing.rows.length > 0) {
+        memberNumber = existing.rows[0].member_number;
+        scanToken = generateGymMemberId(memberNumber, packageCode);
+      }
+    }
+
+    if (!scanToken) {
+      const newCounter = gymResult.rows[0].member_id_counter + 1;
+      memberNumber = newCounter;
+      scanToken = generateGymMemberId(newCounter, packageCode);
+      await client.query('UPDATE gyms SET member_id_counter = $1 WHERE id = $2', [newCounter, req.gymId]);
+    }
 
     const defaultHash = await bcrypt.hash('password123', 10);
     const result = await client.query(
-      `INSERT INTO members (gym_id, name, scan_token, expiry_date, package_id, phone_number, password_hash, group_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO members (gym_id, name, scan_token, expiry_date, package_id, phone_number, password_hash, group_id, member_number)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING id, name, scan_token, phone_number`,
-      [req.gymId, name.trim(), scanToken, group.expiry_date, group.package_id, phoneNumber || null, defaultHash, group.id]
+      [req.gymId, name.trim(), scanToken, group.expiry_date, group.package_id, phoneNumber || null, defaultHash, group.id, memberNumber]
     );
 
     await client.query('COMMIT');

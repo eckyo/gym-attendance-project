@@ -132,6 +132,17 @@ ALTER TABLE gyms ADD COLUMN IF NOT EXISTS reg_fee_grace_months INTEGER NOT NULL 
 -- Gym code / login URL slug (e.g. "fitzone" → kiosgym.com/g/fitzone)
 ALTER TABLE gyms ADD COLUMN IF NOT EXISTS gym_code TEXT UNIQUE;
 
+-- ─── Package ID Prefix ────────────────────────────────────────────────────────
+-- Short code (1–3 uppercase alphanumeric) on each package, used as member ID prefix
+ALTER TABLE membership_packages ADD COLUMN IF NOT EXISTS code TEXT;
+
+-- Per-gym feature flag: when true, new/updated member IDs include the package prefix
+ALTER TABLE gyms ADD COLUMN IF NOT EXISTS use_package_prefix BOOLEAN NOT NULL DEFAULT false;
+
+-- Stores the raw counter value used when the member's scan_token was generated,
+-- enabling same-number reuse when the same person gains a second membership
+ALTER TABLE members ADD COLUMN IF NOT EXISTS member_number INTEGER;
+
 -- ─── Transactions (revenue ledger) ───────────────────────────────────────────
 -- Append-only. No updated_at by design. Amount in IDR (integer).
 -- member_id nullable for walk-ins using ephemeral visitor records.

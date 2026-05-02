@@ -294,7 +294,10 @@
       "visitorPriceSaving": "Saving...",
       "colGroup": "Type",
       "typeGroup": "Group",
-      "typeIndividual": "Individual"
+      "typeIndividual": "Individual",
+      "codeLabel": "ID Code",
+      "codeHint": "1–3 chars, letters/numbers only. Used as member ID prefix when Package ID Prefix is enabled.",
+      "codePlaceholder": "e.g. L"
     },
     "groups": {
       "sectionTitle": "Groups",
@@ -359,7 +362,11 @@
       "gymCodeChangeWarning": "⚠ Changing this will break existing bookmarks and shared links.",
       "gymCodeSave": "Save",
       "gymCodeSaving": "Saving...",
-      "gymCodeClear": "Remove"
+      "gymCodeClear": "Remove",
+      "packagePrefixMenuLabel": "Package ID Prefix",
+      "packagePrefixLabel": "Enable Package ID Prefix",
+      "packagePrefixHint": "When enabled, member IDs include a package prefix (e.g. L0001 for Laki-laki). Assign a code to each package in the Packages tab.",
+      "packagePrefixWarning": "Enabling this will update GYM IDs for all members with a package code. Members without a package keep their current ID."
     },
     "changePassword": {
       "menuLabel": "Change Password",
