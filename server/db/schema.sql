@@ -154,3 +154,26 @@ CREATE INDEX IF NOT EXISTS idx_transactions_gym_type_created
   ON transactions(gym_id, type, created_at);
 CREATE INDEX IF NOT EXISTS idx_transactions_member
   ON transactions(member_id) WHERE member_id IS NOT NULL;
+
+-- ─── Group / Family Packages ─────────────────────────────────────────────────
+
+-- Mark a package as a group/family package
+ALTER TABLE membership_packages ADD COLUMN IF NOT EXISTS is_group BOOLEAN NOT NULL DEFAULT false;
+
+-- Group entity: multiple members share one expiry and one transaction
+CREATE TABLE IF NOT EXISTS member_groups (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  gym_id      UUID NOT NULL REFERENCES gyms(id),
+  name        TEXT NOT NULL,
+  package_id  UUID NOT NULL REFERENCES membership_packages(id),
+  expiry_date DATE,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_member_groups_gym ON member_groups(gym_id);
+
+-- Link each member to a group (nullable — existing individual members unaffected)
+ALTER TABLE members ADD COLUMN IF NOT EXISTS group_id UUID REFERENCES member_groups(id);
+
+-- Track group-level transactions (member_id stays NULL for group billing)
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS group_id UUID REFERENCES member_groups(id);

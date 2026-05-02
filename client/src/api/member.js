@@ -5,11 +5,13 @@ const headers = (token) => ({
   Authorization: `Bearer ${token}`,
 });
 
-export const memberLogin = async (phoneNumber, password, remember = false) => {
+export const memberLogin = async (phoneNumber, password, remember = false, memberId = null) => {
+  const body = { phoneNumber, password, remember };
+  if (memberId) body.memberId = memberId;
   const res = await fetch(`${BASE}/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ phoneNumber, password, remember }),
+    body: JSON.stringify(body),
   });
   return res.json();
 };

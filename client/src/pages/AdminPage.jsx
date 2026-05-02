@@ -16,6 +16,7 @@ import {
   previewImport, confirmImport, getStaff, addStaff, removeStaff, verifyPin, changeStaffPassword,
   getPackages, createPackage, updatePackage, deletePackage, setDefaultPackage,
   addMemberWithPackage, getSettings, setVisitorPrice, setRegFeeRule, changeAdminPassword, getDashboard,
+  getGroups, createGroup, updateGroup, deleteGroup, addGroupMember, removeGroupMember, renewGroup,
 } from '../api/admin.js';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useTranslation, LanguageSwitcher } from '../i18n/LanguageContext.jsx';
@@ -410,6 +411,65 @@ function DeletePinModal({ token, member, onDeleted, onClose }) {
             disabled={loading}
           >
             {loading ? t('admin.delete.removing') : t('admin.delete.remove')}
+          </button>
+          <button
+            type="button"
+            style={{ ...s.modalBtn, background: '#e2e8f0', color: '#475569', marginTop: 10 }}
+            onClick={onClose}
+          >
+            {t('common.cancel')}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function RemoveGroupMemberPinModal({ token, group, member, onRemoved, onClose }) {
+  const [pin, setPin] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { t } = useTranslation();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      await removeGroupMember(token, group.id, member.id, pin);
+      onRemoved(group.id, member.id);
+    } catch (err) {
+      setError(err.message);
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={s.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={s.modal}>
+        <div style={s.modalTitle}>{t('admin.groups.removeMemberTitle')}</div>
+        <p style={{ fontSize: 14, color: '#475569', marginBottom: 16, marginTop: -8 }}>
+          {t('admin.groups.removeMemberConfirm', { name: member.name })}
+        </p>
+        {error && <div style={s.error}>{error}</div>}
+        <form onSubmit={handleSubmit}>
+          <label style={s.modalLabel}>{t('admin.delete.pinLabel')}</label>
+          <input
+            style={s.modalInput}
+            type="password"
+            inputMode="numeric"
+            value={pin}
+            onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            placeholder={t('admin.delete.pinPlaceholder')}
+            required
+            autoFocus
+          />
+          <button
+            style={{ ...s.modalBtn, background: '#dc2626', color: '#fff', opacity: loading ? 0.6 : 1 }}
+            type="submit"
+            disabled={loading}
+          >
+            {loading ? t('admin.delete.removing') : t('admin.members.remove')}
           </button>
           <button
             type="button"
@@ -1293,6 +1353,355 @@ function AttendanceTab({ token }) {
   );
 }
 
+// ─── Group Modals ─────────────────────────────────────────────────────────────
+
+function CreateGroupModal({ token, groupPackages, onCreated, onClose }) {
+  const [name, setName] = useState('');
+  const [packageId, setPackageId] = useState(groupPackages[0]?.id || '');
+  const [members, setMembers] = useState([{ name: '', phoneNumber: '' }]);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { t } = useTranslation();
+
+  const PHONE_RE = /^\+62\d{8,13}$/;
+  const toDigits   = (full) => full.startsWith('+62') ? full.slice(3) : full;
+  const fromDigits = (raw)  => { const d = raw.replace(/\D/g, ''); return d ? '+62' + d : ''; };
+
+  const updateMember = (i, field, value) => {
+    setMembers((prev) => prev.map((m, idx) => idx === i ? { ...m, [field]: value } : m));
+  };
+
+  const addRow = () => setMembers((prev) => [...prev, { name: '', phoneNumber: '' }]);
+  const removeRow = (i) => setMembers((prev) => prev.filter((_, idx) => idx !== i));
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    for (const m of members) {
+      if (!m.name.trim()) { setError('Each member must have a name'); return; }
+      if (m.phoneNumber && !PHONE_RE.test(m.phoneNumber)) {
+        setError(`Invalid phone for ${m.name}. Use +62 format.`);
+        return;
+      }
+    }
+    setLoading(true);
+    try {
+      const group = await createGroup(token, { name, packageId, members });
+      onCreated(group);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const selectedPkg = groupPackages.find((p) => p.id === packageId);
+
+  return (
+    <div style={s.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={{ ...s.modal, maxWidth: 440 }}>
+        <div style={s.modalTitle}>{t('admin.groups.createTitle')}</div>
+        {error && <div style={s.error}>{error}</div>}
+        <form onSubmit={handleSubmit}>
+          <label style={s.modalLabel}>{t('admin.groups.groupNameLabel')}</label>
+          <input style={s.modalInput} type="text" value={name}
+            onChange={(e) => setName(e.target.value)} placeholder={t('admin.groups.groupNamePlaceholder')} required autoFocus />
+          <label style={s.modalLabel}>{t('admin.packages.packageLabel')}</label>
+          <select style={s.select} value={packageId} onChange={(e) => setPackageId(e.target.value)} required>
+            {groupPackages.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name} — {p.duration_days}d — Rp {Number(p.price).toLocaleString('id-ID')}
+              </option>
+            ))}
+          </select>
+          {selectedPkg && (
+            <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>
+              {t('admin.groups.expiresInfo', {
+                date: calcExpiryFromDuration(selectedPkg.duration_days),
+                amount: Number(selectedPkg.price).toLocaleString('id-ID'),
+              })}
+            </div>
+          )}
+          <label style={{ ...s.modalLabel, marginTop: 12 }}>{t('admin.groups.membersLabel')}</label>
+          {members.map((m, i) => (
+            <div key={i} style={{ marginBottom: 10, padding: '10px 12px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>{t('admin.groups.memberN', { n: i + 1 })}</span>
+                {members.length > 1 && (
+                  <button type="button" onClick={() => removeRow(i)}
+                    style={{ border: 'none', background: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 13, padding: 0 }}>
+                    {t('admin.members.remove')}
+                  </button>
+                )}
+              </div>
+              <input style={{ ...s.modalInput, marginBottom: 6 }} type="text" value={m.name}
+                onChange={(e) => updateMember(i, 'name', e.target.value)}
+                placeholder={t('admin.add.namePlaceholder')} required />
+              <div style={{ display: 'flex', alignItems: 'stretch' }}>
+                <span style={{ ...s.modalInput, width: 'auto', borderRight: 'none', borderRadius: '4px 0 0 4px',
+                               background: '#f1f5f9', color: '#64748b', padding: '0 10px',
+                               display: 'flex', alignItems: 'center', whiteSpace: 'nowrap', fontSize: 13 }}>
+                  +62
+                </span>
+                <input style={{ ...s.modalInput, borderRadius: '0 4px 4px 0', flex: 1, borderLeft: 'none' }}
+                  type="tel" value={toDigits(m.phoneNumber)}
+                  onChange={(e) => updateMember(i, 'phoneNumber', fromDigits(e.target.value))}
+                  placeholder={t('admin.groups.phonePlaceholder')} />
+              </div>
+            </div>
+          ))}
+          <button type="button" onClick={addRow}
+            style={{ ...s.outlineBtn, width: '100%', marginBottom: 12, fontSize: 13 }}>
+            {t('admin.groups.addAnotherMember')}
+          </button>
+          <button style={{ ...s.modalBtn, background: '#BEFE00', color: '#1a1a1a', opacity: loading ? 0.6 : 1 }}
+            type="submit" disabled={loading || !name.trim() || !packageId}>
+            {loading ? t('admin.groups.creating') : t('admin.groups.createGroup')}
+          </button>
+          <button type="button"
+            style={{ ...s.modalBtn, background: '#e2e8f0', color: '#475569', marginTop: 10 }}
+            onClick={onClose}>{t('common.cancel')}</button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function EditGroupModal({ token, group, groupPackages, onUpdated, onClose }) {
+  const [name, setName] = useState(group.name);
+  const [packageId, setPackageId] = useState(group.package_id);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { t } = useTranslation();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      const updated = await updateGroup(token, group.id, { name, packageId });
+      onUpdated(updated);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={s.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={s.modal}>
+        <div style={s.modalTitle}>{t('admin.groups.editTitle')}</div>
+        {error && <div style={s.error}>{error}</div>}
+        <form onSubmit={handleSubmit}>
+          <label style={s.modalLabel}>{t('admin.groups.groupNameLabel')}</label>
+          <input style={s.modalInput} type="text" value={name}
+            onChange={(e) => setName(e.target.value)} required autoFocus />
+          <label style={s.modalLabel}>{t('admin.packages.packageLabel')}</label>
+          <select style={s.select} value={packageId} onChange={(e) => setPackageId(e.target.value)} required>
+            {groupPackages.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name} — {p.duration_days}d — Rp {Number(p.price).toLocaleString('id-ID')}
+              </option>
+            ))}
+          </select>
+          <button style={{ ...s.modalBtn, background: '#BEFE00', color: '#1a1a1a', opacity: loading ? 0.6 : 1 }}
+            type="submit" disabled={loading || !name.trim()}>
+            {loading ? t('admin.groups.saving') : t('admin.groups.saveChanges')}
+          </button>
+          <button type="button"
+            style={{ ...s.modalBtn, background: '#e2e8f0', color: '#475569', marginTop: 10 }}
+            onClick={onClose}>{t('common.cancel')}</button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function AddGroupMemberModal({ token, group, onAdded, onClose }) {
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { t } = useTranslation();
+
+  const PHONE_RE = /^\+62\d{8,13}$/;
+  const toDigits   = (full) => full.startsWith('+62') ? full.slice(3) : full;
+  const fromDigits = (raw)  => { const d = raw.replace(/\D/g, ''); return d ? '+62' + d : ''; };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    if (phone && !PHONE_RE.test(phone)) {
+      setError('Phone must start with +62 followed by 8–13 digits');
+      return;
+    }
+    setLoading(true);
+    try {
+      const member = await addGroupMember(token, group.id, { name, phoneNumber: phone || undefined });
+      onAdded(member);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={s.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={s.modal}>
+        <div style={s.modalTitle}>{t('admin.groups.addMemberTitle', { groupName: group.name })}</div>
+        {error && <div style={s.error}>{error}</div>}
+        <form onSubmit={handleSubmit}>
+          <label style={s.modalLabel}>{t('admin.add.nameLabel')}</label>
+          <input style={s.modalInput} type="text" value={name}
+            onChange={(e) => setName(e.target.value)} placeholder={t('admin.add.namePlaceholder')} required autoFocus />
+          <label style={s.modalLabel}>
+            {t('admin.add.phoneLabel')} <span style={{ color: '#94a3b8', fontWeight: 400 }}>({t('admin.add.phoneOptional')})</span>
+          </label>
+          <div style={{ display: 'flex', alignItems: 'stretch' }}>
+            <span style={{ ...s.modalInput, width: 'auto', borderRight: 'none', borderRadius: '4px 0 0 4px',
+                           background: '#f1f5f9', color: '#64748b', padding: '0 10px',
+                           display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>
+              +62
+            </span>
+            <input style={{ ...s.modalInput, borderRadius: '0 4px 4px 0', flex: 1, borderLeft: 'none' }}
+              type="tel" value={toDigits(phone)}
+              onChange={(e) => setPhone(fromDigits(e.target.value))}
+              placeholder="81234567890" />
+          </div>
+          <button style={{ ...s.modalBtn, background: '#BEFE00', color: '#1a1a1a', opacity: loading ? 0.6 : 1 }}
+            type="submit" disabled={loading || !name.trim()}>
+            {loading ? t('admin.groups.adding') : t('admin.groups.addMemberSubmit')}
+          </button>
+          <button type="button"
+            style={{ ...s.modalBtn, background: '#e2e8f0', color: '#475569', marginTop: 10 }}
+            onClick={onClose}>{t('common.cancel')}</button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function RenewGroupModal({ token, group, groupPackages, onRenewed, onClose }) {
+  const [packageId, setPackageId] = useState(group.package_id);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { t } = useTranslation();
+
+  const selectedPkg = groupPackages.find((p) => p.id === packageId);
+  const newExpiry = selectedPkg ? previewExtendExpiry(group.expiry_date, selectedPkg.duration_days) : null;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      const result = await renewGroup(token, group.id, packageId);
+      onRenewed(result);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={s.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={s.modal}>
+        <div style={s.modalTitle}>{t('admin.groups.renewTitle', { groupName: group.name })}</div>
+        {error && <div style={s.error}>{error}</div>}
+        <form onSubmit={handleSubmit}>
+          <div style={{ fontSize: 13, color: '#64748b', marginBottom: 12 }}>
+            {t('admin.groups.currentExpiry')} <strong>{group.expiry_date ? new Date(group.expiry_date).toLocaleDateString() : '—'}</strong>
+          </div>
+          <label style={s.modalLabel}>{t('admin.packages.packageLabel')}</label>
+          <select style={s.select} value={packageId} onChange={(e) => setPackageId(e.target.value)} required>
+            {groupPackages.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name} — {p.duration_days}d — Rp {Number(p.price).toLocaleString('id-ID')}
+              </option>
+            ))}
+          </select>
+          {newExpiry && (
+            <div style={s.expiryPreview}>
+              {t('admin.groups.newExpiry', { date: new Date(newExpiry).toLocaleDateString() })}
+            </div>
+          )}
+          {selectedPkg && (
+            <div style={{ fontSize: 13, color: '#475569', margin: '8px 0 12px',
+                          padding: '8px 12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8 }}>
+              {t('admin.groups.renewTotal', {
+                amount: Number(selectedPkg.price).toLocaleString('id-ID'),
+                count: group.members?.length ?? 0,
+              })}
+            </div>
+          )}
+          <button style={{ ...s.modalBtn, background: '#BEFE00', color: '#1a1a1a', opacity: loading ? 0.6 : 1 }}
+            type="submit" disabled={loading || !packageId}>
+            {loading ? t('admin.groups.renewing') : t('admin.groups.renewGroup')}
+          </button>
+          <button type="button"
+            style={{ ...s.modalBtn, background: '#e2e8f0', color: '#475569', marginTop: 10 }}
+            onClick={onClose}>{t('common.cancel')}</button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Group Member Warning Modal ────────────────────────────────────────────────
+
+function ConfirmModal({ title, body, confirmLabel, onConfirm, onClose }) {
+  const { t } = useTranslation();
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '0 16px' }}>
+      <div style={{ background: '#fff', borderRadius: 14, padding: '28px 24px', width: '100%', maxWidth: 420 }}>
+        <h3 style={{ margin: '0 0 10px', fontSize: 16, fontWeight: 700, color: '#1e293b' }}>{title}</h3>
+        <p style={{ margin: '0 0 22px', fontSize: 14, color: '#475569', lineHeight: 1.55 }}>{body}</p>
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', fontSize: 13, cursor: 'pointer', fontWeight: 500 }}>
+            {t('admin.cancel')}
+          </button>
+          <button onClick={onConfirm} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#ef4444', color: '#fff', fontSize: 13, cursor: 'pointer', fontWeight: 600 }}>
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function GroupMemberWarningModal({ member, action, onConfirm, onClose }) {
+  const { t } = useTranslation();
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '0 16px' }}>
+      <div style={{ background: '#fff', borderRadius: 14, padding: '28px 24px', width: '100%', maxWidth: 420 }}>
+        <h3 style={{ margin: '0 0 10px', fontSize: 16, fontWeight: 700, color: '#1e293b' }}>
+          {t('admin.groups.memberWarningTitle')}
+        </h3>
+        <p style={{ margin: '0 0 22px', fontSize: 14, color: '#475569', lineHeight: 1.55 }}>
+          {t('admin.groups.memberWarningBody', { groupName: member.group_name })}
+        </p>
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          <button
+            onClick={onClose}
+            style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', fontSize: 13, cursor: 'pointer', fontWeight: 500 }}
+          >
+            {t('admin.cancel')}
+          </button>
+          <button
+            onClick={onConfirm}
+            style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: action === 'remove' ? '#ef4444' : '#3b82f6', color: '#fff', fontSize: 13, cursor: 'pointer', fontWeight: 600 }}
+          >
+            {action === 'remove' ? t('admin.groups.memberWarningRemoveBtn') : t('admin.groups.memberWarningEditBtn')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Members Tab ──────────────────────────────────────────────────────────────
 
 function MembersTab({ token, gymSettings }) {
@@ -1327,6 +1736,17 @@ function MembersTab({ token, gymSettings }) {
   const [extendingMember, setExtendingMember] = useState(null);
   const [extendPackageId, setExtendPackageId] = useState('');
   const [extendLoading, setExtendLoading] = useState(false);
+  const [groups, setGroups] = useState([]);
+  const [groupsLoading, setGroupsLoading] = useState(false);
+  const [expandedGroupId, setExpandedGroupId] = useState(null);
+  const [showCreateGroup, setShowCreateGroup] = useState(false);
+  const [editingGroup, setEditingGroup] = useState(null);
+  const [addMemberGroup, setAddMemberGroup] = useState(null);
+  const [renewingGroup, setRenewingGroup] = useState(null);
+  const [groupWarning, setGroupWarning] = useState(null);
+  const [editDetachMemberId, setEditDetachMemberId] = useState(null);
+  const [confirmDeleteGroup, setConfirmDeleteGroup] = useState(null);   // group object
+  const [confirmRemoveGroupMember, setConfirmRemoveGroupMember] = useState(null); // { group, member }
   const { lang, t } = useTranslation();
 
   const PAGE_SIZE = 20;
@@ -1363,6 +1783,20 @@ function MembersTab({ token, gymSettings }) {
   useEffect(() => {
     getPackages(token).then(setPackages).catch(() => {});
   }, [token]);
+
+  const loadGroups = useCallback(async () => {
+    setGroupsLoading(true);
+    try {
+      const data = await getGroups(token);
+      setGroups(data);
+    } catch (_) {
+      // non-fatal
+    } finally {
+      setGroupsLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => { loadGroups(); }, [loadGroups]);
 
   const loadMore = async () => {
     setLoadingMore(true);
@@ -1424,12 +1858,18 @@ function MembersTab({ token, gymSettings }) {
     }
     try {
       const isCustom = editPackageId === '__custom__';
+      const shouldDetach = editDetachMemberId === id;
       const updated = await updateMember(
         token, id, editName,
         isCustom ? editExpiry : null,
         isCustom ? null : editPackageId,
         editPhone || undefined,
+        shouldDetach,
       );
+      if (shouldDetach) {
+        setEditDetachMemberId(null);
+        loadGroups();
+      }
       setMembers((prev) => prev.map((m) => m.id === id ? updated : m));
       setEditingId(null);
     } catch (err) {
@@ -1490,8 +1930,101 @@ function MembersTab({ token, gymSettings }) {
       ? (filterPackageIds[0] === 'none' ? t('admin.members.filterPackageNone') : (packages.find((p) => p.id === filterPackageIds[0])?.name ?? '?'))
       : t('admin.members.filterCountSelected', { n: filterPackageIds.length });
 
+  const groupPackages = packages.filter((p) => p.is_group);
+
   return (
     <div>
+      {/* ── Groups section — only shown when group packages exist or groups already exist ── */}
+      {(groupPackages.length > 0 || groups.length > 0) && <div style={{ background: '#fff', borderRadius: 12, padding: '18px 20px', marginBottom: 20, boxShadow: '0 1px 6px rgba(0,0,0,0.07)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <div style={{ fontWeight: 700, fontSize: 15, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 8 }}>
+            {t('admin.groups.sectionTitle')}
+            {groups.length > 0 && (
+              <span style={{ ...s.badge, background: '#ede9fe', color: '#6d28d9' }}>{groups.length}</span>
+            )}
+          </div>
+          <button style={s.addBtn} onClick={() => setShowCreateGroup(true)} disabled={groupPackages.length === 0}
+            title={groupPackages.length === 0 ? t('admin.groups.newGroupHint') : ''}>
+            {t('admin.groups.newGroup')}
+          </button>
+        </div>
+        {groupsLoading ? (
+          <div style={{ fontSize: 13, color: '#94a3b8', padding: '8px 0' }}>{t('admin.groups.loading')}</div>
+        ) : groups.length === 0 ? (
+          <div style={{ fontSize: 13, color: '#94a3b8', padding: '8px 0' }}>
+            {t('admin.groups.empty')}
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {groups.map((group) => {
+              const isExpanded = expandedGroupId === group.id;
+              const isExpired = group.expiry_date && new Date(group.expiry_date) < new Date();
+              return (
+                <div key={group.id} style={{ border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden' }}>
+                  {/* Group header */}
+                  <div
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', cursor: 'pointer',
+                             background: isExpanded ? '#f8fafc' : '#fff', userSelect: 'none' }}
+                    onClick={() => setExpandedGroupId(isExpanded ? null : group.id)}
+                  >
+                    <span style={{ fontSize: 13, color: '#94a3b8' }}>{isExpanded ? '▼' : '▶'}</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: '#1e293b' }}>{group.name}</div>
+                      <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                        {group.package_name} · {group.members.length} member{group.members.length !== 1 ? 's' : ''}
+                        {' · '}
+                        <span style={{ color: isExpired ? '#dc2626' : '#16a34a', fontWeight: 600 }}>
+                          {group.expiry_date
+                            ? t('admin.groups.expiry', { date: new Date(group.expiry_date).toLocaleDateString() })
+                            : t('admin.groups.noExpiry')}
+                        </span>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6 }} onClick={(e) => e.stopPropagation()}>
+                      <button style={{ ...s.actionBtn, ...s.editBtn, fontSize: 12 }} onClick={() => setEditingGroup(group)}>{t('admin.members.edit')}</button>
+                      <button style={{ ...s.actionBtn, ...s.saveBtn, fontSize: 12 }} onClick={() => setRenewingGroup(group)}>{t('admin.groups.renew')}</button>
+                      <button style={{ ...s.actionBtn, ...s.editBtn, fontSize: 12 }} onClick={() => setAddMemberGroup(group)}>{t('admin.groups.addMemberBtn')}</button>
+                      <button style={{ ...s.actionBtn, ...s.deleteBtn, fontSize: 12 }} onClick={() => setConfirmDeleteGroup(group)}>{t('admin.groups.delete')}</button>
+                    </div>
+                  </div>
+                  {/* Expanded member list */}
+                  {isExpanded && (
+                    <div style={{ borderTop: '1px solid #f1f5f9', padding: '10px 16px', background: '#fafbfc' }}>
+                      {group.members.length === 0 ? (
+                        <div style={{ fontSize: 13, color: '#94a3b8' }}>{t('admin.groups.noMembers')}</div>
+                      ) : (
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                          <thead>
+                            <tr>
+                              <th style={{ ...s.th, fontWeight: 600, textAlign: 'left', padding: '4px 8px' }}>{t('admin.members.colName')}</th>
+                              <th style={{ ...s.th, fontWeight: 600, textAlign: 'left', padding: '4px 8px' }}>{t('admin.groups.colScanToken')}</th>
+                              <th style={{ ...s.th, fontWeight: 600, textAlign: 'left', padding: '4px 8px' }}>{t('admin.members.colPhone')}</th>
+                              <th style={{ ...s.th, padding: '4px 8px' }}></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {group.members.map((m) => (
+                              <tr key={m.id}>
+                                <td style={{ padding: '5px 8px', color: '#1e293b' }}>{m.name}</td>
+                                <td style={{ padding: '5px 8px', fontFamily: 'monospace', color: '#6d28d9' }}>{m.scan_token}</td>
+                                <td style={{ padding: '5px 8px', color: '#64748b' }}>{m.phone_number || '—'}</td>
+                                <td style={{ padding: '5px 8px', textAlign: 'right' }}>
+                                  <button style={{ ...s.actionBtn, ...s.deleteBtn, fontSize: 11 }} onClick={() => setConfirmRemoveGroupMember({ group, member: m })}>{t('admin.members.remove')}</button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>}
+
       <div style={s.toolbar}>
         <input
           style={s.searchInput}
@@ -1738,7 +2271,14 @@ function MembersTab({ token, gymSettings }) {
                             <div style={{ position: 'absolute', right: 0, top: '100%', zIndex: 100, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.10)', minWidth: 180, overflow: 'hidden' }}>
                               <button
                                 style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: '#1e293b' }}
-                                onClick={() => { startEdit(member); setManagingMemberId(null); }}
+                                onClick={() => {
+                                  if (member.group_id) {
+                                    setGroupWarning({ member, action: 'edit' });
+                                  } else {
+                                    startEdit(member);
+                                  }
+                                  setManagingMemberId(null);
+                                }}
                               >
                                 {t('admin.members.edit')}
                               </button>
@@ -1752,7 +2292,13 @@ function MembersTab({ token, gymSettings }) {
                           </>
                         )}
                       </div>
-                      <button style={{ ...s.actionBtn, ...s.deleteBtn }} onClick={() => setDeletingMember(member)}>{t('admin.members.remove')}</button>
+                      <button style={{ ...s.actionBtn, ...s.deleteBtn }} onClick={() => {
+                        if (member.group_id) {
+                          setGroupWarning({ member, action: 'remove' });
+                        } else {
+                          setDeletingMember(member);
+                        }
+                      }}>{t('admin.members.remove')}</button>
                     </>
                   )}
                 </td>
@@ -1876,6 +2422,103 @@ function MembersTab({ token, gymSettings }) {
           onClose={() => setPendingRevealId(null)}
         />
       )}
+
+      {showCreateGroup && groupPackages.length > 0 && (
+        <CreateGroupModal
+          token={token}
+          groupPackages={groupPackages}
+          onCreated={(group) => { setGroups((prev) => [group, ...prev]); setShowCreateGroup(false); }}
+          onClose={() => setShowCreateGroup(false)}
+        />
+      )}
+      {editingGroup && (
+        <EditGroupModal
+          token={token}
+          group={editingGroup}
+          groupPackages={groupPackages}
+          onUpdated={(updated) => {
+            setGroups((prev) => prev.map((g) => g.id === updated.id ? { ...g, ...updated } : g));
+            setEditingGroup(null);
+          }}
+          onClose={() => setEditingGroup(null)}
+        />
+      )}
+      {addMemberGroup && (
+        <AddGroupMemberModal
+          token={token}
+          group={addMemberGroup}
+          onAdded={(member) => {
+            setGroups((prev) => prev.map((g) =>
+              g.id === addMemberGroup.id ? { ...g, members: [...g.members, member] } : g
+            ));
+            setAddMemberGroup(null);
+          }}
+          onClose={() => setAddMemberGroup(null)}
+        />
+      )}
+      {renewingGroup && (
+        <RenewGroupModal
+          token={token}
+          group={renewingGroup}
+          groupPackages={groupPackages}
+          onRenewed={({ newExpiry }) => {
+            setGroups((prev) => prev.map((g) =>
+              g.id === renewingGroup.id ? { ...g, expiry_date: newExpiry } : g
+            ));
+            setRenewingGroup(null);
+          }}
+          onClose={() => setRenewingGroup(null)}
+        />
+      )}
+      {confirmDeleteGroup && (
+        <ConfirmModal
+          title={t('admin.groups.deleteConfirmTitle')}
+          body={t('admin.groups.deleteConfirm', { name: confirmDeleteGroup.name })}
+          confirmLabel={t('admin.groups.delete')}
+          onConfirm={async () => {
+            try {
+              await deleteGroup(token, confirmDeleteGroup.id);
+              setGroups((prev) => prev.filter((g) => g.id !== confirmDeleteGroup.id));
+            } catch (err) {
+              setError(err.message);
+            } finally {
+              setConfirmDeleteGroup(null);
+            }
+          }}
+          onClose={() => setConfirmDeleteGroup(null)}
+        />
+      )}
+      {confirmRemoveGroupMember && (
+        <RemoveGroupMemberPinModal
+          token={token}
+          group={confirmRemoveGroupMember.group}
+          member={confirmRemoveGroupMember.member}
+          onRemoved={(groupId, memberId) => {
+            setGroups((prev) => prev.map((g) =>
+              g.id === groupId ? { ...g, members: g.members.filter((mem) => mem.id !== memberId) } : g
+            ));
+            setConfirmRemoveGroupMember(null);
+          }}
+          onClose={() => setConfirmRemoveGroupMember(null)}
+        />
+      )}
+      {groupWarning && (
+        <GroupMemberWarningModal
+          member={groupWarning.member}
+          action={groupWarning.action}
+          onConfirm={() => {
+            const { member, action } = groupWarning;
+            setGroupWarning(null);
+            if (action === 'edit') {
+              setEditDetachMemberId(member.id);
+              startEdit(member);
+            } else {
+              setDeletingMember(member);
+            }
+          }}
+          onClose={() => setGroupWarning(null)}
+        />
+      )}
     </div>
   );
 }
@@ -1892,11 +2535,13 @@ function PackagesTab({ token }) {
   const [editPrice, setEditPrice] = useState('');
   const [editHasRegFee, setEditHasRegFee] = useState(false);
   const [editRegFee, setEditRegFee] = useState('');
+  const [editIsGroup, setEditIsGroup] = useState(false);
   const [newName, setNewName] = useState('');
   const [newDuration, setNewDuration] = useState('');
   const [newPrice, setNewPrice] = useState('');
   const [newHasRegFee, setNewHasRegFee] = useState(false);
   const [newRegFee, setNewRegFee] = useState('');
+  const [newIsGroup, setNewIsGroup] = useState(false);
   const [addLoading, setAddLoading] = useState(false);
   const [visitorPriceInput, setVisitorPriceInput] = useState('');
   const [visitorPriceLoaded, setVisitorPriceLoaded] = useState(false);
@@ -1946,9 +2591,10 @@ function PackagesTab({ token }) {
         isDefault: packages.length === 0,
         hasRegistrationFee: newHasRegFee,
         registrationFee: newHasRegFee ? Number(newRegFee) : 0,
+        isGroup: newIsGroup,
       });
       setPackages((prev) => [...prev, pkg].sort((a, b) => a.price - b.price));
-      setNewName(''); setNewDuration(''); setNewPrice(''); setNewHasRegFee(false); setNewRegFee('');
+      setNewName(''); setNewDuration(''); setNewPrice(''); setNewHasRegFee(false); setNewRegFee(''); setNewIsGroup(false);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -1963,11 +2609,12 @@ function PackagesTab({ token }) {
     setEditPrice(String(pkg.price));
     setEditHasRegFee(!!pkg.has_registration_fee);
     setEditRegFee(String(pkg.registration_fee ?? 0));
+    setEditIsGroup(!!pkg.is_group);
   };
 
   const cancelEdit = () => {
     setEditingId(null); setEditName(''); setEditDuration(''); setEditPrice('');
-    setEditHasRegFee(false); setEditRegFee('');
+    setEditHasRegFee(false); setEditRegFee(''); setEditIsGroup(false);
   };
 
   const saveEdit = async (id) => {
@@ -1979,6 +2626,7 @@ function PackagesTab({ token }) {
         price: Number(editPrice),
         hasRegistrationFee: editHasRegFee,
         registrationFee: editHasRegFee ? Number(editRegFee) : 0,
+        isGroup: editIsGroup,
       });
       setPackages((prev) => prev.map((p) => p.id === id ? updated : p).sort((a, b) => a.price - b.price));
       setEditingId(null);
@@ -2038,22 +2686,23 @@ function PackagesTab({ token }) {
       </div>
 
       <div style={{ ...s.tableWrap }}>
-      <table style={{ ...s.table, minWidth: 680 }}>
+      <table style={{ ...s.table, minWidth: 760 }}>
         <thead>
           <tr>
             <th style={s.th}>{t('admin.packages.colName')}</th>
             <th style={s.th}>{t('admin.packages.colDuration')}</th>
             <th style={s.th}>{t('admin.packages.colPrice')}</th>
             <th style={s.th}>{t('admin.packages.colRegFee')}</th>
+            <th style={s.th}>{t('admin.packages.colGroup')}</th>
             <th style={s.th}>{t('admin.packages.colDefault')}</th>
             <th style={s.th}>{t('admin.packages.colActions')}</th>
           </tr>
         </thead>
         <tbody>
           {loading ? (
-            <tr><td colSpan={6} style={s.empty}>{t('common.loading')}</td></tr>
+            <tr><td colSpan={7} style={s.empty}>{t('common.loading')}</td></tr>
           ) : packages.length === 0 ? (
-            <tr><td colSpan={6} style={s.empty}>{t('admin.packages.noPackages')}</td></tr>
+            <tr><td colSpan={7} style={s.empty}>{t('admin.packages.noPackages')}</td></tr>
           ) : packages.map((pkg) => (
             <tr key={pkg.id}>
               <td style={s.td}>
@@ -2086,6 +2735,24 @@ function PackagesTab({ token }) {
                     {`Rp ${Number(pkg.registration_fee).toLocaleString('id-ID')}`}
                   </span>
                 ) : '—'}
+              </td>
+              <td style={{ ...s.td, textAlign: 'center' }}>
+                {editingId === pkg.id ? (
+                  <div style={{ display: 'inline-flex', borderRadius: 6, overflow: 'hidden', border: '1.5px solid #e2e8f0' }}>
+                    <button type="button"
+                      style={{ padding: '4px 10px', fontSize: 12, fontWeight: 600, border: 'none', cursor: 'pointer', background: !editIsGroup ? '#1a1a2e' : '#fff', color: !editIsGroup ? '#fff' : '#94a3b8' }}
+                      onClick={() => setEditIsGroup(false)}
+                    >{t('admin.packages.typeIndividual')}</button>
+                    <button type="button"
+                      style={{ padding: '4px 10px', fontSize: 12, fontWeight: 600, border: 'none', borderLeft: '1px solid #e2e8f0', cursor: 'pointer', background: editIsGroup ? '#6d28d9' : '#fff', color: editIsGroup ? '#fff' : '#94a3b8' }}
+                      onClick={() => setEditIsGroup(true)}
+                    >{t('admin.packages.typeGroup')}</button>
+                  </div>
+                ) : pkg.is_group ? (
+                  <span style={{ ...s.badge, background: '#ede9fe', color: '#6d28d9' }}>{t('admin.packages.typeGroup')}</span>
+                ) : (
+                  <span style={{ ...s.badge, background: '#f1f5f9', color: '#64748b' }}>{t('admin.packages.typeIndividual')}</span>
+                )}
               </td>
               <td style={s.td}>
                 {pkg.is_default
@@ -2125,6 +2792,18 @@ function PackagesTab({ token }) {
                     value={newRegFee} onChange={(e) => setNewRegFee(e.target.value)} placeholder="0" />
                 )}
               </label>
+            </td>
+            <td style={{ ...s.td, textAlign: 'center' }}>
+              <div style={{ display: 'inline-flex', borderRadius: 6, overflow: 'hidden', border: '1.5px solid #e2e8f0' }}>
+                <button type="button"
+                  style={{ padding: '4px 10px', fontSize: 12, fontWeight: 600, border: 'none', cursor: 'pointer', background: !newIsGroup ? '#1a1a2e' : '#fff', color: !newIsGroup ? '#fff' : '#94a3b8' }}
+                  onClick={() => setNewIsGroup(false)}
+                >{t('admin.packages.typeIndividual')}</button>
+                <button type="button"
+                  style={{ padding: '4px 10px', fontSize: 12, fontWeight: 600, border: 'none', borderLeft: '1px solid #e2e8f0', cursor: 'pointer', background: newIsGroup ? '#6d28d9' : '#fff', color: newIsGroup ? '#fff' : '#94a3b8' }}
+                  onClick={() => setNewIsGroup(true)}
+                >{t('admin.packages.typeGroup')}</button>
+              </div>
             </td>
             <td style={s.td} />
             <td style={s.td}>

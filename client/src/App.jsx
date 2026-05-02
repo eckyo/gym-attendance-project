@@ -296,6 +296,8 @@ function LoginForm({ onLogin, onMemberLogin }) {
   const [remember, setRemember] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loginStep, setLoginStep] = useState('credentials'); // 'credentials' | 'select'
+  const [accounts, setAccounts] = useState([]);
   const { t } = useTranslation();
 
   const handleStaffSubmit = async (e) => {
@@ -318,6 +320,25 @@ function LoginForm({ onLogin, onMemberLogin }) {
     setLoading(true);
     try {
       const data = await memberLogin(normalizePhone(phone), password, remember);
+      if (data.requiresSelection) {
+        setAccounts(data.accounts);
+        setLoginStep('select');
+        return;
+      }
+      if (data.error) throw new Error(data.error);
+      onMemberLogin(data.token, data.member, remember);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAccountSelect = async (memberId) => {
+    setError('');
+    setLoading(true);
+    try {
+      const data = await memberLogin(normalizePhone(phone), password, remember, memberId);
       if (data.error) throw new Error(data.error);
       onMemberLogin(data.token, data.member, remember);
     } catch (err) {
@@ -331,6 +352,8 @@ function LoginForm({ onLogin, onMemberLogin }) {
     setMode(newMode);
     setError('');
     setPassword('');
+    setLoginStep('credentials');
+    setAccounts([]);
   };
 
   return (
@@ -351,15 +374,72 @@ function LoginForm({ onLogin, onMemberLogin }) {
 
       <div style={s.card}>
         <div style={s.title}>
-          {mode === 'member' ? t('login.heroHeading') : t('login.title')}
+          {mode === 'member'
+            ? (loginStep === 'select' ? t('member.selectAccountTitle') : t('login.heroHeading'))
+            : t('login.title')}
         </div>
         <div style={s.subtitle}>
-          {mode === 'member' ? t('login.heroSub') : t('login.subtitle')}
+          {mode === 'member'
+            ? (loginStep === 'select' ? t('member.selectAccountSubtitle') : t('login.heroSub'))
+            : t('login.subtitle')}
         </div>
 
         {error && <div style={s.error}>{error}</div>}
 
-        {mode === 'member' ? (
+        {mode === 'member' && loginStep === 'select' ? (
+          <div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {accounts.map((account) => {
+                const today = new Date().toISOString().slice(0, 10);
+                const isExpired = account.expiryDate && account.expiryDate < today;
+                const statusColor = isExpired ? '#f87171' : '#4ade80';
+                const statusLabel = isExpired ? t('member.selectStatusExpired') : t('member.selectStatusActive');
+                return (
+                  <button
+                    key={account.gymId}
+                    type="button"
+                    disabled={loading}
+                    onClick={() => handleAccountSelect(account.memberId)}
+                    style={{
+                      ...s.btnStaff,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'flex-start',
+                      padding: '14px 16px',
+                      gap: 4,
+                      textAlign: 'left',
+                      marginTop: 0,
+                      ...(loading ? s.btnDisabled : {}),
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                      <span style={{ fontWeight: 700, color: '#fff', fontSize: 15 }}>{account.memberName}</span>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: statusColor, background: `${statusColor}22`, borderRadius: 6, padding: '2px 8px' }}>{statusLabel}</span>
+                    </div>
+                    <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.50)', fontWeight: 400 }}>
+                      {account.gymName}{account.scanToken ? ` · ${account.scanToken}` : ''}
+                    </span>
+                    {account.packageName && (
+                      <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', fontWeight: 500 }}>{account.packageName}</span>
+                    )}
+                    {account.expiryDate && (
+                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>
+                        {t('member.selectExpiry', { date: account.expiryDate })}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              type="button"
+              style={s.staffLink}
+              onClick={() => { setLoginStep('credentials'); setAccounts([]); setError(''); }}
+            >
+              {t('member.backToLogin')}
+            </button>
+          </div>
+        ) : mode === 'member' ? (
           <form onSubmit={handleMemberSubmit}>
             <label style={s.label}>{t('member.phoneLabel')}</label>
             <div style={{ display: 'flex', marginBottom: 14 }}>
