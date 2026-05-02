@@ -9,7 +9,9 @@ import scanRouter from './routes/scan.js';
 import adminRouter from './routes/admin.js';
 import superadminRouter from './routes/superadmin.js';
 import packagesRouter from './routes/packages.js';
+import groupsRouter from './routes/groups.js';
 import memberRouter from './routes/member.js';
+import publicRouter from './routes/public.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -27,7 +29,9 @@ app.use('/api/scan', scanRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/superadmin', superadminRouter);
 app.use('/api/packages', packagesRouter);
+app.use('/api/groups', groupsRouter);
 app.use('/api/member', memberRouter);
+app.use('/api/public', publicRouter);
 
 app.use((err, req, res, next) => {
   console.error(err);

@@ -49,11 +49,11 @@ export const addMember = (token, name, expiryDate, phoneNumber) =>
     body: JSON.stringify({ name, expiryDate, phoneNumber }),
   }).then(handleResponse);
 
-export const updateMember = (token, id, name, expiryDate, packageId, phoneNumber) =>
+export const updateMember = (token, id, name, expiryDate, packageId, phoneNumber, detachFromGroup) =>
   fetch(`${API_BASE}/api/admin/members/${id}`, {
     method: 'PUT',
     headers: authHeaders(token),
-    body: JSON.stringify({ name, expiryDate, packageId, phoneNumber }),
+    body: JSON.stringify({ name, expiryDate, packageId, phoneNumber, ...(detachFromGroup && { detachFromGroup: true }) }),
   }).then(handleResponse);
 
 export const deleteMember = (token, id, pin) =>
@@ -187,6 +187,20 @@ export const setRegFeeRule = (token, enabled, graceMonths) =>
     body: JSON.stringify({ enabled, graceMonths }),
   }).then(handleResponse);
 
+export const setGymCode = (token, gymCode) =>
+  fetch(`${API_BASE}/api/admin/settings/gym-code`, {
+    method: 'PUT',
+    headers: authHeaders(token),
+    body: JSON.stringify({ gymCode: gymCode || null }),
+  }).then(handleResponse);
+
+export const setPackagePrefix = (token, enabled) =>
+  fetch(`${API_BASE}/api/admin/settings/package-prefix`, {
+    method: 'PUT',
+    headers: authHeaders(token),
+    body: JSON.stringify({ enabled }),
+  }).then(handleResponse);
+
 export const getDashboard = (token, { start, end } = {}) => {
   const params = new URLSearchParams();
   if (start) params.set('start', start);
@@ -195,3 +209,49 @@ export const getDashboard = (token, { start, end } = {}) => {
     headers: authHeaders(token),
   }).then(handleResponse);
 };
+
+export const getGroups = (token) =>
+  fetch(`${API_BASE}/api/groups`, {
+    headers: authHeaders(token),
+  }).then(handleResponse);
+
+export const createGroup = (token, data) =>
+  fetch(`${API_BASE}/api/groups`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify(data),
+  }).then(handleResponse);
+
+export const updateGroup = (token, id, data) =>
+  fetch(`${API_BASE}/api/groups/${id}`, {
+    method: 'PUT',
+    headers: authHeaders(token),
+    body: JSON.stringify(data),
+  }).then(handleResponse);
+
+export const deleteGroup = (token, id) =>
+  fetch(`${API_BASE}/api/groups/${id}`, {
+    method: 'DELETE',
+    headers: authHeaders(token),
+  }).then(handleResponse);
+
+export const addGroupMember = (token, groupId, data) =>
+  fetch(`${API_BASE}/api/groups/${groupId}/members`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify(data),
+  }).then(handleResponse);
+
+export const removeGroupMember = (token, groupId, memberId, pin) =>
+  fetch(`${API_BASE}/api/groups/${groupId}/members/${memberId}`, {
+    method: 'DELETE',
+    headers: authHeaders(token),
+    body: JSON.stringify({ pin }),
+  }).then(handleResponse);
+
+export const renewGroup = (token, groupId, packageId) =>
+  fetch(`${API_BASE}/api/groups/${groupId}/renew`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify({ packageId }),
+  }).then(handleResponse);

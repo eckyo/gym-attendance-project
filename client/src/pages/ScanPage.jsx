@@ -15,7 +15,7 @@ import Lottie from 'lottie-react';
 import successAnimation from '../assets/success.json';
 import errorAnimation from '../assets/error.json';
 import { postScan, verifyScanPin, registerMember, checkInVisitor, lookupMember, extendMember } from '../api/scan.js';
-import { getPackages } from '../api/admin.js';
+import { getPackages, getGroups, addGroupMember } from '../api/admin.js';
 
 import { useTranslation, LanguageSwitcher } from '../i18n/LanguageContext.jsx';
 
@@ -385,6 +385,102 @@ function ImagePinModal({ token, onVerified, onClose, title, subtitle, isPassword
   );
 }
 
+// ── Group Register Modal ───────────────────────────────────────────────────────
+
+function GroupRegisterModal({ token, groups, onSuccess, onBack, onClose }) {
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [selectedGroupId, setSelectedGroupId] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { t } = useTranslation();
+
+  const today = new Date().toISOString().slice(0, 10);
+  const isExpired = (g) => g.expiry_date && g.expiry_date < today;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedGroupId) return;
+    setError('');
+    setLoading(true);
+    try {
+      const group = groups.find((g) => g.id === selectedGroupId);
+      const result = await addGroupMember(token, selectedGroupId, {
+        name: name.trim(),
+        phoneNumber: phone ? '+62' + phone : undefined,
+      });
+      onSuccess({
+        memberName: result.name,
+        gymId: result.scan_token,
+        checkedInAt: null,
+        packageName: group.package_name,
+        expiryDate: group.expiry_date,
+        isGroupMember: true,
+      });
+    } catch (err) {
+      setError(err.message);
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={st.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={st.pinCard}>
+        <div style={st.pinTitle}>📋 {t('scan.registerTitle')}</div>
+        {error && <div style={st.pinError}>{error}</div>}
+        <form onSubmit={handleSubmit}>
+          <label style={st.pinLabel}>{t('admin.add.nameLabel')}</label>
+          <input
+            style={{ ...st.pinInput, letterSpacing: 'normal', textAlign: 'left', fontSize: 15 }}
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={t('admin.add.namePlaceholder')}
+            required
+            autoFocus
+          />
+          <label style={st.pinLabel}>{t('admin.add.phoneLabel')}</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14 }}>
+            <span style={{ fontSize: 14, color: '#374151', fontWeight: 600, whiteSpace: 'nowrap' }}>+62</span>
+            <input
+              style={{ ...st.pinInput, marginBottom: 0, flex: 1, letterSpacing: 'normal', textAlign: 'left', fontSize: 15 }}
+              type="tel"
+              inputMode="numeric"
+              value={formatPhoneDigits(phone)}
+              onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 13))}
+              placeholder="8123 4567 890"
+            />
+          </div>
+          <label style={st.pinLabel}>{t('scan.groupSelectLabel')}</label>
+          <select
+            style={st.registerSelect}
+            value={selectedGroupId}
+            onChange={(e) => setSelectedGroupId(e.target.value)}
+            required
+          >
+            <option value="">{t('scan.groupSelectPlaceholder')}</option>
+            {groups.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}{isExpired(g) ? ` (${t('scan.groupExpiredLabel')})` : ''}{g.package_name ? ` — ${g.package_name}` : ''}
+              </option>
+            ))}
+          </select>
+          <button
+            style={{ ...st.pinBtn, opacity: loading || !name.trim() || !selectedGroupId ? 0.6 : 1 }}
+            type="submit"
+            disabled={loading || !name.trim() || !selectedGroupId}
+          >
+            {loading ? t('scan.registering') : t('scan.registerTitle')}
+          </button>
+          <button type="button" style={st.pinCancelBtn} onClick={onBack}>
+            {t('scan.assignGroupBack')}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ── Register Modal ─────────────────────────────────────────────────────────────
 
 function RegisterModal({ token, onSuccess, onClose }) {
@@ -599,7 +695,7 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
   return currentY;
 }
 
-function downloadStandbyQR(gymName, qrDataUrl) {
+function downloadStandbyQR(gymName, qrDataUrl, gymCode) {
   const W = 600;
   const H = 940;
   const canvas = document.createElement('canvas');
@@ -642,8 +738,8 @@ function downloadStandbyQR(gymName, qrDataUrl) {
     ctx.fillText('Cara Check-in', 40, 468);
 
     const checkinSteps = [
-      '1. Buka kiosgym.com',
-      '2. Login dengan nomor HP & kata sandi',
+      `1. Buka ${gymCode ? 'kiosgym.com/g/' + gymCode : 'kiosgym.com'}`,
+      '2. Login dengan nomor HP atau ID GYM & kata sandi',
       "3. Pilih 'Absen Sekarang' lalu arahkan kamera ke QR ini",
       '4. Selesai! Kamu berhasil check-in',
     ];
@@ -663,9 +759,8 @@ function downloadStandbyQR(gymName, qrDataUrl) {
 
     const registerSteps = [
       '1. Hubungi staff gym',
-      '2. Staff daftarkan nomor HP kamu',
-      '3. Kamu akan mendapat kata sandi sementara',
-      '4. Login dan ikuti langkah di atas',
+      '2. Staff daftarkan kamu & berikan ID GYM + kata sandi',
+      '3. Login dan ikuti langkah di atas',
     ];
     ctx.fillStyle = '#374151';
     ctx.font = '13px sans-serif';
@@ -894,12 +989,20 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
   const [kebabOpen, setKebabOpen] = useState(false);
   const [extendTarget, setExtendTarget] = useState(null);
   const [manageMemberOpen, setManageMemberOpen] = useState(false);
+  const [groups, setGroups] = useState([]);
+  const [showGroupPrompt, setShowGroupPrompt] = useState(false);
+  const [showGroupForm, setShowGroupForm] = useState(false);
 
   const lastScanRef = useRef(null);
   const isProcessingRef = useRef(false);
   const qrRef = useRef(null);
   const fileInputRef = useRef(null);
   const { lang, t } = useTranslation();
+
+  // Fetch groups once on mount — used to decide whether to show group-assign step
+  useEffect(() => {
+    getGroups(token).then(setGroups).catch(() => {});
+  }, [token]);
 
   // Countdown auto-close for success overlay — resets on each new check-in (not for extend-only)
   useEffect(() => {
@@ -1001,7 +1104,7 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
       });
       const data = await res.json();
       const qrDataUrl = await QRCode.toDataURL(data.checkinCode, { width: 400, margin: 2 });
-      setStandbyQrData({ gymName: data.gymName, checkinCode: data.checkinCode, qrDataUrl });
+      setStandbyQrData({ gymName: data.gymName, checkinCode: data.checkinCode, gymCode: data.gymCode ?? null, qrDataUrl });
       setShowStandbyQr(true);
     } catch {
       // silently fail — camera still works
@@ -1162,13 +1265,61 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
           token={token}
           title={`📋 ${t('scan.registerTitle')}`}
           subtitle={t('scan.registerPinSubtitle')}
-          onVerified={() => { setShowRegisterPin(false); setShowRegisterForm(true); }}
+          onVerified={() => {
+            setShowRegisterPin(false);
+            if (groups.length > 0) { setShowGroupPrompt(true); } else { setShowRegisterForm(true); }
+          }}
           onClose={() => setShowRegisterPin(false)}
           isPassword={role === 'staff'}
         />
       )}
 
       {/* ── Register form modal ── */}
+      {showGroupPrompt && (
+        <div style={st.overlay} onClick={(e) => e.target === e.currentTarget && setShowGroupPrompt(false)}>
+          <div style={st.pinCard}>
+            <div style={st.pinTitle}>{t('scan.assignGroupTitle')}</div>
+            <p style={{ fontSize: 13, color: '#64748b', margin: '4px 0 20px', textAlign: 'center' }}>{t('scan.assignGroupSubtitle')}</p>
+            <button
+              type="button"
+              style={{ ...st.pinBtn, marginBottom: 10 }}
+              onClick={() => { setShowGroupPrompt(false); setShowGroupForm(true); }}
+            >
+              {t('scan.assignGroupYes')}
+            </button>
+            <button
+              type="button"
+              style={{ ...st.pinBtn, background: '#e2e8f0', color: '#475569' }}
+              onClick={() => { setShowGroupPrompt(false); setShowRegisterForm(true); }}
+            >
+              {t('scan.assignGroupNo')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showGroupForm && (
+        <GroupRegisterModal
+          token={token}
+          groups={groups}
+          onSuccess={(result) => {
+            setShowGroupForm(false);
+            setFeedback({
+              type: 'success',
+              memberName: result.memberName,
+              gymId: result.gymId,
+              checkedInAt: null,
+              packageName: result.packageName || null,
+              expiryDate: result.expiryDate || null,
+              isNewMember: true,
+              isGroupMember: true,
+            });
+          }}
+          onBack={() => { setShowGroupForm(false); setShowGroupPrompt(true); }}
+          onClose={() => setShowGroupForm(false)}
+        />
+      )}
+
       {showRegisterForm && (
         <RegisterModal
           token={token}
@@ -1178,7 +1329,7 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
               type: 'success',
               memberName: result.memberName,
               gymId: result.gymId,
-              checkedInAt: result.checkedInAt,
+              checkedInAt: result.checkedInAt || null,
               packageName: result.packageName || null,
               expiryDate: result.expiryDate || null,
               isNewMember: true,
@@ -1304,10 +1455,18 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: 20, fontWeight: 600, color: '#1a1a2e' }}>Scan to check in</div>
             <div style={{ fontSize: 18, color: '#374151', marginTop: 4 }}>Pindai untuk absen</div>
+            <div style={{ fontSize: 15, color: '#6366f1', fontWeight: 600, marginTop: 8 }}>
+              {standbyQrData.gymCode
+                ? `kiosgym.com/g/${standbyQrData.gymCode}`
+                : 'kiosgym.com'}
+            </div>
+            <div style={{ fontSize: 14, color: '#374151', marginTop: 2 }}>
+              Login: ID GYM atau Nomor HP
+            </div>
           </div>
           <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
             <button
-              onClick={() => downloadStandbyQR(standbyQrData.gymName, standbyQrData.qrDataUrl)}
+              onClick={() => downloadStandbyQR(standbyQrData.gymName, standbyQrData.qrDataUrl, standbyQrData.gymCode)}
               style={{
                 padding: '12px 24px', background: '#1a1a2e', color: '#fff',
                 border: 'none', borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: 'pointer',
@@ -1324,6 +1483,10 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
             >
               {t('standbyQr.close')}
             </button>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+            <span style={{ fontSize: 12, color: '#94a3b8' }}>Powered by</span>
+            <img src="/kiosgym-icon.svg" alt="KiosGym" style={{ width: 20, height: 20 }} />
           </div>
         </div>
       )}
@@ -1350,7 +1513,8 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
             </p>
             <div style={st.cardName}>{feedback.memberName}</div>
             {!feedback.isVisitor && !feedback.extendOnly && <div style={st.cardGymId}>{t('scan.gymId')}: {feedback.gymId}</div>}
-            {!feedback.extendOnly && <div style={st.cardTime}>{t('scan.clockedIn', { time: formatTime(feedback.checkedInAt) })}</div>}
+            {!feedback.extendOnly && feedback.checkedInAt && <div style={st.cardTime}>{t('scan.clockedIn', { time: formatTime(feedback.checkedInAt) })}</div>}
+            {feedback.isGroupMember && <div style={{ fontSize: 13, color: '#16a34a', marginTop: 4 }}>{t('scan.groupRegisteredNote')}</div>}
             {feedback.packageName && (
               <div style={st.cardPackage}>{feedback.packageName}</div>
             )}

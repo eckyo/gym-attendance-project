@@ -20,6 +20,9 @@ const gymIdToCounter = (gymId) => {
   return letter * 9999 + num;
 };
 
+// Extract the numeric suffix from any member ID (handles plain "A0001" and prefixed "PR0001")
+const gymIdToNumber = (gymId) => parseInt(gymId.replace(/^[A-Z]+/i, ''), 10) || 0;
+
 // POST /api/admin/verify-pin
 router.post('/verify-pin', async (req, res, next) => {
   try {
@@ -237,22 +240,19 @@ router.post('/members/import/confirm', async (req, res, next) => {
     );
     let counter = gymResult.rows[0].member_id_counter;
 
-    // Only sync counter for standard-format IDs (A0001…) to protect future auto-gen IDs
-    const STANDARD_ID_RE = /^[A-Z]\d{4}$/;
-    const standardCounters = rows
-      .map((r) => r.gymId)
-      .filter((id) => STANDARD_ID_RE.test(id))
-      .map((id) => gymIdToCounter(id));
-    if (standardCounters.length > 0) {
-      counter = Math.max(counter, Math.max(...standardCounters));
+    // Sync counter to be >= the highest numeric value seen in imported IDs
+    const allNumbers = rows.map((r) => gymIdToNumber(r.gymId)).filter((n) => n > 0);
+    if (allNumbers.length > 0) {
+      counter = Math.max(counter, Math.max(...allNumbers));
     }
 
     const defaultHash = await bcrypt.hash('password123', 10);
     const inserted = [];
     for (const row of rows) {
+      const memberNumber = gymIdToNumber(row.gymId) || null;
       const result = await client.query(
-        `INSERT INTO members (gym_id, name, scan_token, expiry_date, phone_number, password_hash, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
+        `INSERT INTO members (gym_id, name, scan_token, expiry_date, phone_number, password_hash, member_number, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)
          RETURNING id, name, scan_token, expiry_date, phone_number, created_at`,
         [
           req.gymId,
@@ -261,6 +261,7 @@ router.post('/members/import/confirm', async (req, res, next) => {
           row.expiryDate || null,
           row.phoneNumber || null,
           defaultHash,
+          memberNumber,
           row.joinedDate,
         ]
       );
@@ -338,10 +339,12 @@ router.get('/members', async (req, res, next) => {
 
     const result = await pool.query(
       `SELECT m.id, m.name, m.scan_token, m.expiry_date, m.phone_number, m.created_at,
+              m.group_id, mg.name AS group_name,
               p.id AS package_id, p.name AS package_name, p.duration_days, p.price,
               COUNT(*) OVER() AS total_count
        FROM members m
        LEFT JOIN membership_packages p ON p.id = m.package_id
+       LEFT JOIN member_groups mg ON mg.id = m.group_id
        WHERE m.gym_id = $1
          AND m.deleted_at IS NULL
          AND m.is_visitor = false
@@ -387,7 +390,7 @@ router.post('/members', async (req, res, next) => {
     let pkg = null;
     if (packageId) {
       const pkgResult = await pool.query(
-        'SELECT id, name, duration_days, price FROM membership_packages WHERE id = $1 AND gym_id = $2',
+        'SELECT id, name, duration_days, price, code FROM membership_packages WHERE id = $1 AND gym_id = $2',
         [packageId, req.gymId]
       );
       if (pkgResult.rows.length === 0) return res.status(400).json({ error: 'Package not found' });
@@ -403,11 +406,12 @@ router.post('/members', async (req, res, next) => {
 
     // Lock gym row and get next counter
     const gymResult = await client.query(
-      'SELECT member_id_counter FROM gyms WHERE id = $1 FOR UPDATE',
+      'SELECT member_id_counter, use_package_prefix FROM gyms WHERE id = $1 FOR UPDATE',
       [req.gymId]
     );
     const newCounter = gymResult.rows[0].member_id_counter + 1;
-    const scanToken = generateGymMemberId(newCounter);
+    const packageCode = (gymResult.rows[0].use_package_prefix && pkg?.code) ? pkg.code : null;
+    const scanToken = generateGymMemberId(newCounter, packageCode);
 
     await client.query(
       'UPDATE gyms SET member_id_counter = $1 WHERE id = $2',
@@ -416,10 +420,10 @@ router.post('/members', async (req, res, next) => {
 
     const defaultHash = await bcrypt.hash('password123', 10);
     const result = await client.query(
-      `INSERT INTO members (gym_id, name, scan_token, expiry_date, package_id, phone_number, password_hash)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO members (gym_id, name, scan_token, expiry_date, package_id, phone_number, password_hash, member_number)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING id, name, scan_token, expiry_date, package_id, phone_number, created_at`,
-      [req.gymId, name.trim(), scanToken, resolvedExpiry, resolvedPackageId, phoneNumber || null, defaultHash]
+      [req.gymId, name.trim(), scanToken, resolvedExpiry, resolvedPackageId, phoneNumber || null, defaultHash, newCounter]
     );
 
     await client.query(
@@ -441,7 +445,7 @@ router.post('/members', async (req, res, next) => {
 // PUT /api/admin/members/:id
 router.put('/members/:id', async (req, res, next) => {
   try {
-    const { name, expiryDate, packageId, phoneNumber } = req.body;
+    const { name, expiryDate, packageId, phoneNumber, detachFromGroup } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'Name is required' });
 
     const phoneRe = /^\+62\d{8,13}$/;
@@ -484,6 +488,10 @@ router.put('/members/:id', async (req, res, next) => {
     if (phoneNumber !== undefined) {
       setClauses.splice(2, 0, `phone_number = $${params.length + 1}`);
       params.push(phoneNumber || null);
+    }
+
+    if (detachFromGroup) {
+      setClauses.push(`group_id = NULL`);
     }
 
     params.push(req.params.id, req.gymId);
@@ -636,7 +644,7 @@ router.put('/staff/:id/password', async (req, res, next) => {
 router.get('/settings', async (req, res, next) => {
   try {
     const result = await pool.query(
-      'SELECT visitor_price, reg_fee_rule_enabled, reg_fee_grace_months FROM gyms WHERE id = $1',
+      'SELECT visitor_price, reg_fee_rule_enabled, reg_fee_grace_months, gym_code, use_package_prefix FROM gyms WHERE id = $1',
       [req.gymId]
     );
     const row = result.rows[0];
@@ -644,6 +652,8 @@ router.get('/settings', async (req, res, next) => {
       visitorPrice: row.visitor_price,
       regFeeRuleEnabled: row.reg_fee_rule_enabled,
       regFeeGraceMonths: row.reg_fee_grace_months,
+      gymCode: row.gym_code ?? null,
+      usePackagePrefix: row.use_package_prefix,
     });
   } catch (err) {
     next(err);
@@ -685,6 +695,84 @@ router.put('/settings/reg-fee-rule', async (req, res, next) => {
     res.json({ regFeeRuleEnabled: enabled, regFeeGraceMonths: enabled ? months : (months || 3) });
   } catch (err) {
     next(err);
+  }
+});
+
+// PUT /api/admin/settings/gym-code
+router.put('/settings/gym-code', async (req, res, next) => {
+  try {
+    const { gymCode } = req.body;
+
+    if (gymCode === null || gymCode === undefined || gymCode === '') {
+      await pool.query('UPDATE gyms SET gym_code = NULL, updated_at = NOW() WHERE id = $1', [req.gymId]);
+      return res.json({ gymCode: null });
+    }
+
+    const code = String(gymCode).toLowerCase().trim();
+    if (!/^[a-z0-9-]{3,20}$/.test(code)) {
+      return res.status(400).json({ error: 'Gym code must be 3–20 characters: letters, numbers, and hyphens only.' });
+    }
+
+    const conflict = await pool.query(
+      'SELECT id FROM gyms WHERE gym_code = $1 AND id != $2',
+      [code, req.gymId]
+    );
+    if (conflict.rows.length > 0) {
+      return res.status(400).json({ error: 'This gym code is already taken. Please choose another.' });
+    }
+
+    await pool.query('UPDATE gyms SET gym_code = $1, updated_at = NOW() WHERE id = $2', [code, req.gymId]);
+    res.json({ gymCode: code });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PUT /api/admin/settings/package-prefix
+router.put('/settings/package-prefix', async (req, res, next) => {
+  const client = await pool.connect();
+  try {
+    const { enabled } = req.body;
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({ error: 'enabled must be a boolean' });
+    }
+
+    await client.query('BEGIN');
+    await client.query(
+      'UPDATE gyms SET use_package_prefix = $1, updated_at = NOW() WHERE id = $2',
+      [enabled, req.gymId]
+    );
+
+    if (enabled) {
+      const membersResult = await client.query(
+        `SELECT m.id, m.scan_token, m.member_number, p.code AS package_code
+         FROM members m
+         JOIN membership_packages p ON p.id = m.package_id
+         WHERE m.gym_id = $1 AND m.deleted_at IS NULL AND p.code IS NOT NULL`,
+        [req.gymId]
+      );
+
+      for (const m of membersResult.rows) {
+        const memberNumber = m.member_number ?? parseInt(m.scan_token.slice(-4), 10);
+        const newToken = m.package_code.toUpperCase() + String(memberNumber).padStart(4, '0');
+        if (newToken === m.scan_token) continue;
+        await client.query(
+          'UPDATE members SET scan_token = $1, member_number = $2, updated_at = NOW() WHERE id = $3',
+          [newToken, memberNumber, m.id]
+        );
+      }
+    }
+
+    await client.query('COMMIT');
+    res.json({ usePackagePrefix: enabled });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    if (err.code === '23505') {
+      return res.status(409).json({ error: 'ID collision during bulk update. Ensure package codes are unique and no manual IDs conflict.' });
+    }
+    next(err);
+  } finally {
+    client.release();
   }
 });
 

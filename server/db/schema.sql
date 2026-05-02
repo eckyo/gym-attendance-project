@@ -129,6 +129,20 @@ ALTER TABLE members ADD COLUMN IF NOT EXISTS password_hash TEXT;
 ALTER TABLE gyms ADD COLUMN IF NOT EXISTS reg_fee_rule_enabled BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE gyms ADD COLUMN IF NOT EXISTS reg_fee_grace_months INTEGER NOT NULL DEFAULT 3;
 
+-- Gym code / login URL slug (e.g. "fitzone" → kiosgym.com/g/fitzone)
+ALTER TABLE gyms ADD COLUMN IF NOT EXISTS gym_code TEXT UNIQUE;
+
+-- ─── Package ID Prefix ────────────────────────────────────────────────────────
+-- Short code (1–3 uppercase alphanumeric) on each package, used as member ID prefix
+ALTER TABLE membership_packages ADD COLUMN IF NOT EXISTS code TEXT;
+
+-- Per-gym feature flag: when true, new/updated member IDs include the package prefix
+ALTER TABLE gyms ADD COLUMN IF NOT EXISTS use_package_prefix BOOLEAN NOT NULL DEFAULT false;
+
+-- Stores the raw counter value used when the member's scan_token was generated,
+-- enabling same-number reuse when the same person gains a second membership
+ALTER TABLE members ADD COLUMN IF NOT EXISTS member_number INTEGER;
+
 -- ─── Transactions (revenue ledger) ───────────────────────────────────────────
 -- Append-only. No updated_at by design. Amount in IDR (integer).
 -- member_id nullable for walk-ins using ephemeral visitor records.
@@ -154,3 +168,26 @@ CREATE INDEX IF NOT EXISTS idx_transactions_gym_type_created
   ON transactions(gym_id, type, created_at);
 CREATE INDEX IF NOT EXISTS idx_transactions_member
   ON transactions(member_id) WHERE member_id IS NOT NULL;
+
+-- ─── Group / Family Packages ─────────────────────────────────────────────────
+
+-- Mark a package as a group/family package
+ALTER TABLE membership_packages ADD COLUMN IF NOT EXISTS is_group BOOLEAN NOT NULL DEFAULT false;
+
+-- Group entity: multiple members share one expiry and one transaction
+CREATE TABLE IF NOT EXISTS member_groups (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  gym_id      UUID NOT NULL REFERENCES gyms(id),
+  name        TEXT NOT NULL,
+  package_id  UUID NOT NULL REFERENCES membership_packages(id),
+  expiry_date DATE,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_member_groups_gym ON member_groups(gym_id);
+
+-- Link each member to a group (nullable — existing individual members unaffected)
+ALTER TABLE members ADD COLUMN IF NOT EXISTS group_id UUID REFERENCES member_groups(id);
+
+-- Track group-level transactions (member_id stays NULL for group billing)
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS group_id UUID REFERENCES member_groups(id);

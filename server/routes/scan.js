@@ -104,7 +104,7 @@ router.post('/register', requireAuth, injectGymId, requireRole('admin', 'staff')
     let pkg = null;
     if (packageId) {
       const pkgResult = await client.query(
-        'SELECT id, name, duration_days, price FROM membership_packages WHERE id = $1 AND gym_id = $2',
+        'SELECT id, name, duration_days, price, code FROM membership_packages WHERE id = $1 AND gym_id = $2',
         [packageId, req.gymId]
       );
       if (pkgResult.rows.length === 0) return res.status(400).json({ error: 'Package not found' });
@@ -117,18 +117,19 @@ router.post('/register', requireAuth, injectGymId, requireRole('admin', 'staff')
     await client.query('BEGIN');
 
     const gymResult = await client.query(
-      'SELECT member_id_counter FROM gyms WHERE id = $1 FOR UPDATE',
+      'SELECT member_id_counter, use_package_prefix FROM gyms WHERE id = $1 FOR UPDATE',
       [req.gymId]
     );
     const newCounter = gymResult.rows[0].member_id_counter + 1;
-    const scanToken = generateGymMemberId(newCounter);
+    const packageCode = (gymResult.rows[0].use_package_prefix && pkg?.code) ? pkg.code : null;
+    const scanToken = generateGymMemberId(newCounter, packageCode);
     await client.query('UPDATE gyms SET member_id_counter = $1 WHERE id = $2', [newCounter, req.gymId]);
 
     const defaultHash = await bcrypt.hash('password123', 10);
     const memberResult = await client.query(
-      `INSERT INTO members (gym_id, name, scan_token, expiry_date, package_id, password_hash)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, name, scan_token, expiry_date`,
-      [req.gymId, name.trim(), scanToken, resolvedExpiry, resolvedPackageId, defaultHash]
+      `INSERT INTO members (gym_id, name, scan_token, expiry_date, package_id, password_hash, member_number)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, name, scan_token, expiry_date`,
+      [req.gymId, name.trim(), scanToken, resolvedExpiry, resolvedPackageId, defaultHash, newCounter]
     );
     const member = memberResult.rows[0];
 
@@ -164,11 +165,11 @@ router.post('/register', requireAuth, injectGymId, requireRole('admin', 'staff')
 router.get('/standby-qr', requireAuth, injectGymId, requireRole('admin', 'staff'), async (req, res, next) => {
   try {
     const result = await pool.query(
-      'SELECT name, checkin_code FROM gyms WHERE id = $1',
+      'SELECT name, checkin_code, gym_code FROM gyms WHERE id = $1',
       [req.gymId]
     );
     const gym = result.rows[0];
-    res.json({ gymName: gym.name, checkinCode: gym.checkin_code });
+    res.json({ gymName: gym.name, checkinCode: gym.checkin_code, gymCode: gym.gym_code ?? null });
   } catch (err) {
     next(err);
   }
