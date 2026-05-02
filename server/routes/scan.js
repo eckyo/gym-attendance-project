@@ -164,11 +164,11 @@ router.post('/register', requireAuth, injectGymId, requireRole('admin', 'staff')
 router.get('/standby-qr', requireAuth, injectGymId, requireRole('admin', 'staff'), async (req, res, next) => {
   try {
     const result = await pool.query(
-      'SELECT name, checkin_code FROM gyms WHERE id = $1',
+      'SELECT name, checkin_code, gym_code FROM gyms WHERE id = $1',
       [req.gymId]
     );
     const gym = result.rows[0];
-    res.json({ gymName: gym.name, checkinCode: gym.checkin_code });
+    res.json({ gymName: gym.name, checkinCode: gym.checkin_code, gymCode: gym.gym_code ?? null });
   } catch (err) {
     next(err);
   }

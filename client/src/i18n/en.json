@@ -451,7 +451,7 @@
     "gymCodeLabel": "Gym Code",
     "gymCodePlaceholder": "e.g. fitzone",
     "memberIdLabel": "GYM ID",
-    "memberIdPlaceholder": "e.g. G-001",
+    "memberIdPlaceholder": "e.g. A0001",
     "gymCodeNotFound": "Gym not found. Please contact your gym admin for the correct login link.",
     "gymCodeLoginFor": "Member login for {gymName}"
   },

@@ -695,7 +695,7 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
   return currentY;
 }
 
-function downloadStandbyQR(gymName, qrDataUrl) {
+function downloadStandbyQR(gymName, qrDataUrl, gymCode) {
   const W = 600;
   const H = 940;
   const canvas = document.createElement('canvas');
@@ -738,8 +738,8 @@ function downloadStandbyQR(gymName, qrDataUrl) {
     ctx.fillText('Cara Check-in', 40, 468);
 
     const checkinSteps = [
-      '1. Buka kiosgym.com',
-      '2. Login dengan nomor HP & kata sandi',
+      `1. Buka ${gymCode ? 'kiosgym.com/g/' + gymCode : 'kiosgym.com'}`,
+      '2. Login dengan nomor HP atau ID GYM & kata sandi',
       "3. Pilih 'Absen Sekarang' lalu arahkan kamera ke QR ini",
       '4. Selesai! Kamu berhasil check-in',
     ];
@@ -759,9 +759,8 @@ function downloadStandbyQR(gymName, qrDataUrl) {
 
     const registerSteps = [
       '1. Hubungi staff gym',
-      '2. Staff daftarkan nomor HP kamu',
-      '3. Kamu akan mendapat kata sandi sementara',
-      '4. Login dan ikuti langkah di atas',
+      '2. Staff daftarkan kamu & berikan ID GYM + kata sandi',
+      '3. Login dan ikuti langkah di atas',
     ];
     ctx.fillStyle = '#374151';
     ctx.font = '13px sans-serif';
@@ -1105,7 +1104,7 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
       });
       const data = await res.json();
       const qrDataUrl = await QRCode.toDataURL(data.checkinCode, { width: 400, margin: 2 });
-      setStandbyQrData({ gymName: data.gymName, checkinCode: data.checkinCode, qrDataUrl });
+      setStandbyQrData({ gymName: data.gymName, checkinCode: data.checkinCode, gymCode: data.gymCode ?? null, qrDataUrl });
       setShowStandbyQr(true);
     } catch {
       // silently fail — camera still works
@@ -1456,10 +1455,18 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: 20, fontWeight: 600, color: '#1a1a2e' }}>Scan to check in</div>
             <div style={{ fontSize: 18, color: '#374151', marginTop: 4 }}>Pindai untuk absen</div>
+            <div style={{ fontSize: 15, color: '#6366f1', fontWeight: 600, marginTop: 8 }}>
+              {standbyQrData.gymCode
+                ? `kiosgym.com/g/${standbyQrData.gymCode}`
+                : 'kiosgym.com'}
+            </div>
+            <div style={{ fontSize: 14, color: '#374151', marginTop: 2 }}>
+              Login: ID GYM atau Nomor HP
+            </div>
           </div>
           <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
             <button
-              onClick={() => downloadStandbyQR(standbyQrData.gymName, standbyQrData.qrDataUrl)}
+              onClick={() => downloadStandbyQR(standbyQrData.gymName, standbyQrData.qrDataUrl, standbyQrData.gymCode)}
               style={{
                 padding: '12px 24px', background: '#1a1a2e', color: '#fff',
                 border: 'none', borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: 'pointer',
@@ -1476,6 +1483,10 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
             >
               {t('standbyQr.close')}
             </button>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+            <span style={{ fontSize: 12, color: '#94a3b8' }}>Powered by</span>
+            <img src="/kiosgym-icon.svg" alt="KiosGym" style={{ width: 20, height: 20 }} />
           </div>
         </div>
       )}
