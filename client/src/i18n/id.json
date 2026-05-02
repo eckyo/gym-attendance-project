@@ -351,7 +351,15 @@
       "ruleOff": "Nonaktif",
       "saving": "Menyimpan...",
       "saved": "Tersimpan!",
-      "save": "Simpan Pengaturan"
+      "save": "Simpan Pengaturan",
+      "gymCodeMenuLabel": "URL Login & Kode Gym",
+      "gymCodeLabel": "Kode Gym",
+      "gymCodeHint": "Huruf, angka, dan tanda hubung (3–20 karakter). Digunakan sebagai URL login dan kode untuk anggota.",
+      "gymCodeUrlPreview": "URL login anggota:",
+      "gymCodeChangeWarning": "⚠ Mengubah ini akan merusak tautan lama yang sudah dibagikan.",
+      "gymCodeSave": "Simpan",
+      "gymCodeSaving": "Menyimpan...",
+      "gymCodeClear": "Hapus"
     },
     "changePassword": {
       "menuLabel": "Ubah Kata Sandi",
@@ -437,7 +445,15 @@
     "greetingSubEvening": "Sesi malam selalu berbeda 🌟",
     "greetingSubNight": "Juara berlatih kapan saja 🏆",
     "settings": "Pengaturan",
-    "settingsTitle": "Pengaturan Akun"
+    "settingsTitle": "Pengaturan Akun",
+    "loginMethodPhone": "Nomor Telepon",
+    "loginMethodGymCode": "Kode Gym",
+    "gymCodeLabel": "Kode Gym",
+    "gymCodePlaceholder": "cth. fitzone",
+    "memberIdLabel": "ID GYM",
+    "memberIdPlaceholder": "cth. G-001",
+    "gymCodeNotFound": "Gym tidak ditemukan. Hubungi admin gym Anda untuk mendapatkan tautan login yang benar.",
+    "gymCodeLoginFor": "Login anggota untuk {gymName}"
   },
   "superadmin": {
     "title": "Dasbor Superadmin",

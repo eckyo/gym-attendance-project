@@ -129,6 +129,9 @@ ALTER TABLE members ADD COLUMN IF NOT EXISTS password_hash TEXT;
 ALTER TABLE gyms ADD COLUMN IF NOT EXISTS reg_fee_rule_enabled BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE gyms ADD COLUMN IF NOT EXISTS reg_fee_grace_months INTEGER NOT NULL DEFAULT 3;
 
+-- Gym code / login URL slug (e.g. "fitzone" → kiosgym.com/g/fitzone)
+ALTER TABLE gyms ADD COLUMN IF NOT EXISTS gym_code TEXT UNIQUE;
+
 -- ─── Transactions (revenue ledger) ───────────────────────────────────────────
 -- Append-only. No updated_at by design. Amount in IDR (integer).
 -- member_id nullable for walk-ins using ephemeral visitor records.
