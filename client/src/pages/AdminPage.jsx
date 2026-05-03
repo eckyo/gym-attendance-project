@@ -858,6 +858,123 @@ function AddMemberModal({ token, onAdded, onClose }) {
   );
 }
 
+// ─── Edit Member Modal ────────────────────────────────────────────────────────
+
+function EditMemberModal({ token, member, packages, gymSettings, detachOnSave, onSaved, onClose }) {
+  const [name, setName] = useState(member.name);
+  const [selectedPackageId, setSelectedPackageId] = useState(member.package_id || '__custom__');
+  const [customExpiry, setCustomExpiry] = useState(
+    member.expiry_date ? member.expiry_date.slice(0, 10) : defaultExpiryDate()
+  );
+  const [phone, setPhone] = useState(() => {
+    const raw = member.phone_number || '';
+    const digits = raw.replace(/\D/g, '');
+    if (!digits) return '';
+    if (digits.startsWith('62')) return '+62' + digits.slice(2);
+    if (digits.startsWith('0')) return '+62' + digits.slice(1);
+    return '+62' + digits;
+  });
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { t } = useTranslation();
+
+  const PHONE_RE = /^\+62\d{8,13}$/;
+  const toDigits   = (full) => full.startsWith('+62') ? full.slice(3) : full;
+  const fromDigits = (raw)  => { const d = raw.replace(/\D/g, ''); return d ? '+62' + d : ''; };
+
+  const isCustom = selectedPackageId === '__custom__';
+  const selectedPkg = packages.find((p) => p.id === selectedPackageId);
+  const computedExpiry = selectedPkg ? calcExpiryFromDuration(selectedPkg.duration_days) : null;
+  const locale = 'en-US';
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    if (phone && !PHONE_RE.test(phone)) {
+      setError('Phone must start with +62 followed by 8–13 digits');
+      return;
+    }
+    setLoading(true);
+    try {
+      const updated = await updateMember(
+        token, member.id, name,
+        isCustom ? customExpiry : null,
+        isCustom ? null : selectedPackageId,
+        phone || undefined,
+        detachOnSave || false,
+      );
+      onSaved(updated);
+    } catch (err) {
+      setError(err.message);
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={s.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={{ ...s.modal, maxWidth: 420 }}>
+        <div style={s.modalTitle}>{t('admin.members.edit')}</div>
+        {error && <div style={s.error}>{error}</div>}
+        <form onSubmit={handleSubmit}>
+          <label style={s.modalLabel}>GYM ID</label>
+          <div style={{ fontFamily: 'monospace', fontSize: 13, color: '#64748b', marginBottom: 14, padding: '8px 12px', background: '#f8fafc', borderRadius: 6 }}>
+            {member.scan_token}
+          </div>
+          <label style={s.modalLabel}>{t('admin.add.nameLabel')}</label>
+          <input style={s.modalInput} type="text" value={name}
+            onChange={(e) => setName(e.target.value)} required autoFocus />
+          <label style={s.modalLabel}>{t('admin.packages.packageLabel')}</label>
+          <select style={s.select} value={selectedPackageId} onChange={(e) => setSelectedPackageId(e.target.value)}>
+            {packages.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name} — {p.duration_days}d — Rp {Number(p.price).toLocaleString('id-ID')}
+                {p.is_default ? ' ★' : ''}
+              </option>
+            ))}
+            <option value="__custom__">{t('admin.packages.customDate')}</option>
+          </select>
+          {!isCustom && computedExpiry && (
+            <div style={s.expiryPreview}>
+              {t('admin.packages.expiresOn', { date: new Date(computedExpiry).toLocaleDateString(locale) })}
+            </div>
+          )}
+          {isCustom && (
+            <>
+              <label style={s.modalLabel}>{t('admin.add.expiryLabel')}</label>
+              <input style={s.modalInput} type="date" value={customExpiry}
+                onChange={(e) => setCustomExpiry(e.target.value)} required />
+            </>
+          )}
+          <label style={s.modalLabel}>
+            {t('admin.add.phoneLabel')} <span style={{ color: '#94a3b8', fontWeight: 400 }}>({t('admin.add.phoneOptional')})</span>
+          </label>
+          <div style={{ display: 'flex', alignItems: 'stretch' }}>
+            <span style={{ ...s.modalInput, width: 'auto', borderRight: 'none', borderRadius: '4px 0 0 4px',
+                           background: '#f1f5f9', color: '#64748b', padding: '0 10px',
+                           display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>
+              +62
+            </span>
+            <input
+              style={{ ...s.modalInput, borderRadius: '0 4px 4px 0', flex: 1, borderLeft: 'none' }}
+              type="tel"
+              value={toDigits(phone)}
+              onChange={(e) => setPhone(fromDigits(e.target.value))}
+              placeholder="81234567890"
+            />
+          </div>
+          <button style={{ ...s.modalBtn, background: '#BEFE00', color: '#1a1a1a', opacity: loading ? 0.6 : 1 }}
+            type="submit" disabled={loading}>
+            {loading ? t('common.loading') : t('admin.members.save')}
+          </button>
+          <button type="button"
+            style={{ ...s.modalBtn, background: '#e2e8f0', color: '#475569', marginTop: 10 }}
+            onClick={onClose}>{t('common.cancel')}</button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ─── Phone Reveal Modal ───────────────────────────────────────────────────────
 
 function PhoneRevealModal({ token, onSuccess, onClose }) {
@@ -1115,6 +1232,9 @@ function StaffTab({ token }) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [deletingStaff, setDeletingStaff] = useState(null);
   const [changingPasswordStaff, setChangingPasswordStaff] = useState(null);
+  const [kebabStaff, setKebabStaff] = useState(null);
+  const [kebabPos, setKebabPos] = useState(null);
+  const isMobile = useIsMobile();
   const { lang, t } = useTranslation();
 
   useEffect(() => {
@@ -1135,6 +1255,8 @@ function StaffTab({ token }) {
     setDeletingStaff(null);
   };
 
+  const closeKebab = () => { setKebabStaff(null); setKebabPos(null); };
+
   const locale = lang === 'id' ? 'id-ID' : 'en-US';
 
   return (
@@ -1153,7 +1275,7 @@ function StaffTab({ token }) {
           <tr>
             <th style={s.th}>{t('admin.staff.colEmail')}</th>
             <th style={s.th}>{t('admin.staff.colCreated')}</th>
-            <th style={s.th}>{t('admin.staff.colActions')}</th>
+            <th style={{ ...s.th, position: 'sticky', right: 0, zIndex: 2, background: '#f8fafc', whiteSpace: 'nowrap', boxShadow: '-2px 0 6px rgba(0,0,0,0.06)' }}>{t('admin.staff.colActions')}</th>
           </tr>
         </thead>
         <tbody>
@@ -1165,25 +1287,52 @@ function StaffTab({ token }) {
             <tr key={member.id}>
               <td style={s.td}>{member.email}</td>
               <td style={s.td}>{new Date(member.created_at).toLocaleDateString(locale)}</td>
-              <td style={s.td}>
-                <button
-                  style={{ ...s.actionBtn, ...s.editBtn }}
-                  onClick={() => setChangingPasswordStaff(member)}
-                >
-                  {t('admin.staff.changePassword')}
-                </button>
-                <button
-                  style={{ ...s.actionBtn, ...s.deleteBtn }}
-                  onClick={() => setDeletingStaff(member)}
-                >
-                  {t('admin.staff.remove')}
-                </button>
+              <td style={{ ...s.td, position: 'sticky', right: 0, background: '#fff', zIndex: 1, whiteSpace: 'nowrap', boxShadow: '-2px 0 6px rgba(0,0,0,0.06)' }}>
+                {isMobile ? (
+                  <button
+                    style={{ background: 'none', border: '1.5px solid #e2e8f0', borderRadius: 6, color: '#64748b', cursor: 'pointer', padding: '5px 8px', display: 'inline-flex', alignItems: 'center' }}
+                    onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setKebabPos({ top: r.bottom + 4, right: window.innerWidth - r.right }); setKebabStaff(member); }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
+                  </button>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <button style={{ ...s.actionBtn, ...s.editBtn, marginRight: 0 }} onClick={() => setChangingPasswordStaff(member)}>
+                      {t('admin.staff.changePassword')}
+                    </button>
+                    <button
+                      style={{ background: 'none', border: '1.5px solid #fca5a5', borderRadius: 6, color: '#dc2626', cursor: 'pointer', padding: '5px 7px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                      onClick={() => setDeletingStaff(member)}
+                      title={t('admin.staff.remove')}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+                      </svg>
+                    </button>
+                  </div>
+                )}
               </td>
             </tr>
           ))}
         </tbody>
       </table>
       </div>
+
+      {kebabStaff && kebabPos && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 299 }} onClick={closeKebab} />
+          <div style={{ position: 'fixed', top: kebabPos.top, right: kebabPos.right, zIndex: 300, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.10)', minWidth: 180, overflow: 'hidden' }}>
+            <button style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: '#1e293b' }}
+              onClick={() => { setChangingPasswordStaff(kebabStaff); closeKebab(); }}>
+              {t('admin.staff.changePassword')}
+            </button>
+            <button style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: '#dc2626', borderTop: '1px solid #f1f5f9' }}
+              onClick={() => { setDeletingStaff(kebabStaff); closeKebab(); }}>
+              {t('admin.staff.remove')}
+            </button>
+          </div>
+        </>
+      )}
 
       {showAddModal && (
         <AddStaffModal token={token} onAdded={handleAdded} onClose={() => setShowAddModal(false)} />
@@ -1717,11 +1866,7 @@ function MembersTab({ token, gymSettings }) {
   const [openDropdown,     setOpenDropdown]     = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [editingId, setEditingId] = useState(null);
-  const [editName, setEditName] = useState('');
-  const [editExpiry, setEditExpiry] = useState('');
-  const [editPackageId, setEditPackageId] = useState('');
-  const [editPhone, setEditPhone] = useState('');
+  const [editingMember, setEditingMember] = useState(null);
   const [revealedPhoneId, setRevealedPhoneId] = useState(null);
   const [pendingRevealId, setPendingRevealId] = useState(null);
   const [sortBy, setSortBy]           = useState('scan_token');
@@ -1735,6 +1880,7 @@ function MembersTab({ token, gymSettings }) {
   const [deletingMember, setDeletingMember] = useState(null);
   const [qrMember, setQrMember] = useState(null);
   const [managingMemberId, setManagingMemberId] = useState(null);
+  const [managingPos, setManagingPos] = useState(null);
   const [extendingMember, setExtendingMember] = useState(null);
   const [extendPackageId, setExtendPackageId] = useState('');
   const [extendLoading, setExtendLoading] = useState(false);
@@ -1749,6 +1895,7 @@ function MembersTab({ token, gymSettings }) {
   const [editDetachMemberId, setEditDetachMemberId] = useState(null);
   const [confirmDeleteGroup, setConfirmDeleteGroup] = useState(null);   // group object
   const [confirmRemoveGroupMember, setConfirmRemoveGroupMember] = useState(null); // { group, member }
+  const isMobile = useIsMobile();
   const { lang, t } = useTranslation();
 
   const PAGE_SIZE = 20;
@@ -1832,52 +1979,6 @@ function MembersTab({ token, gymSettings }) {
     }
   };
 
-  const startEdit = (member) => {
-    setEditingId(member.id);
-    setEditName(member.name);
-    setEditExpiry(member.expiry_date ? member.expiry_date.slice(0, 10) : '');
-    setEditPackageId(member.package_id || '__custom__');
-    const rawPhone = member.phone_number || '';
-    const digits = rawPhone.replace(/\D/g, '');
-    const normalizedPhone = digits
-      ? (digits.startsWith('62') ? '+62' + digits.slice(2)
-        : digits.startsWith('0') ? '+62' + digits.slice(1)
-        : '+62' + digits)
-      : '';
-    setEditPhone(normalizedPhone);
-  };
-
-  const cancelEdit = () => { setEditingId(null); setEditName(''); setEditExpiry(''); setEditPackageId(''); setEditPhone(''); };
-
-  const MEMBER_PHONE_RE = /^\+62\d{8,13}$/;
-  const toDigits   = (full) => full.startsWith('+62') ? full.slice(3) : full;
-  const fromDigits = (raw)  => { const d = raw.replace(/\D/g, ''); return d ? '+62' + d : ''; };
-
-  const saveEdit = async (id) => {
-    if (editPhone && !MEMBER_PHONE_RE.test(editPhone)) {
-      setError('Phone must start with +62 followed by 8–13 digits');
-      return;
-    }
-    try {
-      const isCustom = editPackageId === '__custom__';
-      const shouldDetach = editDetachMemberId === id;
-      const updated = await updateMember(
-        token, id, editName,
-        isCustom ? editExpiry : null,
-        isCustom ? null : editPackageId,
-        editPhone || undefined,
-        shouldDetach,
-      );
-      if (shouldDetach) {
-        setEditDetachMemberId(null);
-        loadGroups();
-      }
-      setMembers((prev) => prev.map((m) => m.id === id ? updated : m));
-      setEditingId(null);
-    } catch (err) {
-      setError(err.message);
-    }
-  };
 
   const handleDeleted = (id) => {
     setMembers((prev) => prev.filter((m) => m.id !== id));
@@ -2042,9 +2143,30 @@ function MembersTab({ token, gymSettings }) {
           {t('admin.members.filters')}
           {activeFilterCount > 0 && <span style={{ ...s.badge, ...s.badgeNew, marginLeft: 6 }}>{activeFilterCount}</span>}
         </button>
-        <button style={s.outlineBtn} onClick={handleTemplate}>{t('admin.members.template')}</button>
-        <button style={s.outlineBtn} onClick={handleExport}>{t('admin.members.export')}</button>
-        <button style={s.outlineBtn} onClick={() => setShowImportModal(true)}>{t('admin.members.import')}</button>
+        <button style={s.outlineBtn} onClick={handleTemplate}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 5, verticalAlign: 'middle' }}>
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          {t('admin.members.template')}
+        </button>
+        <button style={s.outlineBtn} onClick={handleExport}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 5, verticalAlign: 'middle' }}>
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          {t('admin.members.export')}
+        </button>
+        <button style={s.outlineBtn} onClick={() => setShowImportModal(true)}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 5, verticalAlign: 'middle' }}>
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          {t('admin.members.import')}
+        </button>
         <button style={s.addBtn} onClick={() => setShowAddModal(true)}>{t('admin.members.addMember')}</button>
       </div>
 
@@ -2117,7 +2239,7 @@ function MembersTab({ token, gymSettings }) {
       {error && <div style={s.error}>{error}</div>}
 
       <div style={{ ...s.tableWrap }}>
-      <table style={{ ...s.table, minWidth: 900 }}>
+      <table style={{ ...s.table, minWidth: 700 }}>
         <thead>
           <tr>
             {[
@@ -2146,7 +2268,7 @@ function MembersTab({ token, gymSettings }) {
                 </th>
               );
             })}
-            <th style={s.th}>{t('admin.members.colActions')}</th>
+            <th style={{ ...s.th, position: 'sticky', right: 0, zIndex: 2, background: '#f8fafc', width: 96, whiteSpace: 'nowrap', boxShadow: '-2px 0 6px rgba(0,0,0,0.06)' }}>{t('admin.members.colActions')}</th>
           </tr>
         </thead>
         <tbody>
@@ -2157,60 +2279,16 @@ function MembersTab({ token, gymSettings }) {
           ) : members.map((member) => {
             const isExpired = member.expiry_date && new Date(member.expiry_date) < new Date();
             const isNew = new Date() - new Date(member.created_at) < 7 * 24 * 60 * 60 * 1000;
-            const isEditingThis = editingId === member.id;
-            const editPkgIsCustom = editPackageId === '__custom__';
-            const editSelectedPkg = packages.find((p) => p.id === editPackageId);
-            const editComputedExpiry = editSelectedPkg
-              ? calcExpiryFromDuration(editSelectedPkg.duration_days)
-              : null;
             return (
               <tr key={member.id}>
                 <td style={s.td}>
-                  {isEditingThis ? (
-                    <input
-                      style={s.inlineInput}
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(member.id); if (e.key === 'Escape') cancelEdit(); }}
-                      autoFocus
-                    />
-                  ) : (
-                    <>
-                      {member.name}
-                      {isNew && <span style={{ ...s.badge, ...s.badgeNew }}>New</span>}
-                    </>
-                  )}
+                  {member.name}
+                  {isNew && <span style={{ ...s.badge, ...s.badgeNew }}>New</span>}
                 </td>
                 <td style={s.tdMono}>{member.scan_token}</td>
+                <td style={s.td}>{member.package_name || '—'}</td>
                 <td style={s.td}>
-                  {isEditingThis ? (
-                    <select style={s.inlineSelect} value={editPackageId} onChange={(e) => setEditPackageId(e.target.value)}>
-                      {packages.map((p) => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
-                      <option value="__custom__">{t('admin.packages.customDate')}</option>
-                    </select>
-                  ) : member.package_name || '—'}
-                </td>
-                <td style={s.td}>
-                  {isEditingThis ? (
-                    <div style={{ display: 'flex', alignItems: 'stretch' }}>
-                      <span style={{ ...s.inlineInput, width: 'auto', borderRight: 'none',
-                                     borderRadius: '4px 0 0 4px', background: '#f1f5f9',
-                                     color: '#64748b', padding: '0 8px', display: 'flex',
-                                     alignItems: 'center', whiteSpace: 'nowrap', fontSize: 14,
-                                     minHeight: 36 }}>
-                        +62
-                      </span>
-                      <input
-                        style={{ ...s.inlineInput, borderRadius: '0 4px 4px 0', maxWidth: 220, minWidth: 100, borderLeft: 'none', minHeight: 36 }}
-                        type="tel"
-                        value={toDigits(editPhone)}
-                        onChange={(e) => setEditPhone(fromDigits(e.target.value))}
-                        placeholder="81234567890"
-                      />
-                    </div>
-                  ) : member.phone_number ? (
+                  {member.phone_number ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ fontFamily: 'monospace', fontSize: 13 }}>
                         {revealedPhoneId === member.id
@@ -2230,20 +2308,7 @@ function MembersTab({ token, gymSettings }) {
                   ) : '—'}
                 </td>
                 <td style={{ ...s.td, color: isExpired ? '#dc2626' : '#1e293b', fontWeight: isExpired ? 600 : 400 }}>
-                  {isEditingThis ? (
-                    editPkgIsCustom ? (
-                      <input
-                        style={{ ...s.inlineInput, maxWidth: 160 }}
-                        type="date"
-                        value={editExpiry}
-                        onChange={(e) => setEditExpiry(e.target.value)}
-                      />
-                    ) : (
-                      <span style={{ fontSize: 12, color: '#64748b' }}>
-                        {editComputedExpiry ? new Date(editComputedExpiry).toLocaleDateString(locale) : '—'}
-                      </span>
-                    )
-                  ) : member.expiry_date ? (
+                  {member.expiry_date ? (
                     <>
                       {new Date(member.expiry_date).toLocaleDateString(locale)}
                       {isExpired && <span style={{ marginLeft: 6, fontSize: 11 }}>{t('admin.members.expired')}</span>}
@@ -2251,57 +2316,55 @@ function MembersTab({ token, gymSettings }) {
                   ) : '—'}
                 </td>
                 <td style={s.td}>{new Date(member.created_at).toLocaleDateString(locale)}</td>
-                <td style={s.td}>
-                  {isEditingThis ? (
-                    <>
-                      <button style={{ ...s.actionBtn, ...s.saveBtn }} onClick={() => saveEdit(member.id)}>{t('admin.members.save')}</button>
-                      <button style={{ ...s.actionBtn, ...s.cancelBtn }} onClick={cancelEdit}>{t('common.cancel')}</button>
-                    </>
+                <td style={{ ...s.td, position: 'sticky', right: 0, background: '#fff', zIndex: 1, whiteSpace: 'nowrap', boxShadow: '-2px 0 6px rgba(0,0,0,0.06)' }}>
+                  {isMobile ? (
+                    <button
+                      style={{ background: 'none', border: '1.5px solid #e2e8f0', borderRadius: 6, color: '#64748b', cursor: 'pointer', padding: '5px 8px', display: 'inline-flex', alignItems: 'center' }}
+                      onClick={(e) => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setManagingPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+                        setManagingMemberId(managingMemberId === member.id ? null : member.id);
+                      }}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
+                    </button>
                   ) : (
-                    <>
-                      <button style={{ ...s.actionBtn, ...s.qrBtn }} onClick={() => setQrMember(member)}>{t('admin.members.qrCode')}</button>
-                      <div style={{ position: 'relative', display: 'inline-block' }}>
-                        <button
-                          style={{ ...s.actionBtn, ...s.editBtn }}
-                          onClick={() => setManagingMemberId((prev) => prev === member.id ? null : member.id)}
-                        >
-                          {t('admin.members.manage')} ▾
-                        </button>
-                        {managingMemberId === member.id && (
-                          <>
-                            <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setManagingMemberId(null)} />
-                            <div style={{ position: 'absolute', right: 0, top: '100%', zIndex: 100, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.10)', minWidth: 180, overflow: 'hidden' }}>
-                              <button
-                                style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: '#1e293b' }}
-                                onClick={() => {
-                                  if (member.group_id) {
-                                    setGroupWarning({ member, action: 'edit' });
-                                  } else {
-                                    startEdit(member);
-                                  }
-                                  setManagingMemberId(null);
-                                }}
-                              >
-                                {t('admin.members.edit')}
-                              </button>
-                              <button
-                                style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: '#1e293b', borderTop: '1px solid #f1f5f9' }}
-                                onClick={() => { setExtendingMember(member); setExtendPackageId(''); setManagingMemberId(null); }}
-                              >
-                                {t('admin.members.extend')}
-                              </button>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                      <button style={{ ...s.actionBtn, ...s.deleteBtn }} onClick={() => {
-                        if (member.group_id) {
-                          setGroupWarning({ member, action: 'remove' });
-                        } else {
-                          setDeletingMember(member);
-                        }
-                      }}>{t('admin.members.remove')}</button>
-                    </>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <button style={{ ...s.actionBtn, ...s.qrBtn, marginRight: 0 }} onClick={() => setQrMember(member)}>{t('admin.members.qrCode')}</button>
+                      <button
+                        style={{ ...s.actionBtn, ...s.editBtn, marginRight: 0 }}
+                        onClick={(e) => {
+                          if (managingMemberId === member.id) {
+                            setManagingMemberId(null);
+                            setManagingPos(null);
+                          } else {
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            setManagingPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+                            setManagingMemberId(member.id);
+                          }
+                        }}
+                      >
+                        {t('admin.members.manage')} ▾
+                      </button>
+                      <button
+                        style={{ background: 'none', border: '1.5px solid #fca5a5', borderRadius: 6, color: '#dc2626', cursor: 'pointer', padding: '5px 7px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                        onClick={() => {
+                          if (member.group_id) {
+                            setGroupWarning({ member, action: 'remove' });
+                          } else {
+                            setDeletingMember(member);
+                          }
+                        }}
+                        title={t('admin.members.remove')}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="3 6 5 6 21 6"/>
+                          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                          <path d="M10 11v6M14 11v6"/>
+                          <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+                        </svg>
+                      </button>
+                    </div>
                   )}
                 </td>
               </tr>
@@ -2324,6 +2387,80 @@ function MembersTab({ token, gymSettings }) {
       </table>
       </div>
 
+      {/* Manage dropdown — rendered outside tableWrap to escape its overflow+WebkitOverflowScrolling clipping */}
+      {managingMemberId && managingPos && (() => {
+        const m = members.find((mem) => mem.id === managingMemberId);
+        if (!m) return null;
+        const closeManage = () => { setManagingMemberId(null); setManagingPos(null); };
+        return (
+          <>
+            <div style={{ position: 'fixed', inset: 0, zIndex: 299 }} onClick={closeManage} />
+            <div style={{ position: 'fixed', top: managingPos.top, right: managingPos.right, zIndex: 300, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.10)', minWidth: 180, overflow: 'hidden' }}>
+              {isMobile && (
+                <button
+                  style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: '#1e293b' }}
+                  onClick={() => { setQrMember(m); closeManage(); }}
+                >
+                  {t('admin.members.qrCode')}
+                </button>
+              )}
+              <button
+                style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: '#1e293b', ...(isMobile ? { borderTop: '1px solid #f1f5f9' } : {}) }}
+                onClick={() => {
+                  if (m.group_id) {
+                    setGroupWarning({ member: m, action: 'edit' });
+                  } else {
+                    setEditingMember(m);
+                  }
+                  closeManage();
+                }}
+              >
+                {t('admin.members.edit')}
+              </button>
+              <button
+                style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: '#1e293b', borderTop: '1px solid #f1f5f9' }}
+                onClick={() => { setExtendingMember(m); setExtendPackageId(''); closeManage(); }}
+              >
+                {t('admin.members.extend')}
+              </button>
+              {isMobile && (
+                <button
+                  style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: '#dc2626', borderTop: '1px solid #f1f5f9' }}
+                  onClick={() => {
+                    if (m.group_id) {
+                      setGroupWarning({ member: m, action: 'remove' });
+                    } else {
+                      setDeletingMember(m);
+                    }
+                    closeManage();
+                  }}
+                >
+                  {t('admin.members.remove')}
+                </button>
+              )}
+            </div>
+          </>
+        );
+      })()}
+
+      {editingMember && (
+        <EditMemberModal
+          token={token}
+          member={editingMember}
+          packages={packages}
+          gymSettings={gymSettings}
+          detachOnSave={editDetachMemberId === editingMember.id}
+          onSaved={(updated) => {
+            setMembers((prev) => prev.map((m) => m.id === updated.id ? updated : m));
+            if (editDetachMemberId === editingMember.id) {
+              setEditDetachMemberId(null);
+              loadGroups();
+            }
+            setEditingMember(null);
+          }}
+          onClose={() => { setEditingMember(null); setEditDetachMemberId(null); }}
+        />
+      )}
       {showAddModal && (
         <AddMemberModal token={token} onAdded={handleAdded} onClose={() => setShowAddModal(false)} />
       )}
@@ -2513,7 +2650,7 @@ function MembersTab({ token, gymSettings }) {
             setGroupWarning(null);
             if (action === 'edit') {
               setEditDetachMemberId(member.id);
-              startEdit(member);
+              setEditingMember(member);
             } else {
               setDeletingMember(member);
             }
@@ -2551,6 +2688,9 @@ function PackagesTab({ token }) {
   const [visitorPriceLoaded, setVisitorPriceLoaded] = useState(false);
   const [visitorPriceSaving, setVisitorPriceSaving] = useState(false);
   const [visitorPriceSaved, setVisitorPriceSaved] = useState(false);
+  const [kebabPkg, setKebabPkg] = useState(null);
+  const [kebabPos, setKebabPos] = useState(null);
+  const isMobile = useIsMobile();
   const { t } = useTranslation();
 
   useEffect(() => {
@@ -2662,6 +2802,8 @@ function PackagesTab({ token }) {
     }
   };
 
+  const closeKebab = () => { setKebabPkg(null); setKebabPos(null); };
+
   return (
     <div>
       {error && <div style={s.error}>{error}</div>}
@@ -2703,7 +2845,7 @@ function PackagesTab({ token }) {
             <th style={s.th}>{t('admin.packages.colGroup')}</th>
             <th style={s.th}>{t('admin.packages.codeLabel')}</th>
             <th style={s.th}>{t('admin.packages.colDefault')}</th>
-            <th style={s.th}>{t('admin.packages.colActions')}</th>
+            <th style={{ ...s.th, position: 'sticky', right: 0, zIndex: 2, background: '#f8fafc', whiteSpace: 'nowrap', boxShadow: '-2px 0 6px rgba(0,0,0,0.06)' }}>{t('admin.packages.colActions')}</th>
           </tr>
         </thead>
         <tbody>
@@ -2780,17 +2922,32 @@ function PackagesTab({ token }) {
                   ? <span style={s.defaultBadge}>{t('admin.packages.isDefault')}</span>
                   : <button style={{ ...s.actionBtn, ...s.starBtn }} onClick={() => handleSetDefault(pkg.id)}>{t('admin.packages.setDefault')}</button>}
               </td>
-              <td style={s.td}>
+              <td style={{ ...s.td, position: 'sticky', right: 0, background: '#fff', zIndex: 1, whiteSpace: 'nowrap', boxShadow: '-2px 0 6px rgba(0,0,0,0.06)' }}>
                 {editingId === pkg.id ? (
                   <>
                     <button style={{ ...s.actionBtn, ...s.saveBtn }} onClick={() => saveEdit(pkg.id)}>{t('admin.packages.save')}</button>
                     <button style={{ ...s.actionBtn, ...s.cancelBtn }} onClick={cancelEdit}>{t('admin.packages.cancel')}</button>
                   </>
+                ) : isMobile ? (
+                  <button
+                    style={{ background: 'none', border: '1.5px solid #e2e8f0', borderRadius: 6, color: '#64748b', cursor: 'pointer', padding: '5px 8px', display: 'inline-flex', alignItems: 'center' }}
+                    onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setKebabPos({ top: r.bottom + 4, right: window.innerWidth - r.right }); setKebabPkg(pkg); }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
+                  </button>
                 ) : (
-                  <>
-                    <button style={{ ...s.actionBtn, ...s.editBtn }} onClick={() => startEdit(pkg)}>{t('admin.members.edit')}</button>
-                    <button style={{ ...s.actionBtn, ...s.deleteBtn }} onClick={() => handleDelete(pkg.id)}>{t('admin.members.remove')}</button>
-                  </>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <button style={{ ...s.actionBtn, ...s.editBtn, marginRight: 0 }} onClick={() => startEdit(pkg)}>{t('admin.members.edit')}</button>
+                    <button
+                      style={{ background: 'none', border: '1.5px solid #fca5a5', borderRadius: 6, color: '#dc2626', cursor: 'pointer', padding: '5px 7px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                      onClick={() => handleDelete(pkg.id)}
+                      title={t('admin.members.remove')}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+                      </svg>
+                    </button>
+                  </div>
                 )}
               </td>
             </tr>
@@ -2849,6 +3006,22 @@ function PackagesTab({ token }) {
         </tbody>
       </table>
       </div>
+
+      {kebabPkg && kebabPos && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 299 }} onClick={closeKebab} />
+          <div style={{ position: 'fixed', top: kebabPos.top, right: kebabPos.right, zIndex: 300, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.10)', minWidth: 180, overflow: 'hidden' }}>
+            <button style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: '#1e293b' }}
+              onClick={() => { startEdit(kebabPkg); closeKebab(); }}>
+              {t('admin.members.edit')}
+            </button>
+            <button style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: '#dc2626', borderTop: '1px solid #f1f5f9' }}
+              onClick={() => { handleDelete(kebabPkg.id); closeKebab(); }}>
+              {t('admin.members.remove')}
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -3483,7 +3656,7 @@ export default function AdminPage({ token, role, gymName, onBack }) {
           </div>
         </div>
         <div style={{ background: '#fff' }}>
-          <div style={{ maxWidth: 900, margin: '0 auto', padding: '0 16px' }}>
+          <div style={{ padding: '0 24px' }}>
             <div style={s.tabs} className="tabs-scroll">
               <button style={{ ...s.tab, ...(tab === 'attendance' ? s.tabActive : {}) }} onClick={() => setTab('attendance')}>
                 {t('admin.tabs.attendance')}
@@ -3533,7 +3706,7 @@ export default function AdminPage({ token, role, gymName, onBack }) {
       </div>
 
       {/* ── Scrollable content ── */}
-      <div style={{ maxWidth: 900, margin: '0 auto', padding: '24px 16px 40px' }}>
+      <div style={{ maxWidth: tab === 'business' ? 900 : 'none', margin: '0 auto', padding: tab === 'business' ? '24px 16px 40px' : '24px 24px 40px' }}>
         {tab === 'attendance' && <AttendanceTab token={token} />}
         {tab === 'members' && <MembersTab token={token} gymSettings={gymSettings} />}
         {tab === 'staff' && <StaffTab token={token} />}

@@ -131,9 +131,9 @@
     },
     "members": {
       "searchPlaceholder": "Cari nama atau ID GYM...",
-      "template": "↓ Template",
-      "export": "↑ Ekspor",
-      "import": "↑ Impor",
+      "template": "Template",
+      "export": "Ekspor",
+      "import": "Impor",
       "addMember": "+ Tambah Anggota",
       "colName": "Nama",
       "colGymId": "ID GYM",
