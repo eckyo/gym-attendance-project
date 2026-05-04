@@ -1105,7 +1105,7 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
       const data = await res.json();
       const qrContent = data.gymCode
         ? `https://kiosgym.com/g/${data.gymCode}?c=${data.checkinCode}`
-        : data.checkinCode;
+        : `https://kiosgym.com/?c=${data.checkinCode}`;
       const qrDataUrl = await QRCode.toDataURL(qrContent, { width: 400, margin: 2 });
       setStandbyQrData({ gymName: data.gymName, checkinCode: data.checkinCode, gymCode: data.gymCode ?? null, qrDataUrl });
       setShowStandbyQr(true);
@@ -1455,14 +1455,6 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
             alt="Check-in QR"
             style={{ width: 320, height: 320, display: 'block' }}
           />
-          {!standbyQrData.gymCode && (
-            <div style={{
-              background: '#fef9c3', border: '1px solid #fbbf24', borderRadius: 8,
-              padding: '10px 16px', fontSize: 13, color: '#92400e', textAlign: 'center', maxWidth: 320,
-            }}>
-              {t('standbyQr.noGymCodeWarning')}
-            </div>
-          )}
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: 20, fontWeight: 600, color: '#1a1a2e' }}>Scan to check in</div>
             <div style={{ fontSize: 18, color: '#374151', marginTop: 4 }}>Pindai untuk absen</div>

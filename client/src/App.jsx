@@ -9,8 +9,7 @@ const gymSlugFromUrl = (() => {
 })();
 
 const checkinCodeFromUrl = (() => {
-  const c = new URLSearchParams(window.location.search).get('c');
-  return c && gymSlugFromUrl ? c : null;
+  return new URLSearchParams(window.location.search).get('c') || null;
 })();
 import ScanPage from './pages/ScanPage.jsx';
 import AdminPage from './pages/AdminPage.jsx';

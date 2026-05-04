@@ -387,8 +387,7 @@
     "instruction": "Scan to check in / Pindai untuk absen",
     "download": "↓ Download QR",
     "close": "Close",
-    "loading": "Generating QR...",
-    "noGymCodeWarning": "Camera scanning unavailable. Set a Gym URL code in Admin Settings to enable it."
+    "loading": "Generating QR..."
   },
   "member": {
     "loginTitle": "Welcome Back!",
