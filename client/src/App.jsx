@@ -7,6 +7,11 @@ const gymSlugFromUrl = (() => {
   const m = window.location.pathname.match(/^\/g\/([a-z0-9-]+)$/i);
   return m ? m[1].toLowerCase() : null;
 })();
+
+const checkinCodeFromUrl = (() => {
+  const c = new URLSearchParams(window.location.search).get('c');
+  return c && gymSlugFromUrl ? c : null;
+})();
 import ScanPage from './pages/ScanPage.jsx';
 import AdminPage from './pages/AdminPage.jsx';
 import SuperadminPage from './pages/SuperadminPage.jsx';
@@ -746,7 +751,7 @@ export default function App() {
   }
 
   if (auth.role === 'member') {
-    return <MemberPage token={auth.token} onLogout={handleLogout} />;
+    return <MemberPage token={auth.token} onLogout={handleLogout} checkinCodeFromUrl={checkinCodeFromUrl} />;
   }
 
   return (
