@@ -551,7 +551,7 @@ function CheckinModal({ token, profile, onClose }) {
 
 // ── Member Page ───────────────────────────────────────────────────────────────
 
-export default function MemberPage({ token, onLogout }) {
+export default function MemberPage({ token, onLogout, checkinCodeFromUrl }) {
   const [profile, setProfile] = useState(null);
   const [history, setHistory] = useState([]);
   const [historyPage, setHistoryPage] = useState(1);
@@ -564,6 +564,7 @@ export default function MemberPage({ token, onLogout }) {
   const [pwMsg, setPwMsg] = useState(null);
   const [pwLoading, setPwLoading] = useState(false);
   const { t } = useTranslation();
+  const autoCheckinFired = useRef(false);
 
   // Inject placeholder colour for dark inputs
   useEffect(() => {
@@ -579,6 +580,38 @@ export default function MemberPage({ token, onLogout }) {
   useEffect(() => {
     getMemberProfile(token).then(setProfile).catch(() => {});
   }, [token]);
+
+  useEffect(() => {
+    if (!checkinCodeFromUrl || autoCheckinFired.current) return;
+    if (!profile) return;
+
+    autoCheckinFired.current = true;
+
+    if (profile.status === 'expired') {
+      setCheckinMsg({ success: false, text: t('member.membershipExpiredError') });
+      return;
+    }
+
+    memberCheckin(token, checkinCodeFromUrl)
+      .then((res) => {
+        if (res.success) {
+          setCheckinMsg({ success: true, text: t('member.checkinSuccess') });
+        } else {
+          const msg = res.error ?? '';
+          if (msg.toLowerCase().includes('already')) {
+            setCheckinMsg({ success: false, text: t('member.checkinAlreadyIn') });
+          } else if (msg.toLowerCase().includes('expired')) {
+            setCheckinMsg({ success: false, text: t('member.membershipExpiredError') });
+          } else {
+            setCheckinMsg({ success: false, text: t('member.checkinError') });
+          }
+        }
+        window.history.replaceState(null, '', window.location.pathname);
+      })
+      .catch(() => {
+        setCheckinMsg({ success: false, text: t('member.checkinError') });
+      });
+  }, [checkinCodeFromUrl, profile]);
 
   useEffect(() => {
     if (activeSection !== 'history') return;
