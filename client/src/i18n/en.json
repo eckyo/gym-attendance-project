@@ -131,9 +131,9 @@
     },
     "members": {
       "searchPlaceholder": "Search by name or GYM ID...",
-      "template": "↓ Template",
-      "export": "↑ Export",
-      "import": "↑ Import",
+      "template": "Template",
+      "export": "Export",
+      "import": "Import",
       "addMember": "+ Add Member",
       "colName": "Name",
       "colGymId": "GYM ID",

@@ -1103,7 +1103,10 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
-      const qrDataUrl = await QRCode.toDataURL(data.checkinCode, { width: 400, margin: 2 });
+      const qrContent = data.gymCode
+        ? `https://kiosgym.com/g/${data.gymCode}?c=${data.checkinCode}`
+        : `https://kiosgym.com/?c=${data.checkinCode}`;
+      const qrDataUrl = await QRCode.toDataURL(qrContent, { width: 400, margin: 2 });
       setStandbyQrData({ gymName: data.gymName, checkinCode: data.checkinCode, gymCode: data.gymCode ?? null, qrDataUrl });
       setShowStandbyQr(true);
     } catch {
