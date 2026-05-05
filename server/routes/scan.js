@@ -25,6 +25,7 @@ router.post('/', requireAuth, injectGymId, requireRole('admin', 'staff'), async 
       gymId: result.scanToken,
       packageName: result.packageName,
       expiryDate: result.expiryDate,
+      gamification: result.gamification,
     });
   } catch (err) {
     if (err instanceof MemberNotFoundError) {

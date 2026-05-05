@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 import QRCode from 'qrcode';
 import Lottie from 'lottie-react';
@@ -6,6 +6,17 @@ import { getMemberProfile, getMemberHistory, memberCheckin, changePassword } fro
 import { useTranslation, LanguageSwitcher } from '../i18n/LanguageContext.jsx';
 import successAnimation from '../assets/success.json';
 import errorAnimation from '../assets/error.json';
+import {
+  GamificationProvider,
+  useGamification,
+  RankCard,
+  StreakPanel,
+  ActiveBoostBanner,
+  XPToast,
+  RankUpOverlay,
+  GachaModal,
+} from '../features/rank-system/index.js';
+import { fetchXpLog, fetchPendingSpins } from '../features/rank-system/api/gamification.js';
 
 const s = {
   // ── Page shell ──────────────────────────────────────────────────────────────
@@ -407,6 +418,76 @@ const s = {
     letterSpacing: '0.1em',
   },
   memberQrHint: { fontSize: 13, color: 'rgba(255,255,255,0.5)', marginTop: 6 },
+  // ── Gamification ────────────────────────────────────────────────────────────
+  spinNudge: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    background: 'rgba(245,158,11,0.08)',
+    border: '1px solid rgba(245,158,11,0.25)',
+    borderRadius: 14,
+    padding: '12px 16px',
+    marginBottom: 10,
+    cursor: 'pointer',
+  },
+  spinNudgeText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#F59E0B',
+    fontWeight: 600,
+  },
+  spinRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '12px 0',
+    borderBottom: '1px solid rgba(255,255,255,0.06)',
+  },
+  spinRowLabel: {
+    fontSize: 14,
+    color: '#fff',
+    fontWeight: 600,
+    textTransform: 'capitalize',
+  },
+  spinRowSub: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.4)',
+    marginTop: 2,
+  },
+  spinBtn: {
+    background: 'linear-gradient(135deg, #F59E0B, #EF4444)',
+    border: 'none',
+    borderRadius: 20,
+    padding: '8px 20px',
+    fontSize: 13,
+    fontWeight: 700,
+    color: '#000',
+    cursor: 'pointer',
+    letterSpacing: '0.03em',
+  },
+  xpLogRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '10px 0',
+    borderBottom: '1px solid rgba(255,255,255,0.06)',
+  },
+  tabBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    background: '#EF4444',
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 800,
+    borderRadius: '50%',
+    minWidth: 16,
+    height: 16,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    lineHeight: 1,
+  },
 };
 
 function getGreeting(name, t) {
@@ -503,7 +584,7 @@ function CheckinResultOverlay({ result, profile, onClose }) {
 
 // ── Check-in Modal ────────────────────────────────────────────────────────────
 
-function CheckinModal({ token, profile, onClose }) {
+function CheckinModal({ token, profile, onClose, onGamification }) {
   const [mode, setMode] = useState('scan');
   const [scanResult, setScanResult] = useState(null);
   const [myQrUrl, setMyQrUrl] = useState(null);
@@ -532,6 +613,7 @@ function CheckinModal({ token, profile, onClose }) {
           try { return new URL(decodedText).searchParams.get('c') || decodedText; } catch { return decodedText; }
         })();
         const result = await memberCheckin(token, code);
+        if (result.success && result.gamification) onGamification?.(result.gamification);
         const alreadyIn = !result.success && (result.error ?? '').toLowerCase().includes('already');
         setScanResult(
           result.success
@@ -621,7 +703,15 @@ function CheckinModal({ token, profile, onClose }) {
 
 // ── Member Page ───────────────────────────────────────────────────────────────
 
-export default function MemberPage({ token, onLogout, checkinCodeFromUrl }) {
+export default function MemberPage(props) {
+  return (
+    <GamificationProvider token={props.token}>
+      <MemberPageContent {...props} />
+    </GamificationProvider>
+  );
+}
+
+function MemberPageContent({ token, onLogout, checkinCodeFromUrl }) {
   const [profile, setProfile] = useState(null);
   const [history, setHistory] = useState([]);
   const [historyPage, setHistoryPage] = useState(1);
@@ -633,8 +723,14 @@ export default function MemberPage({ token, onLogout, checkinCodeFromUrl }) {
   const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' });
   const [pwMsg, setPwMsg] = useState(null);
   const [pwLoading, setPwLoading] = useState(false);
+  // Rewards tab state
+  const [xpLog, setXpLog] = useState([]);
+  const [xpLogPage, setXpLogPage] = useState(1);
+  const [xpLogTotalPages, setXpLogTotalPages] = useState(1);
+  const [pendingSpins, setPendingSpins] = useState([]);
   const { t } = useTranslation();
   const autoCheckinFired = useRef(false);
+  const { state: gamiState, handleCheckinResult, dismissXpToast, dismissRankUp, openGacha } = useGamification();
 
   // Inject placeholder colour for dark inputs
   useEffect(() => {
@@ -665,6 +761,7 @@ export default function MemberPage({ token, onLogout, checkinCodeFromUrl }) {
     memberCheckin(token, checkinCodeFromUrl)
       .then((res) => {
         if (res.success) {
+          if (res.gamification) handleCheckinResult(res.gamification);
           setCheckinOverlay({ success: true, memberName: res.memberName, checkedInAt: res.checkedInAt });
         } else {
           const msg = res.error ?? '';
@@ -690,6 +787,17 @@ export default function MemberPage({ token, onLogout, checkinCodeFromUrl }) {
       setTotalPages(data.totalPages || 1);
     }).catch(() => {});
   }, [token, activeSection, historyPage]);
+
+  useEffect(() => {
+    if (activeSection !== 'rewards') return;
+    fetchXpLog(token, xpLogPage).then((data) => {
+      setXpLog(data.logs || []);
+      setXpLogTotalPages(data.totalPages || 1);
+    }).catch(() => {});
+    fetchPendingSpins(token).then((data) => {
+      setPendingSpins(data.spins || []);
+    }).catch(() => {});
+  }, [token, activeSection, xpLogPage]);
 
   const handlePasswordSave = async (e) => {
     e.preventDefault();
@@ -775,6 +883,30 @@ export default function MemberPage({ token, onLogout, checkinCodeFromUrl }) {
           </div>
         )}
 
+        {/* Gamification components — shown in home section */}
+        {activeSection === 'home' && (
+          <>
+            <ActiveBoostBanner t={t} />
+            <RankCard t={t} />
+            <StreakPanel t={t} pendingSpins={gamiState.data?.pendingSpinsList ?? []} onOpen={openGacha} />
+            {/* Pending spins nudge */}
+            {(gamiState.data?.pendingSpins ?? 0) > 0 && (
+              <div
+                style={s.spinNudge}
+                onClick={() => setActiveSection('rewards')}
+              >
+                <span style={{ fontSize: 20 }}>🎁</span>
+                <span style={s.spinNudgeText}>
+                  {gamiState.data.pendingSpins === 1
+                    ? t('gamification.gacha.nudgeSingle') || '1 reward ready to open'
+                    : t('gamification.gacha.nudgeMulti', { n: gamiState.data.pendingSpins }) || `${gamiState.data.pendingSpins} rewards ready to open`}
+                </span>
+                <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>→</span>
+              </div>
+            )}
+          </>
+        )}
+
         {/* History section */}
         {activeSection === 'history' && (
           <div style={s.card}>
@@ -825,12 +957,97 @@ export default function MemberPage({ token, onLogout, checkinCodeFromUrl }) {
             )}
           </div>
         )}
+        {/* Rewards section */}
+        {activeSection === 'rewards' && (
+          <div>
+            {/* Pending spins */}
+            {pendingSpins.length > 0 && (
+              <div style={s.card}>
+                <div style={s.sectionTitle}>{t('gamification.gacha.sectionTitle') || 'Rewards'}</div>
+                {pendingSpins.map(spin => (
+                  <div key={spin.id} style={s.spinRow}>
+                    <div>
+                      <div style={s.spinRowLabel}>
+                        🎁 {t('gamification.gacha.rewardLabel', { day: spin.milestone_value }) || `Day ${spin.milestone_value} reward`}
+                      </div>
+                      <div style={s.spinRowSub}>
+                        {new Date(spin.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </div>
+                    </div>
+                    <button
+                      style={s.spinBtn}
+                      onClick={() => openGacha(spin.id)}
+                    >
+                      {t('gamification.gacha.openButton') || 'Open'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* XP Log */}
+            <div style={s.card}>
+              <div style={s.sectionTitle}>{t('gamification.xpLog.title') || 'XP History'}</div>
+              {xpLog.length === 0 ? (
+                <div style={{ color: 'rgba(255,255,255,0.35)', textAlign: 'center', padding: '20px 0' }}>
+                  {t('gamification.xpLog.noHistory') || 'No XP earned yet.'}
+                </div>
+              ) : (
+                <>
+                  {xpLog.map(entry => (
+                    <div key={entry.id} style={s.xpLogRow}>
+                      <div>
+                        <div style={{ fontSize: 14, color: '#fff', fontWeight: 600 }}>
+                          +{entry.xp_earned} XP
+                        </div>
+                        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
+                          {new Date(entry.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: 12, color: '#F59E0B', fontWeight: 700 }}>
+                          ×{entry.multiplier_total}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>
+                          {entry.rank_at_time}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {xpLogTotalPages > 1 && (
+                    <div style={s.pageNav}>
+                      <button
+                        style={{ ...s.pageBtn, ...(xpLogPage <= 1 ? { opacity: 0.4, cursor: 'default' } : {}) }}
+                        disabled={xpLogPage <= 1}
+                        onClick={() => setXpLogPage(p => p - 1)}
+                      >{t('member.prevPage')}</button>
+                      <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>
+                        {xpLogPage} / {xpLogTotalPages}
+                      </span>
+                      <button
+                        style={{ ...s.pageBtn, ...(xpLogPage >= xpLogTotalPages ? { opacity: 0.4, cursor: 'default' } : {}) }}
+                        disabled={xpLogPage >= xpLogTotalPages}
+                        onClick={() => setXpLogPage(p => p + 1)}
+                      >{t('member.nextPage')}</button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Sticky bottom nav */}
       <div style={s.navTabs}>
         <button style={s.tab(activeSection === 'home')} onClick={() => setActiveSection('home')}>
           🏠 {t('member.profile')}
+        </button>
+        <button style={{ ...s.tab(activeSection === 'rewards'), position: 'relative' }} onClick={() => setActiveSection('rewards')}>
+          🎁 {t('gamification.gacha.sectionTitle') || 'Rewards'}
+          {(gamiState.data?.pendingSpins ?? 0) > 0 && (
+            <span style={s.tabBadge}>{gamiState.data.pendingSpins}</span>
+          )}
         </button>
         <button style={s.tab(activeSection === 'history')} onClick={() => setActiveSection('history')}>
           📋 {t('member.history')}
@@ -911,8 +1128,14 @@ export default function MemberPage({ token, onLogout, checkinCodeFromUrl }) {
           token={token}
           profile={profile}
           onClose={() => setShowCheckinModal(false)}
+          onGamification={handleCheckinResult}
         />
       )}
+
+      {/* Gamification overlays */}
+      <XPToast toast={gamiState.xpToast} onDismiss={dismissXpToast} t={t} />
+      <RankUpOverlay rankUp={gamiState.rankUp} onDismiss={dismissRankUp} t={t} />
+      <GachaModal t={t} />
 
       {/* Check-in result overlay (auto-checkin from QR URL) */}
       {checkinOverlay && (

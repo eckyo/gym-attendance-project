@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs';
 import XLSX from 'xlsx';
 import pool from '../db/pool.js';
 import { generateVisitorId } from '../utils/gymId.js';
+import { processCheckin } from './gamification.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = join(__dirname, '../../data');
@@ -192,12 +193,18 @@ export const processScan = async (gymId, scanToken) => {
 
   appendToXlsx({ memberName: member.name, gymMemberId: scanToken, checkedInAt: log.checked_in_at });
 
+  const gamification = await processCheckin(gymId, member.id, log.id).catch(err => {
+    console.error('[gamification] processCheckin error:', err);
+    return null;
+  });
+
   return {
     memberName: member.name,
     checkedInAt: log.checked_in_at,
     scanToken,
     packageName: member.package_name || null,
     expiryDate: member.expiry_date || null,
+    gamification,
   };
 };
 
@@ -236,10 +243,16 @@ export const processMemberSelfCheckin = async (gymId, memberId) => {
 
   appendToXlsx({ memberName: member.name, gymMemberId: member.scan_token, checkedInAt: log.checked_in_at });
 
+  const gamification = await processCheckin(gymId, member.id, log.id).catch(err => {
+    console.error('[gamification] processCheckin error:', err);
+    return null;
+  });
+
   return {
     memberName: member.name,
     checkedInAt: log.checked_in_at,
     packageName: member.package_name || null,
     expiryDate: member.expiry_date || null,
+    gamification,
   };
 };

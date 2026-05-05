@@ -258,7 +258,12 @@ router.post('/checkin', ...requireMember, async (req, res, next) => {
     }
 
     const result = await processMemberSelfCheckin(req.gymId, req.user.userId);
-    res.json({ success: true, memberName: result.memberName, checkedInAt: result.checkedInAt });
+    res.json({
+      success: true,
+      memberName: result.memberName,
+      checkedInAt: result.checkedInAt,
+      gamification: result.gamification,
+    });
   } catch (err) {
     if (err instanceof MemberNotFoundError) {
       return res.status(404).json({ error: err.message });

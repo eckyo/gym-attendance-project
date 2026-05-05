@@ -35,3 +35,15 @@ export const resetAdminPassword = (token, gymId, newPassword) =>
     headers: authHeaders(token),
     body: JSON.stringify({ newPassword }),
   }).then(handleResponse);
+
+export const getGamificationConfig = (token) =>
+  fetch(`${API_BASE}/api/superadmin/gamification/config`, {
+    headers: authHeaders(token),
+  }).then(handleResponse);
+
+export const updateGamificationConfig = (token, config) =>
+  fetch(`${API_BASE}/api/superadmin/gamification/config`, {
+    method: 'PUT',
+    headers: authHeaders(token),
+    body: JSON.stringify(config),
+  }).then(handleResponse);

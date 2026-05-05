@@ -191,3 +191,135 @@ ALTER TABLE members ADD COLUMN IF NOT EXISTS group_id UUID REFERENCES member_gro
 
 -- Track group-level transactions (member_id stays NULL for group billing)
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS group_id UUID REFERENCES member_groups(id);
+
+-- ─── Gamification ─────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS member_gamification (
+  id                      UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  gym_id                  UUID        NOT NULL REFERENCES gyms(id),
+  member_id               UUID        NOT NULL REFERENCES members(id),
+  total_xp                INTEGER     NOT NULL DEFAULT 0,
+  rank                    TEXT        NOT NULL DEFAULT 'rookie'
+                            CHECK (rank IN ('rookie','regular','veteran','elite','legend')),
+  daily_streak            INTEGER     NOT NULL DEFAULT 0,
+  daily_streak_best       INTEGER     NOT NULL DEFAULT 0,
+  last_checkin_date       DATE,
+  weekly_streak           INTEGER     NOT NULL DEFAULT 0,
+  weekly_streak_best      INTEGER     NOT NULL DEFAULT 0,
+  last_week_key           TEXT,
+  monthly_streak          INTEGER     NOT NULL DEFAULT 0,
+  monthly_streak_best     INTEGER     NOT NULL DEFAULT 0,
+  last_month_key          TEXT,
+  shield_count            INTEGER     NOT NULL DEFAULT 0 CHECK (shield_count BETWEEN 0 AND 3),
+  last_shield_grant_month TEXT,
+  pending_spins           INTEGER     NOT NULL DEFAULT 0,
+  created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (gym_id, member_id)
+);
+CREATE INDEX IF NOT EXISTS idx_member_gamification_member ON member_gamification(member_id, gym_id);
+
+CREATE TABLE IF NOT EXISTS member_xp_log (
+  id               UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+  gym_id           UUID         NOT NULL REFERENCES gyms(id),
+  member_id        UUID         NOT NULL REFERENCES members(id),
+  checkin_log_id   UUID         REFERENCES attendance_logs(id),
+  xp_earned        INTEGER      NOT NULL,
+  base_xp          INTEGER      NOT NULL DEFAULT 100,
+  multiplier_total NUMERIC(4,2) NOT NULL DEFAULT 1.00,
+  breakdown        JSONB        NOT NULL DEFAULT '{}',
+  rank_at_time     TEXT         NOT NULL,
+  total_xp_after   INTEGER      NOT NULL,
+  created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_member_xp_log_member ON member_xp_log(member_id, gym_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS member_gacha_spins (
+  id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  gym_id          UUID        NOT NULL REFERENCES gyms(id),
+  member_id       UUID        NOT NULL REFERENCES members(id),
+  streak_type     TEXT        NOT NULL CHECK (streak_type IN ('daily','weekly','monthly')),
+  milestone_value INTEGER     NOT NULL,
+  status          TEXT        NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','completed')),
+  spun_at         TIMESTAMPTZ,
+  rarity          TEXT        CHECK (rarity IN ('common','rare','epic')),
+  reward_type     TEXT,
+  reward_detail   JSONB,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_member_gacha_spins_pending
+  ON member_gacha_spins(member_id, gym_id, status) WHERE status = 'pending';
+
+CREATE TABLE IF NOT EXISTS member_xp_boosts (
+  id          UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+  gym_id      UUID         NOT NULL REFERENCES gyms(id),
+  member_id   UUID         NOT NULL REFERENCES members(id),
+  source_spin UUID         REFERENCES member_gacha_spins(id),
+  rarity      TEXT         NOT NULL CHECK (rarity IN ('common','rare','epic')),
+  multiplier  NUMERIC(3,2) NOT NULL,
+  expires_at  TIMESTAMPTZ  NOT NULL,
+  is_active   BOOLEAN      NOT NULL DEFAULT true,
+  created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_member_xp_boosts_active
+  ON member_xp_boosts(member_id, gym_id, expires_at) WHERE is_active = true;
+
+CREATE TABLE IF NOT EXISTS member_streak_milestones (
+  id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  gym_id          UUID        NOT NULL REFERENCES gyms(id),
+  member_id       UUID        NOT NULL REFERENCES members(id),
+  streak_type     TEXT        NOT NULL CHECK (streak_type IN ('daily','weekly','monthly')),
+  milestone_value INTEGER     NOT NULL,
+  spin_id         UUID        REFERENCES member_gacha_spins(id),
+  awarded_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (gym_id, member_id, streak_type, milestone_value)
+);
+CREATE INDEX IF NOT EXISTS idx_member_streak_milestones_member
+  ON member_streak_milestones(member_id, gym_id, streak_type);
+
+CREATE TABLE IF NOT EXISTS member_shield_log (
+  id                    UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  gym_id                UUID        NOT NULL REFERENCES gyms(id),
+  member_id             UUID        NOT NULL REFERENCES members(id),
+  event_type            TEXT        NOT NULL CHECK (event_type IN ('granted_auto','granted_admin','used','expired')),
+  shield_count_after    INTEGER     NOT NULL,
+  granted_by_user_id    UUID        REFERENCES users(id),
+  streak_type_protected TEXT,
+  notes                 TEXT,
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_member_shield_log_member
+  ON member_shield_log(member_id, gym_id, created_at DESC);
+
+-- ─── Visit-based milestone system ─────────────────────────────────────────────
+
+ALTER TABLE member_gamification
+  ADD COLUMN IF NOT EXISTS total_visits    INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS last_visit_date DATE;
+
+ALTER TABLE member_gacha_spins
+  DROP CONSTRAINT IF EXISTS member_gacha_spins_streak_type_check,
+  ADD CONSTRAINT member_gacha_spins_streak_type_check
+    CHECK (streak_type IN ('daily','weekly','monthly','visits'));
+
+ALTER TABLE member_streak_milestones
+  DROP CONSTRAINT IF EXISTS member_streak_milestones_streak_type_check,
+  ADD CONSTRAINT member_streak_milestones_streak_type_check
+    CHECK (streak_type IN ('daily','weekly','monthly','visits'));
+
+
+-- ── Gamification Platform Config (global singleton) ───────────────────────────
+
+CREATE TABLE IF NOT EXISTS gamification_platform_config (
+  id                  INTEGER      PRIMARY KEY DEFAULT 1,
+  base_xp             INTEGER      NOT NULL DEFAULT 100,
+  max_multiplier      NUMERIC(4,2) NOT NULL DEFAULT 3.0,
+  rank_xp_thresholds  JSONB        NOT NULL DEFAULT '{"rookie":0,"regular":500,"veteran":2000,"elite":5000,"legend":12000}',
+  rank_multipliers    JSONB        NOT NULL DEFAULT '{"rookie":1.0,"regular":1.1,"veteran":1.25,"elite":1.4,"legend":1.6}',
+  visit_milestones    JSONB        NOT NULL DEFAULT '[10,30,60,90,120,180,240,365]',
+  gacha_table         JSONB        NOT NULL DEFAULT '[{"rarity":"common","weight":60,"multiplier":1.10,"durationDays":3},{"rarity":"rare","weight":30,"multiplier":1.25,"durationDays":7},{"rarity":"epic","weight":10,"multiplier":1.50,"durationDays":3}]',
+  updated_at          TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  CONSTRAINT singleton_row CHECK (id = 1)
+);
+INSERT INTO gamification_platform_config (id) VALUES (1) ON CONFLICT (id) DO NOTHING;

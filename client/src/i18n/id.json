@@ -498,5 +498,66 @@
       "saving": "Menyimpan...",
       "submit": "Reset Kata Sandi"
     }
+  },
+  "gamification": {
+    "sectionTitle": "Peringkat & Progres",
+    "ranks": {
+      "rookie": "Pemula",
+      "regular": "Reguler",
+      "veteran": "Veteran",
+      "elite": "Elite",
+      "legend": "Legenda"
+    },
+    "rankPerks": {
+      "rookie":  "Terus hadir — setiap sesi itu berarti.",
+      "regular": "Kamu mulai konsisten. Pertahankan!",
+      "veteran": "Member sejati. Dedikasimu nyata.",
+      "elite":   "Komitmen level Elite. Kamu inspirasi orang lain.",
+      "legend":  "Kamu adalah Legenda. Gym adalah rumah keduamu."
+    },
+    "xpToNextRank": "{xp} XP menuju {rank}",
+    "atMaxRank": "Peringkat tertinggi tercapai",
+    "rankUp": "NAIK PERINGKAT!",
+    "rankUpDismiss": "Keren!",
+    "streaks": {
+      "sectionTitle": "Kunjungan Gym",
+      "visitCount": "kunjungan gym",
+      "nextMilestoneLabel": "Hadiah berikutnya",
+      "visitsAway": "{count} kunjungan lagi ke Hari {milestone}",
+      "allMilestonesReached": "Semua pencapaian telah diraih!"
+    },
+    "boosts": {
+      "label": "Boost XP",
+      "active": "+{pct}% XP aktif",
+      "expiresIn": "Berakhir dalam {time}",
+      "rarityCommon": "Umum",
+      "rarityRare": "Langka",
+      "rarityEpic": "Epik"
+    },
+    "gacha": {
+      "sectionTitle": "Hadiah",
+      "nudgeSingle": "1 hadiah siap dibuka",
+      "nudgeMulti": "{n} hadiah siap dibuka",
+      "rewardLabel": "Hadiah Hari {day}",
+      "openButton": "Buka",
+      "rewardReady": "Hadiah siap!",
+      "tapToOpen": "Ketuk peti untuk membuka hadiahmu",
+      "spinning": "Membuka...",
+      "resultCommon": "Hadiah Umum",
+      "resultRare": "Hadiah Langka!",
+      "resultEpic": "Hadiah EPIK!!!",
+      "rewardDescription": "+{pct}% XP selama {days} hari",
+      "confirmSpin": "Ambil Hadiah",
+      "noSpins": "Tidak ada hadiah tersedia"
+    },
+    "xpToast": {
+      "earned": "+{xp} XP",
+      "frozen": "XP beku — langganan tidak aktif"
+    },
+    "xpLog": {
+      "title": "Riwayat XP",
+      "noHistory": "Belum ada XP — mulai check-in sekarang!"
+    },
+    "admin": {}
   }
 }

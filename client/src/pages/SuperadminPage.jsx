@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getGyms, createGym, toggleGym, resetAdminPassword } from '../api/superadmin.js';
 import { useTranslation, LanguageSwitcher } from '../i18n/LanguageContext.jsx';
+import GamificationConfigPanel from './GamificationConfigPanel.jsx';
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
@@ -366,6 +367,8 @@ export default function SuperadminPage({ token, onLogout }) {
             ))}
           </tbody>
         </table>
+
+        <GamificationConfigPanel token={token} />
       </div>
 
       {showCreate && (

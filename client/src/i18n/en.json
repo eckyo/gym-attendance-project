@@ -498,5 +498,66 @@
       "saving": "Saving...",
       "submit": "Reset Password"
     }
+  },
+  "gamification": {
+    "sectionTitle": "Rank & Progress",
+    "ranks": {
+      "rookie": "Rookie",
+      "regular": "Regular",
+      "veteran": "Veteran",
+      "elite": "Elite",
+      "legend": "Legend"
+    },
+    "rankPerks": {
+      "rookie":  "Keep showing up — every session counts.",
+      "regular": "You're building real consistency. Keep it up!",
+      "veteran": "A true gym regular. Your dedication shows.",
+      "elite":   "Elite level commitment. You inspire others.",
+      "legend":  "You are a Legend. The gym is your second home."
+    },
+    "xpToNextRank": "{xp} XP to {rank}",
+    "atMaxRank": "Maximum rank achieved",
+    "rankUp": "RANK UP!",
+    "rankUpDismiss": "Awesome!",
+    "streaks": {
+      "sectionTitle": "Gym Visits",
+      "visitCount": "gym visits",
+      "nextMilestoneLabel": "Next reward",
+      "visitsAway": "{count} visits to Day {milestone} reward",
+      "allMilestonesReached": "All milestones reached!"
+    },
+    "boosts": {
+      "label": "XP Boost",
+      "active": "+{pct}% XP active",
+      "expiresIn": "Expires in {time}",
+      "rarityCommon": "Common",
+      "rarityRare": "Rare",
+      "rarityEpic": "Epic"
+    },
+    "gacha": {
+      "sectionTitle": "Rewards",
+      "nudgeSingle": "1 reward ready to open",
+      "nudgeMulti": "{n} rewards ready to open",
+      "rewardLabel": "Day {day} reward",
+      "openButton": "Open",
+      "rewardReady": "Reward ready!",
+      "tapToOpen": "Tap the chest to open your reward",
+      "spinning": "Opening...",
+      "resultCommon": "Common Reward",
+      "resultRare": "Rare Reward!",
+      "resultEpic": "EPIC Reward!!!",
+      "rewardDescription": "+{pct}% XP for {days} days",
+      "confirmSpin": "Claim Reward",
+      "noSpins": "No rewards available"
+    },
+    "xpToast": {
+      "earned": "+{xp} XP",
+      "frozen": "XP frozen — subscription expired"
+    },
+    "xpLog": {
+      "title": "XP History",
+      "noHistory": "No XP earned yet — check in to get started!"
+    },
+    "admin": {}
   }
 }
