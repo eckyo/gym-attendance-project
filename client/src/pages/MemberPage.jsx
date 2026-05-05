@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 import QRCode from 'qrcode';
+import Lottie from 'lottie-react';
 import { getMemberProfile, getMemberHistory, memberCheckin, changePassword } from '../api/member.js';
 import { useTranslation, LanguageSwitcher } from '../i18n/LanguageContext.jsx';
+import successAnimation from '../assets/success.json';
+import errorAnimation from '../assets/error.json';
 
 const s = {
   // ── Page shell ──────────────────────────────────────────────────────────────
@@ -432,6 +435,72 @@ function formatDateTime(iso) {
     + ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
+// ── Check-in Result Overlay ───────────────────────────────────────────────────
+
+function CheckinResultOverlay({ result, profile, onClose }) {
+  const [countdown, setCountdown] = useState(5);
+  const { t } = useTranslation();
+
+  useEffect(() => {
+    if (!result.success) return;
+    setCountdown(5);
+    const iv = setInterval(() => setCountdown((c) => Math.max(0, c - 1)), 1000);
+    const to = setTimeout(onClose, 5000);
+    return () => { clearInterval(iv); clearTimeout(to); };
+  }, []);
+
+  const expiryDays = profile?.expiryDate
+    ? Math.ceil((new Date(profile.expiryDate) - new Date()) / 86400000)
+    : null;
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.72)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9500 }}>
+      <div style={{ background: '#fff', borderRadius: 20, padding: '32px 36px', textAlign: 'center', width: 320, maxWidth: '90vw', boxShadow: '0 20px 60px rgba(0,0,0,0.35)' }}>
+        <Lottie
+          animationData={result.success ? successAnimation : errorAnimation}
+          loop={false}
+          style={{ width: 140, height: 140, margin: '0 auto' }}
+        />
+        <div style={{ fontSize: 19, fontWeight: 700, color: result.success ? '#166534' : '#991b1b', margin: '0 0 8px' }}>
+          {result.success
+            ? result.alreadyIn ? t('member.checkinAlreadyIn') : t('member.checkinSuccess')
+            : t('scan.membershipExpired')}
+        </div>
+        {result.memberName && (
+          <div style={{ fontSize: 22, fontWeight: 700, color: '#1a1a2e' }}>{result.memberName}</div>
+        )}
+        {result.checkedInAt && (
+          <div style={{ fontSize: 13, color: '#94a3b8', marginTop: 2 }}>
+            {new Date(result.checkedInAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
+          </div>
+        )}
+        {profile?.packageName && result.success && (
+          <div style={{ fontSize: 13, color: '#64748b', fontWeight: 600, marginTop: 6 }}>{profile.packageName}</div>
+        )}
+        {expiryDays !== null && result.success && (
+          <div style={{ fontSize: 13, color: expiryDays <= 7 ? '#f59e0b' : '#94a3b8', marginTop: 4 }}>
+            {t('scan.daysRemaining', { n: expiryDays })}
+          </div>
+        )}
+        {!result.success && result.message && (
+          <div style={{ fontSize: 14, color: '#475569', marginTop: 8, lineHeight: 1.5 }}>{result.message}</div>
+        )}
+        <button
+          onClick={onClose}
+          style={{ marginTop: 20, width: '100%', padding: '11px 0', background: '#f1f5f9', border: '2px solid #e2e8f0', borderRadius: 12, fontSize: 15, fontWeight: 600, color: '#475569', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+        >
+          {t('standbyQr.close')}
+          {result.success && !result.alreadyIn && (
+            <span style={{ width: 26, height: 26, borderRadius: '50%', background: '#1a1a2e', color: '#fff', fontSize: 13, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {countdown}
+            </span>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Check-in Modal ────────────────────────────────────────────────────────────
 
 function CheckinModal({ token, profile, onClose }) {
@@ -464,9 +533,12 @@ function CheckinModal({ token, profile, onClose }) {
         })();
         const result = await memberCheckin(token, code);
         const alreadyIn = !result.success && (result.error ?? '').toLowerCase().includes('already');
-        setScanResult(result.success || alreadyIn
-          ? { success: true, message: alreadyIn ? t('member.checkinAlreadyIn') : `${t('member.checkinSuccess')} — ${profile?.name ?? ''}` }
-          : { success: false, message: result.error || t('member.checkinError') }
+        setScanResult(
+          result.success
+            ? { success: true, memberName: result.memberName, checkedInAt: result.checkedInAt }
+            : alreadyIn
+            ? { success: true, alreadyIn: true, memberName: profile?.name }
+            : { success: false, message: result.error || t('member.checkinError') }
         );
       },
       () => {}
@@ -511,16 +583,10 @@ function CheckinModal({ token, profile, onClose }) {
           </button>
         </div>
 
-        {scanResult ? (
-          <>
-            <div style={scanResult.success ? s.checkinResultSuccess : s.checkinResultError}>
-              {scanResult.success ? '✓ ' : '✕ '}{scanResult.message}
-            </div>
-            <button style={s.closeBtn} onClick={handleClose}>
-              {t('standbyQr.close')}
-            </button>
-          </>
-        ) : mode === 'scan' ? (
+        {scanResult && (
+          <CheckinResultOverlay result={scanResult} profile={profile} onClose={handleClose} />
+        )}
+        {!scanResult && mode === 'scan' ? (
           <>
             <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', textAlign: 'center', marginBottom: 12 }}>
               {t('member.checkinInstruction')}
@@ -562,7 +628,7 @@ export default function MemberPage({ token, onLogout, checkinCodeFromUrl }) {
   const [totalPages, setTotalPages] = useState(1);
   const [activeSection, setActiveSection] = useState('home');
   const [showCheckinModal, setShowCheckinModal] = useState(false);
-  const [checkinMsg, setCheckinMsg] = useState(null);
+  const [checkinOverlay, setCheckinOverlay] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' });
   const [pwMsg, setPwMsg] = useState(null);
@@ -592,28 +658,28 @@ export default function MemberPage({ token, onLogout, checkinCodeFromUrl }) {
     autoCheckinFired.current = true;
 
     if (profile.status === 'expired') {
-      setCheckinMsg({ success: false, text: t('member.membershipExpiredError') });
+      setCheckinOverlay({ success: false, message: t('member.membershipExpiredError') });
       return;
     }
 
     memberCheckin(token, checkinCodeFromUrl)
       .then((res) => {
         if (res.success) {
-          setCheckinMsg({ success: true, text: t('member.checkinSuccess') });
+          setCheckinOverlay({ success: true, memberName: res.memberName, checkedInAt: res.checkedInAt });
         } else {
           const msg = res.error ?? '';
           if (msg.toLowerCase().includes('already')) {
-            setCheckinMsg({ success: true, text: t('member.checkinAlreadyIn') });
+            setCheckinOverlay({ success: true, alreadyIn: true, memberName: profile.name });
           } else if (msg.toLowerCase().includes('expired')) {
-            setCheckinMsg({ success: false, text: t('member.membershipExpiredError') });
+            setCheckinOverlay({ success: false, message: t('member.membershipExpiredError') });
           } else {
-            setCheckinMsg({ success: false, text: t('member.checkinError') });
+            setCheckinOverlay({ success: false, message: t('member.checkinError') });
           }
         }
         window.history.replaceState(null, '', window.location.pathname);
       })
       .catch(() => {
-        setCheckinMsg({ success: false, text: t('member.checkinError') });
+        setCheckinOverlay({ success: false, message: t('member.checkinError') });
       });
   }, [checkinCodeFromUrl, profile]);
 
@@ -696,19 +762,13 @@ export default function MemberPage({ token, onLogout, checkinCodeFromUrl }) {
               📅 {t('member.expiry')}: {profile.expiryDate ? formatDate(profile.expiryDate) : t('member.noExpiry')}
             </div>
 
-            {checkinMsg && (
-              <div style={checkinMsg.success ? s.msgSuccess : s.msgError}>
-                {checkinMsg.success ? '✓ ' : '✕ '}{checkinMsg.text}
-              </div>
-            )}
-
             <button
               style={{
                 ...s.checkinBtn,
                 ...(profile.status === 'expired' ? s.checkinBtnDisabled : {}),
               }}
               disabled={profile.status === 'expired'}
-              onClick={() => { setCheckinMsg(null); setShowCheckinModal(true); }}
+              onClick={() => setShowCheckinModal(true)}
             >
               {t('member.checkInButton')}
             </button>
@@ -850,12 +910,16 @@ export default function MemberPage({ token, onLogout, checkinCodeFromUrl }) {
         <CheckinModal
           token={token}
           profile={profile}
-          onClose={(wasSuccess) => {
-            setShowCheckinModal(false);
-            if (wasSuccess) {
-              setCheckinMsg({ success: true, text: t('member.checkinSuccess') });
-            }
-          }}
+          onClose={() => setShowCheckinModal(false)}
+        />
+      )}
+
+      {/* Check-in result overlay (auto-checkin from QR URL) */}
+      {checkinOverlay && (
+        <CheckinResultOverlay
+          result={checkinOverlay}
+          profile={profile}
+          onClose={() => setCheckinOverlay(null)}
         />
       )}
     </div>
