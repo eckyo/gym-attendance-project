@@ -479,7 +479,7 @@ function CheckinResultOverlay({ result, profile, onClose }) {
         )}
         {expiryDays !== null && result.success && (
           <div style={{ fontSize: 13, color: expiryDays <= 7 ? '#f59e0b' : '#94a3b8', marginTop: 4 }}>
-            {t('scan.daysRemaining', { n: expiryDays })}
+            {t('admin.packages.daysRemaining', { n: expiryDays })}
           </div>
         )}
         {!result.success && result.message && (
