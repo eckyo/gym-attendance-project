@@ -459,9 +459,13 @@ function CheckinModal({ token, profile, onClose }) {
       async (decodedText) => {
         try { await scanner.stop(); } catch { /* ignore */ }
         scannerRef.current = null;
-        const result = await memberCheckin(token, decodedText);
-        setScanResult(result.success
-          ? { success: true, message: `${t('member.checkinSuccess')} — ${profile?.name ?? ''}` }
+        const code = (() => {
+          try { return new URL(decodedText).searchParams.get('c') || decodedText; } catch { return decodedText; }
+        })();
+        const result = await memberCheckin(token, code);
+        const alreadyIn = !result.success && (result.error ?? '').toLowerCase().includes('already');
+        setScanResult(result.success || alreadyIn
+          ? { success: true, message: alreadyIn ? t('member.checkinAlreadyIn') : `${t('member.checkinSuccess')} — ${profile?.name ?? ''}` }
           : { success: false, message: result.error || t('member.checkinError') }
         );
       },
@@ -599,7 +603,7 @@ export default function MemberPage({ token, onLogout, checkinCodeFromUrl }) {
         } else {
           const msg = res.error ?? '';
           if (msg.toLowerCase().includes('already')) {
-            setCheckinMsg({ success: false, text: t('member.checkinAlreadyIn') });
+            setCheckinMsg({ success: true, text: t('member.checkinAlreadyIn') });
           } else if (msg.toLowerCase().includes('expired')) {
             setCheckinMsg({ success: false, text: t('member.membershipExpiredError') });
           } else {
