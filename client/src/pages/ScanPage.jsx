@@ -697,7 +697,7 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
 
 function downloadStandbyQR(gymName, qrDataUrl, gymCode) {
   const W = 600;
-  const H = 940;
+  const H = 1040;
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
@@ -708,14 +708,19 @@ function downloadStandbyQR(gymName, qrDataUrl, gymCode) {
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, W, H);
 
+    // ── "ABSENSI MEMBER" instruction label
+    ctx.fillStyle = '#1a1a2e';
+    ctx.font = 'bold 22px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('ABSENSI MEMBER', 300, 42);
+
     // ── Gym name
     ctx.fillStyle = '#1a1a2e';
     ctx.font = 'bold 26px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(gymName, 300, 52);
+    ctx.fillText(gymName, 300, 74);
 
     // ── QR code
-    ctx.drawImage(qrImg, 125, 76, 350, 350);
+    ctx.drawImage(qrImg, 125, 90, 350, 350);
 
     // ── Divider
     const drawDivider = (y) => {
@@ -726,16 +731,29 @@ function downloadStandbyQR(gymName, qrDataUrl, gymCode) {
       ctx.lineTo(W, y);
       ctx.stroke();
     };
-    drawDivider(442);
+    drawDivider(450);
+
+    // ── Cara Cepat tip box (blue-tinted bg)
+    ctx.fillStyle = '#eff6ff';
+    ctx.fillRect(0, 450, W, 82);
+    drawDivider(532);
+
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#1d4ed8';
+    ctx.font = 'bold 13px sans-serif';
+    ctx.fillText('💡 Cara Cepat:', 40, 474);
+
+    ctx.fillStyle = '#1e40af';
+    ctx.font = '13px sans-serif';
+    wrapText(ctx, 'Arahkan kamera HP langsung ke QR ini → halaman login terbuka otomatis → masuk & absen selesai!', 40, 496, 520, 20);
 
     // ── Cara Check-in section (light gray bg)
     ctx.fillStyle = '#f8fafc';
-    ctx.fillRect(0, 442, W, 190);
+    ctx.fillRect(0, 532, W, 200);
 
-    ctx.textAlign = 'left';
     ctx.fillStyle = '#1a1a2e';
     ctx.font = 'bold 14px sans-serif';
-    ctx.fillText('Cara Check-in', 40, 468);
+    ctx.fillText('Cara Check-in', 40, 560);
 
     const checkinSteps = [
       `1. Buka ${gymCode ? 'kiosgym.com/g/' + gymCode : 'kiosgym.com'}`,
@@ -745,17 +763,17 @@ function downloadStandbyQR(gymName, qrDataUrl, gymCode) {
     ];
     ctx.fillStyle = '#374151';
     ctx.font = '13px sans-serif';
-    let y = 494;
+    let y = 584;
     for (const step of checkinSteps) {
       y = wrapText(ctx, step, 40, y, 520, 20) + 24;
     }
 
-    drawDivider(632);
+    drawDivider(732);
 
     // ── Belum terdaftar? section (white bg)
     ctx.fillStyle = '#1a1a2e';
     ctx.font = 'bold 14px sans-serif';
-    ctx.fillText('Belum terdaftar?', 40, 658);
+    ctx.fillText('Belum terdaftar?', 40, 758);
 
     const registerSteps = [
       '1. Hubungi staff gym',
@@ -764,12 +782,12 @@ function downloadStandbyQR(gymName, qrDataUrl, gymCode) {
     ];
     ctx.fillStyle = '#374151';
     ctx.font = '13px sans-serif';
-    y = 682;
+    y = 782;
     for (const step of registerSteps) {
       y = wrapText(ctx, step, 40, y, 520, 20) + 24;
     }
 
-    drawDivider(800);
+    drawDivider(900);
 
     // ── Footer: logo icon + "Powered by" text
     const iconSize = 24;
@@ -781,8 +799,8 @@ function downloadStandbyQR(gymName, qrDataUrl, gymCode) {
     const totalW = labelW + gap + iconSize;
     const startX = (W - totalW) / 2;
     ctx.textAlign = 'left';
-    ctx.fillText(label, startX, 828);
-    ctx.drawImage(logoImg, startX + labelW + gap, 828 - iconSize + 4, iconSize, iconSize);
+    ctx.fillText(label, startX, 928);
+    ctx.drawImage(logoImg, startX + labelW + gap, 928 - iconSize + 4, iconSize, iconSize);
 
     // ── Trigger download
     const link = document.createElement('a');
