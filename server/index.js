@@ -42,10 +42,17 @@ app.use((err, req, res, next) => {
 });
 
 if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '../client/dist')));
-  app.get('*', (_req, res) =>
-    res.sendFile(path.join(__dirname, '../client/dist/index.html'))
-  );
+  app.use(express.static(path.join(__dirname, '../client/dist'), {
+    setHeaders(res, filePath) {
+      if (filePath.endsWith('index.html')) {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      }
+    },
+  }));
+  app.get('*', (_req, res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.sendFile(path.join(__dirname, '../client/dist/index.html'));
+  });
 }
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
