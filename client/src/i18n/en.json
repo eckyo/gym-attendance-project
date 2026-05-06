@@ -560,5 +560,73 @@
       "noHistory": "No XP earned yet — check in to get started!"
     },
     "admin": {}
+  },
+  "landing": {
+    "nav": { "cta": "Register Now" },
+    "hero": {
+      "headline": "Gym Attendance, Now Smarter & More Efficient",
+      "sub": "Manage member check-ins, membership packages, and reports — all in one digital platform.",
+      "ctaPrimary": "Register Now",
+      "ctaSecondary": "See Features"
+    },
+    "pain": {
+      "title": "Still doing it the old way?",
+      "items": [
+        { "icon": "📋", "title": "Manual attendance", "desc": "Attendance books get lost, are hard to search, and are prone to writing errors." },
+        { "icon": "⏰", "title": "No expiry control", "desc": "Members who haven't paid can still enter without being detected." },
+        { "icon": "🏢", "title": "Multi-location is messy", "desc": "Managing multiple gym branches at once without integrated data." }
+      ]
+    },
+    "features": {
+      "title": "Everything you need",
+      "items": [
+        { "icon": "📷", "title": "QR Scan & Camera", "desc": "Automatic check-in via smartphone camera or printed QR scan." },
+        { "icon": "📦", "title": "Flexible Membership Packages", "desc": "Create packages with custom durations and prices to fit your gym's needs." },
+        { "icon": "👥", "title": "Multi-Role Staff", "desc": "Admin, staff, and member — each with the right level of access." },
+        { "icon": "📊", "title": "Real-time Dashboard", "desc": "Monitor live attendance, daily reports, and member statistics anytime." },
+        { "icon": "🏢", "title": "Multi-Tenant", "desc": "One platform for many gym branches — data 100% isolated." },
+        { "icon": "🔌", "title": "No Special Hardware", "desc": "Just a regular smartphone or laptop — no need to buy expensive equipment." }
+      ]
+    },
+    "variants": {
+      "title": "Flexible for any gym setup",
+      "sub": "Choose the approach that best fits your gym environment",
+      "slides": [
+        {
+          "title": "Mobile + Printed QR",
+          "sub": "The most affordable solution",
+          "desc": "Print a QR code, stick it on the wall, and members just scan it with their own camera. No additional devices needed.",
+          "tags": ["No Kiosk Camera", "Lowest Cost", "5-Minute Setup"]
+        },
+        {
+          "title": "Tablet as Kiosk",
+          "sub": "Premium experience",
+          "desc": "Place a tablet at the reception desk. The tablet camera automatically detects members' QR codes as they arrive.",
+          "tags": ["Auto-Scan Camera", "Hands-Free", "Professional Look"]
+        },
+        {
+          "title": "PC / Laptop + Webcam",
+          "sub": "For fixed workstations",
+          "desc": "Use the computer already at the front desk. A standard webcam is enough to auto-scan members' QR codes.",
+          "tags": ["Large Screen", "Standard Webcam", "Great for Front Desk"]
+        }
+      ]
+    },
+    "adminPreview": {
+      "title": "Full control in your hands",
+      "sub": "Complete admin dashboard — monitor attendance, manage members, set packages, all from one screen."
+    },
+    "memberPreview": {
+      "title": "A seamless member experience",
+      "sub": "Members can check membership status, attendance history, and self check-in from their smartphone."
+    },
+    "cta": {
+      "title": "Ready to upgrade your gym management?",
+      "sub": "Start now — free consultation, quick setup.",
+      "btn": "Contact Us on WhatsApp"
+    },
+    "footer": {
+      "copy": "© 2025 Kios Gym. All rights reserved."
+    }
   }
 }
