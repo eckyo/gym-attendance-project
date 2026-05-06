@@ -4,29 +4,25 @@ on:
   push:
     branches: [main, staging]
 
-env:
-  RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-  RAILWAY_PROJECT_ID: 1144840b-8b9f-49b6-adb0-76968b4b04a5
-  RAILWAY_SERVICE_ID: e88235cd-e8e9-45cc-b6cc-62a9a1432e3e
-
 jobs:
   deploy:
     name: Deploy (${{ github.ref_name }})
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
-
-      - name: Deploy to Production
+      - name: Trigger Railway Production Deploy
         if: github.ref_name == 'main'
-        run: railway up --detach --environment production --service gym-attendance-server
-        env:
-          RAILWAY_ENVIRONMENT_ID: a63ed619-5b12-469c-9d28-79a7e86ba02a
+        run: |
+          curl -fsSL -X POST https://backboard.railway.app/graphql/v2 \
+            -H "Authorization: Bearer ${{ secrets.RAILWAY_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{"query":"mutation { serviceInstanceRedeploy(serviceId: \"e88235cd-e8e9-45cc-b6cc-62a9a1432e3e\", environmentId: \"a63ed619-5b12-469c-9d28-79a7e86ba02a\") }"}' \
+            | tee /dev/stderr | grep -q '"serviceInstanceRedeploy":true'
 
-      - name: Deploy to Staging
+      - name: Trigger Railway Staging Deploy
         if: github.ref_name == 'staging'
-        run: railway up --detach --environment staging --service gym-attendance-server
-        env:
-          RAILWAY_ENVIRONMENT_ID: febea53c-fdcf-4b39-b28a-09b5a5eaa029
+        run: |
+          curl -fsSL -X POST https://backboard.railway.app/graphql/v2 \
+            -H "Authorization: Bearer ${{ secrets.RAILWAY_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{"query":"mutation { serviceInstanceRedeploy(serviceId: \"e88235cd-e8e9-45cc-b6cc-62a9a1432e3e\", environmentId: \"febea53c-fdcf-4b39-b28a-09b5a5eaa029\") }"}' \
+            | tee /dev/stderr | grep -q '"serviceInstanceRedeploy":true'
