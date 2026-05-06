@@ -4,6 +4,11 @@ on:
   push:
     branches: [main, staging]
 
+env:
+  RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+  RAILWAY_PROJECT_ID: 1144840b-8b9f-49b6-adb0-76968b4b04a5
+  RAILWAY_SERVICE_ID: e88235cd-e8e9-45cc-b6cc-62a9a1432e3e
+
 jobs:
   deploy:
     name: Deploy (${{ github.ref_name }})
@@ -18,10 +23,10 @@ jobs:
         if: github.ref_name == 'main'
         run: railway up --detach --environment production --service gym-attendance-server
         env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_ENVIRONMENT_ID: a63ed619-5b12-469c-9d28-79a7e86ba02a
 
       - name: Deploy to Staging
         if: github.ref_name == 'staging'
         run: railway up --detach --environment staging --service gym-attendance-server
         env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_ENVIRONMENT_ID: febea53c-fdcf-4b39-b28a-09b5a5eaa029
