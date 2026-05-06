@@ -995,6 +995,7 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
   const [feedback, setFeedback] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [cameraError, setCameraError] = useState(false);
+  const [cameraRetry, setCameraRetry] = useState(0);
   const [showImagePin, setShowImagePin] = useState(false);
   const [showRegisterPin, setShowRegisterPin] = useState(false);
   const [showRegisterForm, setShowRegisterForm] = useState(false);
@@ -1071,8 +1072,10 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
     }
   };
 
-  // Auto-start camera on mount
+  // Auto-start camera on mount (or after permission granted via CTA)
   useEffect(() => {
+    setCameraError(false);
+
     if (!navigator.mediaDevices) {
       setCameraError(true);
       return;
@@ -1105,7 +1108,18 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
     return () => {
       try { qr?.stop()?.catch?.(() => {}); } catch {}
     };
-  }, [token]);
+  }, [token, cameraRetry]);
+
+  const handleRequestCamera = async () => {
+    if (!navigator.mediaDevices) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      stream.getTracks().forEach((t) => t.stop());
+      setCameraRetry((r) => r + 1);
+    } catch {
+      setCameraError(true);
+    }
+  };
 
   // After PIN verified, open the file picker
   const handleImagePinVerified = () => {
@@ -1213,7 +1227,27 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
         {/* Camera scanner */}
         <div style={st.scannerCard}>
           {cameraError && (
-            <div style={st.cameraError}>{t('scan.cameraError')}</div>
+            <div style={st.cameraError}>
+              <div>{t('scan.cameraError')}</div>
+              {navigator.mediaDevices && (
+                <button
+                  onClick={handleRequestCamera}
+                  style={{
+                    marginTop: 10,
+                    padding: '8px 18px',
+                    background: '#BEFE00',
+                    color: '#1a1a1a',
+                    border: 'none',
+                    borderRadius: 8,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {t('scan.enableCamera')}
+                </button>
+              )}
+            </div>
           )}
           <div id="qr-reader" style={{ width: '100%' }} />
         </div>

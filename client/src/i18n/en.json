@@ -40,6 +40,7 @@
     "pinForImage": "Enter admin PIN to use image scanning",
     "noQrFound": "No QR code found in image",
     "cameraError": "Camera unavailable — use image scan below",
+    "enableCamera": "Enable Camera Access",
     "registerMember": "Register New Member",
     "registerPinSubtitle": "Enter admin PIN to register a new member",
     "registerTitle": "Register New Member",

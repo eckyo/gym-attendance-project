@@ -40,6 +40,7 @@
     "pinForImage": "Masukkan PIN admin untuk memindai file gambar",
     "noQrFound": "Tidak ada kode QR dalam gambar",
     "cameraError": "Kamera tidak tersedia — gunakan pindai gambar di bawah",
+    "enableCamera": "Aktifkan Akses Kamera",
     "registerMember": "Daftarkan Anggota Baru",
     "registerPinSubtitle": "Masukkan PIN admin untuk mendaftarkan anggota baru",
     "registerTitle": "Daftarkan Anggota Baru",
