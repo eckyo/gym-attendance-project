@@ -1073,20 +1073,38 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
 
   // Auto-start camera on mount
   useEffect(() => {
-    const qr = new Html5Qrcode('qr-reader');
+    if (!navigator.mediaDevices) {
+      setCameraError(true);
+      return;
+    }
+
+    let qr;
+    try {
+      qr = new Html5Qrcode('qr-reader');
+    } catch {
+      setCameraError(true);
+      return;
+    }
     qrRef.current = qr;
 
     const config = { fps: 10, qrbox: { width: 260, height: 260 } };
     const onSuccess = (text) => processQrCodeRef.current(text);
-    const onError = () => {};
 
-    qr.start({ facingMode: 'environment' }, config, onSuccess, onError)
-      .catch(() =>
-        qr.start({ facingMode: 'user' }, config, onSuccess, onError)
-          .catch(() => setCameraError(true))
-      );
+    (async () => {
+      try {
+        await qr.start({ facingMode: 'environment' }, config, onSuccess, () => {});
+      } catch {
+        try {
+          await qr.start({ facingMode: 'user' }, config, onSuccess, () => {});
+        } catch {
+          setCameraError(true);
+        }
+      }
+    })();
 
-    return () => { qr.stop().catch(() => {}); };
+    return () => {
+      try { qr?.stop()?.catch?.(() => {}); } catch {}
+    };
   }, [token]);
 
   // After PIN verified, open the file picker
