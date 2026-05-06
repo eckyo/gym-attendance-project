@@ -4,6 +4,16 @@ import { useTranslation, LanguageSwitcher } from '../i18n/LanguageContext.jsx';
 const WA_NUMBER = '6281234567890'; // ← update before launch
 const WA_LINK = `https://wa.me/${WA_NUMBER}?text=Halo%2C%20saya%20tertarik%20dengan%20Kios%20Gym`;
 
+const IMAGES = {
+  hero:               '/landing/hero-app.png',
+  adminDashboard:     '/landing/admin-dashboard.png',
+  memberHome:         '/landing/member-home.png',
+  memberGamification: '/landing/member-gamification.png',
+  variantMobile:      '/landing/variant-mobile-qr.png',
+  variantTablet:      '/landing/variant-tablet.png',
+  variantLaptop:      '/landing/variant-laptop.png',
+};
+
 // ─── Inject responsive CSS ────────────────────────────────────────────────────
 const STYLE_ID = 'landing-responsive';
 if (!document.getElementById(STYLE_ID)) {
@@ -23,6 +33,7 @@ if (!document.getElementById(STYLE_ID)) {
     .lp-nav-cta { display: none !important; }
     .lp-bottom-bar { display: flex !important; }
     .lp-pain-grid { grid-template-columns: 1fr !important; }
+    .lp-member-images { justify-content: center; }
     @media (min-width: 480px) {
       .lp-features-grid { grid-template-columns: 1fr 1fr !important; }
       .lp-pain-grid { grid-template-columns: 1fr 1fr 1fr !important; }
@@ -40,226 +51,35 @@ if (!document.getElementById(STYLE_ID)) {
       .lp-member-text { text-align: left !important; }
       .lp-nav-cta { display: inline-flex !important; }
       .lp-bottom-bar { display: none !important; }
+      .lp-member-images { justify-content: flex-start; }
     }
   `;
   document.head.appendChild(s);
 }
 
-// ─── Phone Mockup ─────────────────────────────────────────────────────────────
-function PhoneMockup({ variant = 'member' }) {
+// ─── Placeholder Image ────────────────────────────────────────────────────────
+function PlaceholderImg({ src, alt = '', style = {} }) {
+  const [failed, setFailed] = useState(false);
   return (
     <div style={{
-      width: 220, flexShrink: 0,
-      background: '#1a1a1a',
-      borderRadius: 40,
-      padding: '12px 8px',
-      boxShadow: '0 0 0 2px #333, 0 32px 64px rgba(0,0,0,0.6), 0 0 60px rgba(190,254,0,0.12)',
-      position: 'relative',
+      background: '#1e293b',
+      border: '2px dashed rgba(190,254,0,0.25)',
+      borderRadius: 16,
+      overflow: 'hidden',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+      ...style,
     }}>
-      {/* Notch */}
-      <div style={{ width: 60, height: 8, background: '#111', borderRadius: 4, margin: '0 auto 10px' }} />
-      {/* Screen */}
-      <div style={{
-        background: 'linear-gradient(160deg, #0d1117 0%, #0f2027 50%, #111827 100%)',
-        borderRadius: 28,
-        overflow: 'hidden',
-        minHeight: 380,
-        padding: '14px 12px',
-      }}>
-        {variant === 'member' ? <MemberScreenContent /> : <ScanScreenContent />}
-      </div>
-      {/* Home bar */}
-      <div style={{ width: 60, height: 4, background: '#333', borderRadius: 2, margin: '10px auto 0' }} />
-    </div>
-  );
-}
-
-function MemberScreenContent() {
-  return (
-    <>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-        <span style={{ color: '#BEFE00', fontSize: 11, fontWeight: 700, fontFamily: 'Impact, sans-serif', letterSpacing: 1 }}>KIOS GYM</span>
-        <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'rgba(190,254,0,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>👤</div>
-      </div>
-      {/* Greeting card */}
-      <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 14, padding: '12px 10px', marginBottom: 10, border: '1px solid rgba(255,255,255,0.1)' }}>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 3 }}>Selamat datang 👋</div>
-        <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 6 }}>Budi Santoso</div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          <span style={{ background: 'rgba(74,222,128,0.15)', color: '#4ade80', fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 99 }}>● AKTIF</span>
-          <span style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.5)', fontSize: 9, padding: '2px 7px', borderRadius: 99 }}>Paket 1 Bulan</span>
-        </div>
-      </div>
-      {/* Check-in button */}
-      <button style={{ width: '100%', padding: '10px', background: '#BEFE00', color: '#1a1a1a', border: 'none', borderRadius: 12, fontSize: 12, fontWeight: 700, marginBottom: 12, cursor: 'default' }}>
-        ✓ ABSENSI SEKARANG
-      </button>
-      {/* History */}
-      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>Riwayat Kehadiran</div>
-      {[['Hari ini', '09:01'], ['Kemarin', '08:45'], ['2 hari lalu', '09:22']].map(([day, time]) => (
-        <div key={day} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: 10, color: 'rgba(255,255,255,0.65)' }}>
-          <span>✓ {day}</span><span style={{ color: '#BEFE00' }}>{time}</span>
-        </div>
-      ))}
-    </>
-  );
-}
-
-function ScanScreenContent() {
-  return (
-    <>
-      <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', marginBottom: 10, fontFamily: 'Impact, sans-serif', letterSpacing: 0.5 }}>KIOS GYM — Scan</div>
-      {/* Camera viewfinder */}
-      <div style={{ background: '#000', borderRadius: 10, aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10, position: 'relative', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'linear-gradient(135deg, rgba(190,254,0,0.08) 0%, transparent 60%)' }} />
-        {/* Corner markers */}
-        {[['top:8px','left:8px'], ['top:8px','right:8px'], ['bottom:8px','left:8px'], ['bottom:8px','right:8px']].map((pos, i) => {
-          const [v, h] = pos;
-          const [vDir] = v.split(':');
-          const [hDir] = h.split(':');
-          return (
-            <div key={i} style={{
-              position: 'absolute', [vDir]: 8, [hDir]: 8, width: 14, height: 14,
-              borderTop: vDir === 'top' ? '2px solid #BEFE00' : 'none',
-              borderBottom: vDir === 'bottom' ? '2px solid #BEFE00' : 'none',
-              borderLeft: hDir === 'left' ? '2px solid #BEFE00' : 'none',
-              borderRight: hDir === 'right' ? '2px solid #BEFE00' : 'none',
-            }} />
-          );
-        })}
-        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', textAlign: 'center', zIndex: 1 }}>Arahkan kamera ke QR</div>
-      </div>
-      <div style={{ textAlign: 'center', fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Scan otomatis saat QR terdeteksi</div>
-    </>
-  );
-}
-
-// ─── Tablet Mockup ────────────────────────────────────────────────────────────
-function TabletMockup() {
-  return (
-    <div style={{
-      width: 280, flexShrink: 0,
-      background: '#1a1a1a',
-      borderRadius: 20,
-      padding: '10px 8px',
-      boxShadow: '0 0 0 2px #333, 0 32px 64px rgba(0,0,0,0.6), 0 0 60px rgba(190,254,0,0.1)',
-    }}>
-      <div style={{ width: 30, height: 5, background: '#333', borderRadius: 3, margin: '0 auto 8px' }} />
-      <div style={{ background: 'linear-gradient(160deg, #0d1117, #111827)', borderRadius: 14, overflow: 'hidden', padding: '12px', minHeight: 200 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 8, fontFamily: 'Impact, sans-serif', letterSpacing: 0.5 }}>KIOS GYM — Kiosk</div>
-        <div style={{ background: '#000', borderRadius: 8, aspectRatio: '16/9', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden', marginBottom: 8 }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, rgba(190,254,0,0.06), transparent)' }} />
-          {[['top:6px','left:6px'],['top:6px','right:6px'],['bottom:6px','left:6px'],['bottom:6px','right:6px']].map((pos, i) => {
-            const [v, h] = pos;
-            const [vDir] = v.split(':');
-            const [hDir] = h.split(':');
-            return <div key={i} style={{ position: 'absolute', [vDir]: 6, [hDir]: 6, width: 10, height: 10, borderTop: vDir === 'top' ? '2px solid #BEFE00' : 'none', borderBottom: vDir === 'bottom' ? '2px solid #BEFE00' : 'none', borderLeft: hDir === 'left' ? '2px solid #BEFE00' : 'none', borderRight: hDir === 'right' ? '2px solid #BEFE00' : 'none' }} />;
-          })}
-          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)', zIndex: 1 }}>📷 Kamera aktif</div>
-        </div>
-        <div style={{ background: 'rgba(190,254,0,0.12)', border: '1px solid rgba(190,254,0,0.3)', borderRadius: 6, padding: '6px 10px', textAlign: 'center', fontSize: 9, color: '#BEFE00', fontWeight: 700 }}>✓ SCAN OTOMATIS</div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Browser / Admin Mockup ───────────────────────────────────────────────────
-function BrowserMockup({ compact = false }) {
-  const rows = [
-    { name: 'Budi Santoso', time: '09:01', pkg: 'Paket 1 Bulan' },
-    { name: 'Siti Rahayu', time: '09:03', pkg: 'Paket 3 Bulan' },
-    { name: 'Agus Kurniawan', time: '09:07', pkg: 'Paket 1 Bulan' },
-    { name: 'Dewi Susanti', time: '09:15', pkg: 'Paket 6 Bulan' },
-  ];
-  return (
-    <div style={{ width: '100%', maxWidth: compact ? 320 : 640, borderRadius: 12, overflow: 'hidden', boxShadow: '0 24px 64px rgba(0,0,0,0.35)', flexShrink: 0 }}>
-      {/* Chrome bar */}
-      <div style={{ background: '#f1f5f9', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
-        <div style={{ display: 'flex', gap: 5 }}>
-          {['#ef4444','#f59e0b','#22c55e'].map(c => <div key={c} style={{ width: 10, height: 10, borderRadius: '50%', background: c }} />)}
-        </div>
-        <div style={{ flex: 1, background: '#e2e8f0', borderRadius: 6, padding: '3px 10px', fontSize: 10, color: '#64748b', textAlign: 'center' }}>kiosgym.com/admin</div>
-      </div>
-      {/* Header */}
-      <div style={{ background: '#1a1a2e', padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ color: '#BEFE00', fontSize: 11, fontWeight: 700, fontFamily: 'Impact, sans-serif' }}>KIOS GYM</span>
-          <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 9 }}>GYM ADMIN</span>
-        </div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          <div style={{ background: 'rgba(255,255,255,0.1)', borderRadius: 5, padding: '3px 8px', fontSize: 9, color: 'rgba(255,255,255,0.7)' }}>⚙</div>
-          <div style={{ background: 'rgba(255,255,255,0.1)', borderRadius: 5, padding: '3px 8px', fontSize: 9, color: 'rgba(255,255,255,0.7)' }}>↩ Kiosk</div>
-        </div>
-      </div>
-      {/* Tabs */}
-      <div style={{ background: '#fff', borderBottom: '2px solid #e2e8f0', display: 'flex', padding: '0 16px' }}>
-        {['Absensi', 'Member', 'Staff', 'Paket'].map((tab, i) => (
-          <div key={tab} style={{ padding: '8px 14px', fontSize: 11, color: i === 0 ? '#1a1a2e' : '#94a3b8', fontWeight: i === 0 ? 700 : 400, borderBottom: i === 0 ? '2px solid #BEFE00' : 'none', marginBottom: -2 }}>{tab}</div>
-        ))}
-      </div>
-      {/* Toolbar */}
-      <div style={{ background: '#fff', padding: '8px 16px', display: 'flex', gap: 8 }}>
-        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, padding: '4px 10px', fontSize: 10, color: '#475569' }}>📅 Hari ini</div>
-        <div style={{ flex: 1, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, padding: '4px 10px', fontSize: 10, color: '#94a3b8' }}>🔍 Cari member...</div>
-      </div>
-      {/* Table */}
-      <div style={{ background: '#fff' }}>
-        {rows.slice(0, compact ? 3 : 4).map((row) => (
-          <div key={row.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 16px', borderBottom: '1px solid #f1f5f9' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e' }} />
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 600, color: '#1e293b' }}>{row.name}</div>
-                <div style={{ fontSize: 9, color: '#94a3b8' }}>{row.pkg}</div>
-              </div>
-            </div>
-            <div style={{ fontSize: 11, color: '#475569', fontWeight: 600 }}>{row.time}</div>
-          </div>
-        ))}
-        <div style={{ padding: '8px 16px', background: '#f8fafc', textAlign: 'center', fontSize: 9, color: '#94a3b8' }}>+ 42 kehadiran lainnya hari ini</div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Laptop Mockup ────────────────────────────────────────────────────────────
-function LaptopMockup() {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
-      {/* Screen bezel */}
-      <div style={{ background: '#1a1a1a', borderRadius: '12px 12px 0 0', padding: '8px 8px 4px', width: 300, boxShadow: '0 0 0 1px #333' }}>
-        <div style={{ borderRadius: 6, overflow: 'hidden' }}>
-          <BrowserMockup compact />
-        </div>
-      </div>
-      {/* Keyboard base */}
-      <div style={{ width: 320, height: 16, background: 'linear-gradient(180deg, #2a2a2a, #1a1a1a)', borderRadius: '0 0 8px 8px', boxShadow: '0 4px 16px rgba(0,0,0,0.5)' }}>
-        <div style={{ width: 60, height: 4, background: '#333', borderRadius: 2, margin: '6px auto 0' }} />
-      </div>
-      <div style={{ width: 340, height: 6, background: '#111', borderRadius: '0 0 6px 6px' }} />
-    </div>
-  );
-}
-
-// ─── QR Print Illustration ────────────────────────────────────────────────────
-function QrPrintIllustration() {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-      <PhoneMockup variant="scan" />
-      {/* Printed QR sticker */}
-      <div style={{ background: '#fff', borderRadius: 10, padding: 10, boxShadow: '0 4px 16px rgba(0,0,0,0.4)', textAlign: 'center', width: 90 }}>
-        {/* Simple QR-like grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 1.5, marginBottom: 6 }}>
-          {Array.from({ length: 49 }).map((_, i) => {
-            const corners = [0,1,2,7,8,9,14,15,16,32,33,34,39,40,41,46,47,48];
-            const fill = corners.includes(i) || (i % 3 === 0 && i > 18 && i < 30) || i === 24;
-            return <div key={i} style={{ aspectRatio: '1', background: fill ? '#1a1a1a' : '#fff', borderRadius: 1 }} />;
-          })}
-        </div>
-        <div style={{ fontSize: 8, color: '#64748b', fontWeight: 600 }}>SCAN UNTUK ABSEN</div>
-        <div style={{ fontSize: 7, color: '#94a3b8', marginTop: 2 }}>KIOS GYM</div>
-      </div>
+      {failed ? (
+        <span style={{ color: 'rgba(190,254,0,0.45)', fontSize: 11, padding: 16, textAlign: 'center', lineHeight: 1.6 }}>
+          📁 {src}
+        </span>
+      ) : (
+        <img src={src} alt={alt} onError={() => setFailed(true)}
+          style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
+      )}
     </div>
   );
 }
@@ -272,21 +92,21 @@ function VariantsCarousel() {
 
   const slides = [
     {
-      device: <QrPrintIllustration />,
+      device: <PlaceholderImg src={IMAGES.variantMobile} alt="Mobile + QR" style={{ width: 220, height: 420 }} />,
       titleKey: 'landing.variants.slides.0.title',
       subKey: 'landing.variants.slides.0.sub',
       descKey: 'landing.variants.slides.0.desc',
       tagsKey: 'landing.variants.slides.0.tags',
     },
     {
-      device: <TabletMockup />,
+      device: <PlaceholderImg src={IMAGES.variantTablet} alt="Tablet Kiosk" style={{ width: 260, height: 380 }} />,
       titleKey: 'landing.variants.slides.1.title',
       subKey: 'landing.variants.slides.1.sub',
       descKey: 'landing.variants.slides.1.desc',
       tagsKey: 'landing.variants.slides.1.tags',
     },
     {
-      device: <LaptopMockup />,
+      device: <PlaceholderImg src={IMAGES.variantLaptop} alt="Laptop + Webcam" style={{ width: 340, height: 260 }} />,
       titleKey: 'landing.variants.slides.2.title',
       subKey: 'landing.variants.slides.2.sub',
       descKey: 'landing.variants.slides.2.desc',
@@ -439,9 +259,9 @@ export default function LandingPage() {
               ))}
             </div>
           </div>
-          {/* Phone mockup */}
+          {/* Hero app screenshot */}
           <div style={{ display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
-            <PhoneMockup variant="member" />
+            <PlaceholderImg src={IMAGES.hero} alt="Kios Gym App" style={{ width: 260, minHeight: 520, maxWidth: '100%', borderRadius: 28 }} />
           </div>
         </div>
       </section>
@@ -530,7 +350,7 @@ export default function LandingPage() {
                 ))}
               </div>
             </div>
-            <BrowserMockup />
+            <PlaceholderImg src={IMAGES.adminDashboard} alt="Admin Dashboard" style={{ flex: 1, aspectRatio: '16/10', minWidth: 280, maxWidth: 580 }} />
           </div>
         </div>
       </section>
@@ -539,7 +359,11 @@ export default function LandingPage() {
       <section style={{ background: 'linear-gradient(180deg, #0f172a, #1a1a2e)', padding: 'clamp(48px,6vw,80px) clamp(16px,5vw,80px)' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           <div className="lp-member-inner" style={{ display: 'flex', gap: 48, alignItems: 'center' }}>
-            <PhoneMockup variant="member" />
+            {/* Two phone screenshots */}
+            <div className="lp-member-images" style={{ display: 'flex', gap: 12, flexShrink: 0 }}>
+              <PlaceholderImg src={IMAGES.memberHome} alt="Member Home" style={{ width: 140, minHeight: 280 }} />
+              <PlaceholderImg src={IMAGES.memberGamification} alt="Gamification" style={{ width: 140, minHeight: 280 }} />
+            </div>
             <div style={{ flex: 1 }} className="lp-member-text">
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(190,254,0,0.1)', border: '1px solid rgba(190,254,0,0.25)', borderRadius: 99, padding: '5px 14px', fontSize: 12, color: '#BEFE00', fontWeight: 700, marginBottom: 16 }}>
                 📱 Member App
@@ -555,6 +379,23 @@ export default function LandingPage() {
                   <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 14, color: 'rgba(255,255,255,0.65)' }}>
                     <span style={{ color: '#BEFE00', background: 'rgba(190,254,0,0.1)', borderRadius: '50%', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 12, fontWeight: 700 }}>✓</span>
                     {f}
+                  </div>
+                ))}
+              </div>
+              {/* Gamification group */}
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#BEFE00', letterSpacing: 1.5, textTransform: 'uppercase', marginTop: 24, marginBottom: 12 }}>
+                Gamification
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {[
+                  ['🏆', 'Sistem peringkat: Pemula, Reguler, Veteran, Elite, Legenda'],
+                  ['⚡', 'Kumpulkan XP tiap check-in & lihat progres naik level'],
+                  ['🎁', 'Capai target kunjungan, buka hadiah & reward eksklusif'],
+                  ['🚀', 'XP Boost dari reward — percepat progres anggotamu'],
+                ].map(([icon, text]) => (
+                  <div key={text} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 14, color: 'rgba(255,255,255,0.65)' }}>
+                    <span style={{ background: 'rgba(190,254,0,0.1)', borderRadius: '50%', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 12 }}>{icon}</span>
+                    {text}
                   </div>
                 ))}
               </div>
