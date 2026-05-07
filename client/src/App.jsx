@@ -15,6 +15,7 @@ import ScanPage from './pages/ScanPage.jsx';
 import AdminPage from './pages/AdminPage.jsx';
 import SuperadminPage from './pages/SuperadminPage.jsx';
 import MemberPage from './pages/MemberPage.jsx';
+import LandingPage from './pages/LandingPage.jsx';
 import { useTranslation, LanguageSwitcher } from './i18n/LanguageContext.jsx';
 
 const SESSION_KEY = 'memberSession';
@@ -740,6 +741,10 @@ export default function App() {
     setAuth(null);
     setPage('scan');
   };
+
+  if (window.location.pathname === '/landing') {
+    return <LandingPage />;
+  }
 
   if (!auth) {
     return <LoginForm onLogin={handleLogin} onMemberLogin={handleMemberLogin} gymSlug={gymSlugFromUrl} />;
