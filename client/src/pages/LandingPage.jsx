@@ -342,7 +342,7 @@ export default function LandingPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {['Absensi real-time dengan pencarian & filter tanggal', 'Kelola data member, perpanjang paket, & hapus akun', 'Manajemen staff dengan kontrol akses berbasis role', 'Konfigurasi paket harga, kode gym, & biaya daftar'].map(f => (
                   <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 14, color: '#475569' }}>
-                    <span style={{ color: '#BEFE00', background: 'rgba(15,23,42,0.06)', borderRadius: '50%', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 12, fontWeight: 700 }}>✓</span>
+                    <span style={{ color: '#0f172a', background: '#BEFE00', borderRadius: '50%', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 12, fontWeight: 700 }}>✓</span>
                     {f}
                   </div>
                 ))}
