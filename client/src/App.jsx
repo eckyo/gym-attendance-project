@@ -742,7 +742,7 @@ export default function App() {
     setPage('scan');
   };
 
-  if (window.location.pathname === '/landing') {
+  if (window.location.pathname === '/landing' || window.location.pathname === '/landing/') {
     return <LandingPage />;
   }
 
