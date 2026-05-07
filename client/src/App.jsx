@@ -655,7 +655,7 @@ function LoginForm({ onLogin, onMemberLogin, gymSlug, onTryDemo }) {
             onClick={onTryDemo}
             style={{ ...s.staffLink, marginTop: 10, color: 'rgba(190,254,0,0.6)', fontSize: 13 }}
           >
-            ⚡ {t('demo.loginBtn')}
+            ⚡ {t('landing.demo.loginBtn')}
           </button>
         )}
       </div>
@@ -679,7 +679,7 @@ export function DemoRolePicker({ open, onClose, onStart }) {
       const data = await startDemo(role);
       onStart(data);
     } catch (err) {
-      setError(err.message || t('demo.error'));
+      setError(err.message || t('landing.demo.error'));
     } finally {
       setLoading(false);
     }
@@ -698,10 +698,10 @@ export function DemoRolePicker({ open, onClose, onStart }) {
           <div style={{ fontSize: 28, marginBottom: 8 }}>⚡</div>
           <div style={{ fontSize: 22, fontWeight: 900, color: '#fff',
                         fontFamily: 'Impact, Arial Black, sans-serif', marginBottom: 6 }}>
-            {t('demo.modalTitle')}
+            {t('landing.demo.modalTitle')}
           </div>
           <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', lineHeight: 1.5 }}>
-            {t('demo.modalSub')}
+            {t('landing.demo.modalSub')}
           </div>
         </div>
 
@@ -715,8 +715,8 @@ export function DemoRolePicker({ open, onClose, onStart }) {
 
         <div style={{ display: 'flex', gap: 12, flexDirection: 'row' }}>
           {[
-            { role: 'admin',  icon: '🖥',  label: t('demo.adminCard'),  desc: t('demo.adminDesc') },
-            { role: 'member', icon: '📱', label: t('demo.memberCard'), desc: t('demo.memberDesc') },
+            { role: 'admin',  icon: '🖥',  label: t('landing.demo.adminCard'),  desc: t('landing.demo.adminDesc') },
+            { role: 'member', icon: '📱', label: t('landing.demo.memberCard'), desc: t('landing.demo.memberDesc') },
           ].map(({ role, icon, label, desc }) => (
             <button
               key={role}
@@ -772,19 +772,19 @@ export function DemoBanner({ expiresAt, onEnd }) {
                   background: 'rgba(15,23,42,0.97)', borderBottom: '1px solid rgba(190,254,0,0.25)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   flexWrap: 'wrap', gap: '6px 20px', padding: '8px 16px', fontSize: 12 }}>
-      <span style={{ color: '#BEFE00', fontWeight: 800 }}>⚡ {t('demo.banner')}</span>
+      <span style={{ color: '#BEFE00', fontWeight: 800 }}>⚡ {t('landing.demo.banner')}</span>
       <span style={{ color: 'rgba(255,255,255,0.6)' }}>
-        {t('demo.bannerRemaining', { min: remaining.split(':')[0], sec: remaining.split(':')[1] })}
+        {t('landing.demo.bannerRemaining', { min: remaining.split(':')[0], sec: remaining.split(':')[1] })}
       </span>
       <span style={{ color: 'rgba(255,255,255,0.35)' }}>·</span>
-      <span style={{ color: 'rgba(255,255,255,0.45)' }}>{t('demo.bannerReset')}</span>
+      <span style={{ color: 'rgba(255,255,255,0.45)' }}>{t('landing.demo.bannerReset')}</span>
       <button
         onClick={onEnd}
         style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)',
                  color: '#fca5a5', borderRadius: 6, padding: '2px 10px', fontSize: 11,
                  cursor: 'pointer', fontWeight: 700 }}
       >
-        {t('demo.bannerEnd')}
+        {t('landing.demo.bannerEnd')}
       </button>
     </div>
   );
