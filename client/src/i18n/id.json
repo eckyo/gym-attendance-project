@@ -560,5 +560,88 @@
       "noHistory": "Belum ada XP — mulai check-in sekarang!"
     },
     "admin": {}
+  },
+  "landing": {
+    "nav": { "cta": "Daftar Sekarang" },
+    "hero": {
+      "headline": "Absensi Gym, Kini Lebih Pintar & Efisien",
+      "sub": "Kelola kehadiran member, paket membership, dan laporan — semua dalam satu platform digital.",
+      "ctaPrimary": "Daftar Sekarang",
+      "ctaSecondary": "Lihat Fitur"
+    },
+    "pain": {
+      "title": "Masih pakai cara lama?",
+      "items": [
+        { "icon": "📋", "title": "Absensi manual", "desc": "Buku absen mudah hilang, sulit dicari, dan rawan kesalahan tulis." },
+        { "icon": "⏰", "title": "Tidak ada kontrol expired", "desc": "Member yang sudah tidak bayar bisa masuk tanpa terdeteksi." },
+        { "icon": "🏢", "title": "Multi-lokasi jadi rumit", "desc": "Kelola beberapa cabang gym sekaligus tanpa data yang terintegrasi." }
+      ]
+    },
+    "features": {
+      "title": "Semua yang kamu butuhkan",
+      "items": [
+        { "icon": "📷", "title": "Scan QR & Kamera", "desc": "Check-in otomatis lewat kamera smartphone atau scan QR cetak." },
+        { "icon": "📦", "title": "Paket Membership Fleksibel", "desc": "Buat paket dengan durasi dan harga kustom sesuai kebutuhan gym." },
+        { "icon": "👥", "title": "Multi-Role Staff", "desc": "Admin, staff, dan member — masing-masing punya akses yang tepat." },
+        { "icon": "📊", "title": "Dashboard Real-time", "desc": "Pantau kehadiran live, laporan harian, dan statistik member kapan saja." },
+        { "icon": "🏢", "title": "Multi-Tenant", "desc": "Satu platform untuk banyak cabang gym, data 100% terisolasi." },
+        { "icon": "🔌", "title": "Tanpa Hardware Khusus", "desc": "Cukup smartphone atau laptop biasa — tidak perlu beli alat mahal." }
+      ]
+    },
+    "variants": {
+      "title": "Fleksibel di berbagai setup gym",
+      "sub": "Pilih cara yang paling cocok untuk lingkungan gym kamu",
+      "slides": [
+        {
+          "title": "Mobile + QR Cetak",
+          "sub": "Solusi paling hemat",
+          "desc": "Print QR code, tempel di dinding, dan anggota tinggal scan pakai kameranya sendiri. Tidak perlu perangkat tambahan.",
+          "tags": ["Tanpa Kamera Kiosk", "Biaya Paling Rendah", "Setup 5 Menit"]
+        },
+        {
+          "title": "Tablet sebagai Kiosk",
+          "sub": "Pengalaman premium",
+          "desc": "Pasang tablet di meja resepsionis. Kamera tablet otomatis mendeteksi QR anggota saat mereka datang.",
+          "tags": ["Auto-Scan Kamera", "Hands-Free", "Tampilan Profesional"]
+        },
+        {
+          "title": "PC / Laptop + Webcam",
+          "sub": "Untuk workstation tetap",
+          "desc": "Gunakan komputer yang sudah ada di front desk. Webcam standar sudah cukup untuk auto-scan QR anggota.",
+          "tags": ["Layar Besar", "Webcam Biasa", "Cocok untuk Front Desk"]
+        }
+      ]
+    },
+    "adminPreview": {
+      "title": "Kontrol penuh di tangan kamu",
+      "sub": "Dashboard admin yang lengkap — pantau kehadiran, kelola member, atur paket, semua dari satu layar."
+    },
+    "memberPreview": {
+      "title": "Pengalaman anggota yang mulus",
+      "sub": "Anggota bisa cek status membership, riwayat kehadiran, naik peringkat lewat XP, dan buka hadiah — semua dari satu app."
+    },
+    "cta": {
+      "title": "Siap tingkatkan manajemen gym kamu?",
+      "sub": "Mulai sekarang — gratis konsultasi, setup cepat.",
+      "btn": "Coba 1 Bulan Gratis"
+    },
+    "footer": {
+      "copy": "© 2026 Kios Gym. All rights reserved."
+    },
+    "demo": {
+      "btn": "Coba Demo",
+      "modalTitle": "Coba Kios Gym Gratis",
+      "modalSub": "Sesi 30 menit · tanpa daftar · data direset tiap jam",
+      "adminCard": "Tampilan Admin",
+      "adminDesc": "Dashboard penuh: kelola member, paket & laporan",
+      "memberCard": "Tampilan Member",
+      "memberDesc": "Aplikasi member dengan gamifikasi, check-in & hadiah",
+      "banner": "Mode Demo",
+      "bannerRemaining": "{min}:{sec} tersisa",
+      "bannerReset": "Data direset tiap jam",
+      "bannerEnd": "Keluar Demo",
+      "loginBtn": "Coba Demo — tanpa daftar",
+      "error": "Demo tidak tersedia, coba lagi"
+    }
   }
 }
