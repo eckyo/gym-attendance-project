@@ -1,14 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation, LanguageSwitcher } from '../i18n/LanguageContext.jsx';
 
-const WA_NUMBER = '6281234567890'; // ← update before launch
+const WA_NUMBER = '628131465088';
 const WA_LINK = `https://wa.me/${WA_NUMBER}?text=Halo%2C%20saya%20tertarik%20dengan%20Kios%20Gym`;
 
 const IMAGES = {
   hero:               '/landing/hero-app.png',
   adminDashboard:     '/landing/admin-dashboard.png',
-  memberHome:         '/landing/member-home.png',
-  memberGamification: '/landing/member-gamification.png',
+  memberFeature:      '/landing/member-feature.png',
   variantMobile:      '/landing/variant-mobile-qr.png',
   variantTablet:      '/landing/variant-tablet.png',
   variantLaptop:      '/landing/variant-laptop.png',
@@ -28,17 +27,15 @@ if (!document.getElementById(STYLE_ID)) {
     .lp-slide-text { text-align: center !important; }
     .lp-slide-tags { justify-content: center !important; }
     .lp-admin-inner { flex-direction: column !important; }
-    .lp-member-inner { flex-direction: column !important; align-items: center !important; }
-    .lp-member-text { text-align: center !important; }
+    .lp-member-inner { align-items: center !important; }
     .lp-nav-cta { display: none !important; }
     .lp-bottom-bar { display: flex !important; }
     .lp-pain-grid { grid-template-columns: 1fr !important; }
-    .lp-member-images { justify-content: center; }
     @media (min-width: 480px) {
       .lp-features-grid { grid-template-columns: 1fr 1fr !important; }
-      .lp-pain-grid { grid-template-columns: 1fr 1fr 1fr !important; }
     }
     @media (min-width: 768px) {
+      .lp-pain-grid { grid-template-columns: 1fr 1fr 1fr !important; }
       .lp-hero { flex-direction: row !important; text-align: left; }
       .lp-hero-text { align-items: flex-start !important; }
       .lp-hero-ctas { justify-content: flex-start !important; }
@@ -47,11 +44,8 @@ if (!document.getElementById(STYLE_ID)) {
       .lp-slide-text { text-align: left !important; }
       .lp-slide-tags { justify-content: flex-start !important; }
       .lp-admin-inner { flex-direction: row !important; }
-      .lp-member-inner { flex-direction: row !important; align-items: center !important; }
-      .lp-member-text { text-align: left !important; }
       .lp-nav-cta { display: inline-flex !important; }
       .lp-bottom-bar { display: none !important; }
-      .lp-member-images { justify-content: flex-start; }
     }
   `;
   document.head.appendChild(s);
@@ -60,27 +54,31 @@ if (!document.getElementById(STYLE_ID)) {
 // ─── Placeholder Image ────────────────────────────────────────────────────────
 function PlaceholderImg({ src, alt = '', style = {} }) {
   const [failed, setFailed] = useState(false);
-  return (
-    <div style={{
-      background: '#1e293b',
-      border: '2px dashed rgba(190,254,0,0.25)',
-      borderRadius: 16,
-      overflow: 'hidden',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      flexShrink: 0,
-      ...style,
-    }}>
-      {failed ? (
+  if (failed) {
+    return (
+      <div style={{
+        background: '#1e293b',
+        border: '2px dashed rgba(190,254,0,0.25)',
+        borderRadius: 16,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: 120,
+        ...style,
+      }}>
         <span style={{ color: 'rgba(190,254,0,0.45)', fontSize: 11, padding: 16, textAlign: 'center', lineHeight: 1.6 }}>
           📁 {src}
         </span>
-      ) : (
-        <img src={src} alt={alt} onError={() => setFailed(true)}
-          style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
-      )}
-    </div>
+      </div>
+    );
+  }
+  return (
+    <img
+      src={src}
+      alt={alt}
+      onError={() => setFailed(true)}
+      style={{ display: 'block', maxWidth: '100%', height: 'auto', ...style }}
+    />
   );
 }
 
@@ -92,21 +90,21 @@ function VariantsCarousel() {
 
   const slides = [
     {
-      device: <PlaceholderImg src={IMAGES.variantMobile} alt="Mobile + QR" style={{ width: 220, height: 420 }} />,
+      device: <PlaceholderImg src={IMAGES.variantMobile} alt="Mobile + QR" style={{ maxWidth: 600, width: '100%' }} />,
       titleKey: 'landing.variants.slides.0.title',
       subKey: 'landing.variants.slides.0.sub',
       descKey: 'landing.variants.slides.0.desc',
       tagsKey: 'landing.variants.slides.0.tags',
     },
     {
-      device: <PlaceholderImg src={IMAGES.variantTablet} alt="Tablet Kiosk" style={{ width: 260, height: 380 }} />,
+      device: <PlaceholderImg src={IMAGES.variantTablet} alt="Tablet Kiosk" style={{ maxWidth: 600, width: '100%' }} />,
       titleKey: 'landing.variants.slides.1.title',
       subKey: 'landing.variants.slides.1.sub',
       descKey: 'landing.variants.slides.1.desc',
       tagsKey: 'landing.variants.slides.1.tags',
     },
     {
-      device: <PlaceholderImg src={IMAGES.variantLaptop} alt="Laptop + Webcam" style={{ width: 340, height: 260 }} />,
+      device: <PlaceholderImg src={IMAGES.variantLaptop} alt="Laptop + Webcam" style={{ maxWidth: 600, width: '100%' }} />,
       titleKey: 'landing.variants.slides.2.title',
       subKey: 'landing.variants.slides.2.sub',
       descKey: 'landing.variants.slides.2.desc',
@@ -143,9 +141,9 @@ function VariantsCarousel() {
       <div style={{ display: 'flex', transition: 'transform 0.5s cubic-bezier(0.4,0,0.2,1)', transform: `translateX(-${slide * 100}%)` }}>
         {slides.map((s, i) => (
           <div key={i} style={{ minWidth: '100%', padding: '0 4px' }}>
-            <div className="lp-slide-inner" style={{ display: 'flex', gap: 48, alignItems: 'center', justifyContent: 'center', padding: '20px 0' }}>
-              <div style={{ flexShrink: 0 }}>{s.device}</div>
-              <div className="lp-slide-text" style={{ maxWidth: 380 }}>
+            <div className="lp-slide-inner" style={{ display: 'flex', flexDirection: 'column', gap: 32, alignItems: 'center', justifyContent: 'center', padding: '20px 0' }}>
+              <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>{s.device}</div>
+              <div className="lp-slide-text" style={{ maxWidth: 560, textAlign: 'center' }}>
                 <div style={{ display: 'inline-block', background: 'rgba(190,254,0,0.12)', color: '#BEFE00', fontSize: 11, fontWeight: 700, padding: '4px 12px', borderRadius: 99, marginBottom: 12, border: '1px solid rgba(190,254,0,0.25)' }}>
                   {titles[i][1]}
                 </div>
@@ -155,7 +153,7 @@ function VariantsCarousel() {
                 <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: 15, lineHeight: 1.7, marginBottom: 20 }}>
                   {titles[i][2]}
                 </p>
-                <div className="lp-slide-tags" style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                <div className="lp-slide-tags" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
                   {tags[i].map(tag => (
                     <span key={tag} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.8)', fontSize: 12, padding: '4px 12px', borderRadius: 99 }}>
                       {tag}
@@ -215,7 +213,7 @@ export default function LandingPage() {
     <div style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", overflowX: 'hidden' }}>
 
       {/* ── Sticky Navbar ── */}
-      <nav style={{ position: 'sticky', top: 0, zIndex: 100, background: 'rgba(15,23,42,0.95)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.08)', padding: '12px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <nav style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100, background: 'rgba(15,23,42,0.95)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.08)', padding: '12px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <img src="/kiosgym-icon.svg" alt="Kios Gym" style={{ height: 28, width: 'auto' }} />
           <span style={{ color: '#fff', fontSize: 16, fontWeight: 700, fontFamily: 'Impact, Arial Black, sans-serif', letterSpacing: 0.5 }}>KIOS GYM</span>
@@ -229,14 +227,14 @@ export default function LandingPage() {
       </nav>
 
       {/* ── 1. Hero ── */}
-      <section style={{ background: 'linear-gradient(135deg, #0f172a 0%, #0d1117 50%, #1a1a2e 100%)', padding: 'clamp(48px,8vw,96px) clamp(16px,5vw,80px)', minHeight: '90vh', display: 'flex', alignItems: 'center' }}>
+      <section style={{ background: 'linear-gradient(135deg, #0f172a 0%, #0d1117 50%, #1a1a2e 100%)', padding: 'clamp(48px,8vw,96px) clamp(16px,5vw,80px)', paddingTop: 'calc(clamp(48px,8vw,96px) + 56px)', minHeight: '90vh', display: 'flex', alignItems: 'center' }}>
         <div style={{ maxWidth: 1200, margin: '0 auto', width: '100%', display: 'flex', gap: 48, alignItems: 'center' }} className="lp-hero">
           {/* Text */}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }} className="lp-hero-text">
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(190,254,0,0.1)', border: '1px solid rgba(190,254,0,0.25)', borderRadius: 99, padding: '5px 14px', fontSize: 12, color: '#BEFE00', fontWeight: 700, marginBottom: 20 }}>
               ✦ Platform Manajemen Gym Digital
             </div>
-            <h1 style={{ fontSize: 'clamp(28px, 5vw, 56px)', fontWeight: 900, color: '#fff', lineHeight: 1.1, marginBottom: 20, fontFamily: 'Impact, Arial Black, sans-serif', letterSpacing: 0.5 }}>
+            <h1 style={{ fontSize: 'clamp(36px, 7vw, 96px)', fontWeight: 900, color: '#fff', lineHeight: 1.0, marginBottom: 20, fontFamily: 'Impact, Arial Black, sans-serif', letterSpacing: 0.5 }}>
               Absensi Gym,<br />
               <span style={{ color: '#BEFE00' }}>Kini Lebih Pintar</span><br />
               &amp; Efisien
@@ -260,8 +258,8 @@ export default function LandingPage() {
             </div>
           </div>
           {/* Hero app screenshot */}
-          <div style={{ display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
-            <PlaceholderImg src={IMAGES.hero} alt="Kios Gym App" style={{ width: 260, minHeight: 520, maxWidth: '100%', borderRadius: 28 }} />
+          <div style={{ display: 'flex', justifyContent: 'center', flex: '0 1 auto', minWidth: 0 }}>
+            <PlaceholderImg src={IMAGES.hero} alt="Kios Gym App" style={{ width: '100%', maxWidth: 560 }} />
           </div>
         </div>
       </section>
@@ -270,7 +268,7 @@ export default function LandingPage() {
       <section style={{ background: '#f8fafc', padding: 'clamp(48px,6vw,80px) clamp(16px,5vw,80px)' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 48 }}>
-            <h2 style={{ fontSize: 'clamp(22px, 3.5vw, 36px)', fontWeight: 800, color: '#1a1a2e', marginBottom: 10, fontFamily: 'Impact, Arial Black, sans-serif' }}>
+            <h2 style={{ fontSize: 'clamp(28px, 4.5vw, 56px)', fontWeight: 800, color: '#1a1a2e', marginBottom: 10, fontFamily: 'Impact, Arial Black, sans-serif' }}>
               {t('landing.pain.title')}
             </h2>
             <p style={{ fontSize: 15, color: '#64748b', maxWidth: 440, margin: '0 auto' }}>
@@ -293,7 +291,7 @@ export default function LandingPage() {
       <section id="lp-features" style={{ background: 'linear-gradient(180deg, #0f172a, #111827)', padding: 'clamp(48px,6vw,80px) clamp(16px,5vw,80px)' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 48 }}>
-            <h2 style={{ fontSize: 'clamp(22px, 3.5vw, 36px)', fontWeight: 800, color: '#fff', marginBottom: 10, fontFamily: 'Impact, Arial Black, sans-serif' }}>
+            <h2 style={{ fontSize: 'clamp(28px, 4.5vw, 56px)', fontWeight: 800, color: '#fff', marginBottom: 10, fontFamily: 'Impact, Arial Black, sans-serif' }}>
               {t('landing.features.title')}
             </h2>
             <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.5)', maxWidth: 440, margin: '0 auto' }}>
@@ -316,7 +314,7 @@ export default function LandingPage() {
       <section style={{ background: 'linear-gradient(180deg, #111827, #0f172a)', padding: 'clamp(48px,6vw,80px) clamp(16px,5vw,48px)' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 40 }}>
-            <h2 style={{ fontSize: 'clamp(22px, 3.5vw, 36px)', fontWeight: 800, color: '#fff', marginBottom: 10, fontFamily: 'Impact, Arial Black, sans-serif' }}>
+            <h2 style={{ fontSize: 'clamp(28px, 4.5vw, 56px)', fontWeight: 800, color: '#fff', marginBottom: 10, fontFamily: 'Impact, Arial Black, sans-serif' }}>
               {t('landing.variants.title')}
             </h2>
             <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.5)', maxWidth: 440, margin: '0 auto' }}>
@@ -335,7 +333,7 @@ export default function LandingPage() {
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(15,23,42,0.06)', border: '1px solid rgba(15,23,42,0.12)', borderRadius: 99, padding: '5px 14px', fontSize: 12, color: '#1a1a2e', fontWeight: 700, marginBottom: 16 }}>
                 💻 Admin Dashboard
               </div>
-              <h2 style={{ fontSize: 'clamp(22px, 3.5vw, 36px)', fontWeight: 800, color: '#1a1a2e', marginBottom: 14, fontFamily: 'Impact, Arial Black, sans-serif', lineHeight: 1.2 }}>
+              <h2 style={{ fontSize: 'clamp(28px, 4.5vw, 56px)', fontWeight: 800, color: '#1a1a2e', marginBottom: 14, fontFamily: 'Impact, Arial Black, sans-serif', lineHeight: 1.2 }}>
                 {t('landing.adminPreview.title')}
               </h2>
               <p style={{ fontSize: 15, color: '#64748b', lineHeight: 1.7, marginBottom: 24, maxWidth: 420 }}>
@@ -350,7 +348,7 @@ export default function LandingPage() {
                 ))}
               </div>
             </div>
-            <PlaceholderImg src={IMAGES.adminDashboard} alt="Admin Dashboard" style={{ flex: 1, aspectRatio: '16/10', minWidth: 280, maxWidth: 580 }} />
+            <PlaceholderImg src={IMAGES.adminDashboard} alt="Admin Dashboard" style={{ maxWidth: 580, width: '100%', height: 'auto' }} />
           </div>
         </div>
       </section>
@@ -358,17 +356,14 @@ export default function LandingPage() {
       {/* ── 6. Member Experience ── */}
       <section style={{ background: 'linear-gradient(180deg, #0f172a, #1a1a2e)', padding: 'clamp(48px,6vw,80px) clamp(16px,5vw,80px)' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-          <div className="lp-member-inner" style={{ display: 'flex', gap: 48, alignItems: 'center' }}>
-            {/* Two phone screenshots */}
-            <div className="lp-member-images" style={{ display: 'flex', gap: 12, flexShrink: 0 }}>
-              <PlaceholderImg src={IMAGES.memberHome} alt="Member Home" style={{ width: 140, minHeight: 280 }} />
-              <PlaceholderImg src={IMAGES.memberGamification} alt="Gamification" style={{ width: 140, minHeight: 280 }} />
-            </div>
-            <div style={{ flex: 1 }} className="lp-member-text">
+          <div className="lp-member-inner" style={{ display: 'flex', flexDirection: 'column', gap: 48, alignItems: 'center' }}>
+            {/* Single feature image */}
+            <PlaceholderImg src={IMAGES.memberFeature} alt="Member App" style={{ width: '100%', maxWidth: 900 }} />
+            <div style={{ width: '100%', maxWidth: 900 }} className="lp-member-text">
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(190,254,0,0.1)', border: '1px solid rgba(190,254,0,0.25)', borderRadius: 99, padding: '5px 14px', fontSize: 12, color: '#BEFE00', fontWeight: 700, marginBottom: 16 }}>
                 📱 Member App
               </div>
-              <h2 style={{ fontSize: 'clamp(22px, 3.5vw, 36px)', fontWeight: 800, color: '#fff', marginBottom: 14, fontFamily: 'Impact, Arial Black, sans-serif', lineHeight: 1.2 }}>
+              <h2 style={{ fontSize: 'clamp(28px, 4.5vw, 56px)', fontWeight: 800, color: '#fff', marginBottom: 14, fontFamily: 'Impact, Arial Black, sans-serif', lineHeight: 1.2 }}>
                 {t('landing.memberPreview.title')}
               </h2>
               <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.6)', lineHeight: 1.7, marginBottom: 24, maxWidth: 420 }}>
@@ -409,7 +404,7 @@ export default function LandingPage() {
         {/* Glow */}
         <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 400, height: 400, background: 'radial-gradient(circle, rgba(190,254,0,0.08) 0%, transparent 70%)', pointerEvents: 'none' }} />
         <div style={{ position: 'relative', zIndex: 1, maxWidth: 600, margin: '0 auto' }}>
-          <h2 style={{ fontSize: 'clamp(24px, 4.5vw, 44px)', fontWeight: 900, color: '#fff', marginBottom: 16, fontFamily: 'Impact, Arial Black, sans-serif', lineHeight: 1.15 }}>
+          <h2 style={{ fontSize: 'clamp(36px, 6vw, 80px)', fontWeight: 900, color: '#fff', marginBottom: 16, fontFamily: 'Impact, Arial Black, sans-serif', lineHeight: 1.15 }}>
             {t('landing.cta.title')}
           </h2>
           <p style={{ fontSize: 'clamp(14px, 2vw, 17px)', color: 'rgba(255,255,255,0.6)', marginBottom: 36, lineHeight: 1.6 }}>
