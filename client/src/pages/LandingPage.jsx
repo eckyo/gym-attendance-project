@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation, LanguageSwitcher } from '../i18n/LanguageContext.jsx';
+import { DemoRolePicker } from '../App.jsx';
 
 const WA_NUMBER = '628131465088';
 const WA_LINK = `https://wa.me/${WA_NUMBER}?text=Halo%2C%20saya%20tertarik%20dengan%20Kios%20Gym`;
@@ -183,6 +184,7 @@ function VariantsCarousel() {
 // ─── Main Landing Page ────────────────────────────────────────────────────────
 export default function LandingPage() {
   const { t, lang, setLang } = useTranslation();
+  const [demoOpen, setDemoOpen] = useState(false);
 
   // Default to Indonesian for landing page visitors
   useEffect(() => {
@@ -191,6 +193,18 @@ export default function LandingPage() {
 
   const scrollToFeatures = () => {
     document.getElementById('lp-features')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleDemoStart = (data) => {
+    const { token, role, gymName, expiresAt, isDemo } = data;
+    if (role === 'admin') {
+      localStorage.setItem('staffSession', JSON.stringify({ token, role, gymName, isDemo, expiresAt }));
+      localStorage.setItem('adminPinUnlocked', token);
+    } else {
+      const member = { id: null, name: 'Demo Pengguna', gymId: null };
+      localStorage.setItem('memberSession', JSON.stringify({ token, member, isDemo, expiresAt }));
+    }
+    window.location.href = '/';
   };
 
   const featureIcons = ['📷', '📦', '👥', '📊', '🏢', '🔌'];
@@ -246,6 +260,9 @@ export default function LandingPage() {
               <a href={WA_LINK} target="_blank" rel="noreferrer" style={{ padding: '14px 28px', background: '#BEFE00', color: '#1a1a1a', borderRadius: 10, fontSize: 15, fontWeight: 700, textDecoration: 'none', boxShadow: '0 0 32px rgba(190,254,0,0.3)' }}>
                 {t('landing.hero.ctaPrimary')} →
               </a>
+              <button onClick={() => setDemoOpen(true)} style={{ padding: '14px 28px', background: 'transparent', color: '#BEFE00', border: '1.5px solid rgba(190,254,0,0.4)', borderRadius: 10, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
+                ⚡ {t('landing.demo.btn')}
+              </button>
               <button onClick={scrollToFeatures} style={{ padding: '14px 28px', background: 'transparent', color: '#fff', border: '1.5px solid rgba(255,255,255,0.25)', borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: 'pointer' }}>
                 {t('landing.hero.ctaSecondary')} ↓
               </button>
@@ -410,9 +427,14 @@ export default function LandingPage() {
           <p style={{ fontSize: 'clamp(14px, 2vw, 17px)', color: 'rgba(255,255,255,0.6)', marginBottom: 36, lineHeight: 1.6 }}>
             {t('landing.cta.sub')}
           </p>
-          <a href={WA_LINK} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '16px 36px', background: '#BEFE00', color: '#1a1a1a', borderRadius: 12, fontSize: 16, fontWeight: 700, textDecoration: 'none', boxShadow: '0 0 48px rgba(190,254,0,0.35)' }}>
-            <span>💬</span> {t('landing.cta.btn')}
-          </a>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
+            <a href={WA_LINK} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '16px 36px', background: '#BEFE00', color: '#1a1a1a', borderRadius: 12, fontSize: 16, fontWeight: 700, textDecoration: 'none', boxShadow: '0 0 48px rgba(190,254,0,0.35)' }}>
+              <span>💬</span> {t('landing.cta.btn')}
+            </a>
+            <button onClick={() => setDemoOpen(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '16px 36px', background: 'transparent', color: '#BEFE00', border: '2px solid rgba(190,254,0,0.4)', borderRadius: 12, fontSize: 16, fontWeight: 700, cursor: 'pointer' }}>
+              ⚡ {t('landing.demo.btn')}
+            </button>
+          </div>
         </div>
       </section>
 
@@ -438,6 +460,11 @@ export default function LandingPage() {
       {/* Spacer for bottom bar on mobile */}
       <div className="lp-bottom-bar" style={{ height: 70, display: 'none' }} />
 
+      <DemoRolePicker
+        open={demoOpen}
+        onClose={() => setDemoOpen(false)}
+        onStart={handleDemoStart}
+      />
     </div>
   );
 }

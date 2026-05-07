@@ -627,6 +627,21 @@
     },
     "footer": {
       "copy": "© 2026 Kios Gym. All rights reserved."
+    },
+    "demo": {
+      "btn": "Try Demo",
+      "modalTitle": "Try Kios Gym Free",
+      "modalSub": "30-minute session · no signup · data resets hourly",
+      "adminCard": "Admin View",
+      "adminDesc": "Full dashboard: manage members, packages & reports",
+      "memberCard": "Member View",
+      "memberDesc": "Member app with gamification, check-in & rewards",
+      "banner": "Demo Mode",
+      "bannerRemaining": "{min}:{sec} remaining",
+      "bannerReset": "Data resets hourly",
+      "bannerEnd": "End Demo",
+      "loginBtn": "Try Demo — no signup needed",
+      "error": "Demo unavailable, please try again"
     }
   }
 }

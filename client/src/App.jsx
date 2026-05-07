@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { login } from './api/scan.js';
 import { memberLogin, gymCodeLogin, lookupGym } from './api/member.js';
 import { verifyPin } from './api/admin.js';
+import { startDemo } from './api/demo.js';
 
 const gymSlugFromUrl = (() => {
   const m = window.location.pathname.match(/^\/g\/([a-z0-9-]+)$/i);
@@ -30,13 +31,13 @@ function loadSession() {
   try {
     const raw = localStorage.getItem(SESSION_KEY);
     if (!raw) return null;
-    const { token, member } = JSON.parse(raw);
+    const { token, member, isDemo, expiresAt } = JSON.parse(raw);
     const payload = JSON.parse(atob(token.split('.')[1]));
     if (payload.exp * 1000 < Date.now()) {
       localStorage.removeItem(SESSION_KEY);
       return null;
     }
-    return { token, member };
+    return { token, member, isDemo: isDemo || false, expiresAt: expiresAt || null };
   } catch {
     localStorage.removeItem(SESSION_KEY);
     return null;
@@ -47,21 +48,21 @@ function clearSession() {
   localStorage.removeItem(SESSION_KEY);
 }
 
-function saveStaffSession(token, role, gymName) {
-  localStorage.setItem(STAFF_SESSION_KEY, JSON.stringify({ token, role, gymName }));
+function saveStaffSession(token, role, gymName, extra = {}) {
+  localStorage.setItem(STAFF_SESSION_KEY, JSON.stringify({ token, role, gymName, ...extra }));
 }
 
 function loadStaffSession() {
   try {
     const raw = localStorage.getItem(STAFF_SESSION_KEY);
     if (!raw) return null;
-    const { token, role, gymName } = JSON.parse(raw);
+    const { token, role, gymName, isDemo, expiresAt } = JSON.parse(raw);
     const payload = JSON.parse(atob(token.split('.')[1]));
     if (payload.exp * 1000 < Date.now()) {
       localStorage.removeItem(STAFF_SESSION_KEY);
       return null;
     }
-    return { token, role, gymName };
+    return { token, role, gymName, isDemo: isDemo || false, expiresAt: expiresAt || null };
   } catch {
     localStorage.removeItem(STAFF_SESSION_KEY);
     return null;
@@ -287,7 +288,7 @@ const s = {
   },
 };
 
-function LoginForm({ onLogin, onMemberLogin, gymSlug }) {
+function LoginForm({ onLogin, onMemberLogin, gymSlug, onTryDemo }) {
   const [mode, setMode] = useState('member'); // member is primary
 
   // Inject placeholder colour for dark inputs — runs once
@@ -648,7 +649,143 @@ function LoginForm({ onLogin, onMemberLogin, gymSlug }) {
         >
           💬 <strong style={{ color: '#BEFE00', fontWeight: 700 }}>{t('login.contactUsLabel')}</strong> {t('login.contactUsVia')}
         </a>
+        {onTryDemo && (
+          <button
+            type="button"
+            onClick={onTryDemo}
+            style={{ ...s.staffLink, marginTop: 10, color: 'rgba(190,254,0,0.6)', fontSize: 13 }}
+          >
+            ⚡ {t('demo.loginBtn')}
+          </button>
+        )}
       </div>
+    </div>
+  );
+}
+
+// ── DemoRolePicker ────────────────────────────────────────────────────────────
+
+export function DemoRolePicker({ open, onClose, onStart }) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState('');
+  const { t } = useTranslation();
+
+  if (!open) return null;
+
+  const pick = async (role) => {
+    setError('');
+    setLoading(true);
+    try {
+      const data = await startDemo(role);
+      onStart(data);
+    } catch (err) {
+      setError(err.message || t('demo.error'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.72)', zIndex: 9999,
+               display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div style={{ background: '#0f172a', border: '1.5px solid rgba(190,254,0,0.25)',
+                    borderRadius: 20, padding: '32px 28px', width: '100%', maxWidth: 460,
+                    boxShadow: '0 0 60px rgba(190,254,0,0.12)' }}>
+        <div style={{ textAlign: 'center', marginBottom: 24 }}>
+          <div style={{ fontSize: 28, marginBottom: 8 }}>⚡</div>
+          <div style={{ fontSize: 22, fontWeight: 900, color: '#fff',
+                        fontFamily: 'Impact, Arial Black, sans-serif', marginBottom: 6 }}>
+            {t('demo.modalTitle')}
+          </div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', lineHeight: 1.5 }}>
+            {t('demo.modalSub')}
+          </div>
+        </div>
+
+        {error && (
+          <div style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.35)',
+                        color: '#fca5a5', borderRadius: 8, padding: '10px 14px', fontSize: 13,
+                        marginBottom: 16, textAlign: 'center' }}>
+            {error}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: 12, flexDirection: 'row' }}>
+          {[
+            { role: 'admin',  icon: '🖥',  label: t('demo.adminCard'),  desc: t('demo.adminDesc') },
+            { role: 'member', icon: '📱', label: t('demo.memberCard'), desc: t('demo.memberDesc') },
+          ].map(({ role, icon, label, desc }) => (
+            <button
+              key={role}
+              disabled={loading}
+              onClick={() => pick(role)}
+              style={{ flex: 1, background: 'rgba(190,254,0,0.06)', border: '1.5px solid rgba(190,254,0,0.2)',
+                       borderRadius: 14, padding: '20px 16px', cursor: loading ? 'not-allowed' : 'pointer',
+                       textAlign: 'center', opacity: loading ? 0.6 : 1, transition: 'border-color 0.15s' }}
+              onMouseEnter={(e) => { if (!loading) e.currentTarget.style.borderColor = 'rgba(190,254,0,0.6)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(190,254,0,0.2)'; }}
+            >
+              <div style={{ fontSize: 28, marginBottom: 8 }}>{icon}</div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: '#BEFE00', marginBottom: 6 }}>{label}</div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>{desc}</div>
+            </button>
+          ))}
+        </div>
+
+        <button
+          onClick={onClose}
+          style={{ display: 'block', margin: '20px auto 0', background: 'none', border: 'none',
+                   color: 'rgba(255,255,255,0.3)', fontSize: 13, cursor: 'pointer' }}
+        >
+          {t('common.cancel')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── DemoBanner ────────────────────────────────────────────────────────────────
+
+export function DemoBanner({ expiresAt, onEnd }) {
+  const { t } = useTranslation();
+  const [remaining, setRemaining] = useState('');
+
+  const compute = useCallback(() => {
+    const diff = Math.max(0, new Date(expiresAt) - Date.now());
+    if (diff === 0) { onEnd(); return; }
+    const m = String(Math.floor(diff / 60000)).padStart(2, '0');
+    const s = String(Math.floor((diff % 60000) / 1000)).padStart(2, '0');
+    setRemaining(`${m}:${s}`);
+  }, [expiresAt, onEnd]);
+
+  useEffect(() => {
+    compute();
+    const id = setInterval(compute, 1000);
+    return () => clearInterval(id);
+  }, [compute]);
+
+  return (
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9998,
+                  background: 'rgba(15,23,42,0.97)', borderBottom: '1px solid rgba(190,254,0,0.25)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  flexWrap: 'wrap', gap: '6px 20px', padding: '8px 16px', fontSize: 12 }}>
+      <span style={{ color: '#BEFE00', fontWeight: 800 }}>⚡ {t('demo.banner')}</span>
+      <span style={{ color: 'rgba(255,255,255,0.6)' }}>
+        {t('demo.bannerRemaining', { min: remaining.split(':')[0], sec: remaining.split(':')[1] })}
+      </span>
+      <span style={{ color: 'rgba(255,255,255,0.35)' }}>·</span>
+      <span style={{ color: 'rgba(255,255,255,0.45)' }}>{t('demo.bannerReset')}</span>
+      <button
+        onClick={onEnd}
+        style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)',
+                 color: '#fca5a5', borderRadius: 6, padding: '2px 10px', fontSize: 11,
+                 cursor: 'pointer', fontWeight: 700 }}
+      >
+        {t('demo.bannerEnd')}
+      </button>
     </div>
   );
 }
@@ -715,13 +852,14 @@ function PinModal({ token, onSuccess, onCancel }) {
 export default function App() {
   const [auth, setAuth] = useState(() => {
     const staff = loadStaffSession();
-    if (staff) return { token: staff.token, role: staff.role, gymName: staff.gymName };
+    if (staff) return { token: staff.token, role: staff.role, gymName: staff.gymName, isDemo: staff.isDemo, expiresAt: staff.expiresAt };
     const session = loadSession();
     if (!session) return null;
-    return { token: session.token, role: 'member', gymName: '', memberName: session.member.name };
+    return { token: session.token, role: 'member', gymName: '', memberName: session.member?.name, isDemo: session.isDemo, expiresAt: session.expiresAt };
   });
   const [page, setPage] = useState('scan');
   const [showPinModal, setShowPinModal] = useState(false);
+  const [showDemoPicker, setShowDemoPicker] = useState(false);
 
   const handleLogin = (token, role, gymName, gymId) => {
     if (gymId) localStorage.setItem('gymId', gymId);
@@ -732,6 +870,21 @@ export default function App() {
   const handleMemberLogin = (token, member, remember) => {
     if (remember) saveSession(token, member);
     setAuth({ token, role: 'member', gymName: '', memberName: member.name });
+  };
+
+  const handleDemoStart = (data) => {
+    setShowDemoPicker(false);
+    const { token, role, gymName, expiresAt, isDemo } = data;
+    if (role === 'admin') {
+      saveStaffSession(token, role, gymName, { isDemo, expiresAt });
+      localStorage.setItem(PIN_UNLOCK_KEY, token);
+      setPage('scan');
+      setAuth({ token, role, gymName, isDemo, expiresAt });
+    } else {
+      const member = { id: null, name: 'Demo Pengguna', gymId: null };
+      localStorage.setItem(SESSION_KEY, JSON.stringify({ token, member, isDemo, expiresAt }));
+      setAuth({ token, role: 'member', gymName, memberName: 'Demo Pengguna', isDemo, expiresAt });
+    }
   };
 
   const handleLogout = () => {
@@ -747,42 +900,71 @@ export default function App() {
   }
 
   if (!auth) {
-    return <LoginForm onLogin={handleLogin} onMemberLogin={handleMemberLogin} gymSlug={gymSlugFromUrl} />;
+    return (
+      <>
+        <LoginForm
+          onLogin={handleLogin}
+          onMemberLogin={handleMemberLogin}
+          gymSlug={gymSlugFromUrl}
+          onTryDemo={() => setShowDemoPicker(true)}
+        />
+        <DemoRolePicker
+          open={showDemoPicker}
+          onClose={() => setShowDemoPicker(false)}
+          onStart={handleDemoStart}
+        />
+      </>
+    );
   }
+
+  const demoBanner = auth.isDemo
+    ? <DemoBanner expiresAt={auth.expiresAt} onEnd={handleLogout} />
+    : null;
+  const demoPaddingTop = auth.isDemo ? { paddingTop: 36 } : {};
 
   if (auth.role === 'superadmin') {
     return <SuperadminPage token={auth.token} onLogout={handleLogout} />;
   }
 
   if (auth.role === 'member') {
-    return <MemberPage token={auth.token} onLogout={handleLogout} checkinCodeFromUrl={checkinCodeFromUrl} />;
+    return (
+      <>
+        {demoBanner}
+        <div style={demoPaddingTop}>
+          <MemberPage token={auth.token} onLogout={handleLogout} checkinCodeFromUrl={checkinCodeFromUrl} />
+        </div>
+      </>
+    );
   }
 
   return (
     <>
-      {page === 'scan' && (
-        <ScanPage
-          token={auth.token}
-          role={auth.role}
-          gymName={auth.gymName}
-          onLogout={handleLogout}
-          onAdminAccess={() => {
-            if (localStorage.getItem(PIN_UNLOCK_KEY) === auth.token) {
-              setPage('admin');
-            } else {
-              setShowPinModal(true);
-            }
-          }}
-        />
-      )}
-      {page === 'admin' && (
-        <AdminPage
-          token={auth.token}
-          role={auth.role}
-          gymName={auth.gymName}
-          onBack={() => setPage('scan')}
-        />
-      )}
+      {demoBanner}
+      <div style={demoPaddingTop}>
+        {page === 'scan' && (
+          <ScanPage
+            token={auth.token}
+            role={auth.role}
+            gymName={auth.gymName}
+            onLogout={handleLogout}
+            onAdminAccess={() => {
+              if (localStorage.getItem(PIN_UNLOCK_KEY) === auth.token) {
+                setPage('admin');
+              } else {
+                setShowPinModal(true);
+              }
+            }}
+          />
+        )}
+        {page === 'admin' && (
+          <AdminPage
+            token={auth.token}
+            role={auth.role}
+            gymName={auth.gymName}
+            onBack={() => setPage('scan')}
+          />
+        )}
+      </div>
       {showPinModal && (
         <PinModal
           token={auth.token}
