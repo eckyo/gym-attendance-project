@@ -598,6 +598,15 @@ function LoginForm({ onLogin, onMemberLogin, gymSlug, onTryDemo }) {
                 <button type="button" style={s.btnStaff} onClick={() => switchMode('staff')}>
                   {t('login.staffAccessLink')}
                 </button>
+                {onTryDemo && (
+                  <button
+                    type="button"
+                    onClick={onTryDemo}
+                    style={{ ...s.btnStaff, marginTop: 8, color: '#BEFE00', borderColor: 'rgba(190,254,0,0.3)' }}
+                  >
+                    ⚡ {t('landing.demo.loginBtn')}
+                  </button>
+                )}
               </>
             )}
           </form>
@@ -649,15 +658,6 @@ function LoginForm({ onLogin, onMemberLogin, gymSlug, onTryDemo }) {
         >
           💬 <strong style={{ color: '#BEFE00', fontWeight: 700 }}>{t('login.contactUsLabel')}</strong> {t('login.contactUsVia')}
         </a>
-        {onTryDemo && (
-          <button
-            type="button"
-            onClick={onTryDemo}
-            style={{ ...s.staffLink, marginTop: 10, color: 'rgba(190,254,0,0.6)', fontSize: 13 }}
-          >
-            ⚡ {t('landing.demo.loginBtn')}
-          </button>
-        )}
       </div>
     </div>
   );
