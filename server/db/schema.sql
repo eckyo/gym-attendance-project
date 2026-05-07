@@ -323,3 +323,8 @@ CREATE TABLE IF NOT EXISTS gamification_platform_config (
   CONSTRAINT singleton_row CHECK (id = 1)
 );
 INSERT INTO gamification_platform_config (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+
+-- ── Demo gym columns ──────────────────────────────────────────────────────────
+
+ALTER TABLE gyms ADD COLUMN IF NOT EXISTS is_demo       BOOLEAN     NOT NULL DEFAULT false;
+ALTER TABLE gyms ADD COLUMN IF NOT EXISTS demo_reset_at TIMESTAMPTZ;

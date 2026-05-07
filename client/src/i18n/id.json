@@ -627,6 +627,21 @@
     },
     "footer": {
       "copy": "© 2026 Kios Gym. All rights reserved."
+    },
+    "demo": {
+      "btn": "Coba Demo",
+      "modalTitle": "Coba Kios Gym Gratis",
+      "modalSub": "Sesi 30 menit · tanpa daftar · data direset tiap jam",
+      "adminCard": "Tampilan Admin",
+      "adminDesc": "Dashboard penuh: kelola member, paket & laporan",
+      "memberCard": "Tampilan Member",
+      "memberDesc": "Aplikasi member dengan gamifikasi, check-in & hadiah",
+      "banner": "Mode Demo",
+      "bannerRemaining": "{min}:{sec} tersisa",
+      "bannerReset": "Data direset tiap jam",
+      "bannerEnd": "Keluar Demo",
+      "loginBtn": "Coba Demo — tanpa daftar",
+      "error": "Demo tidak tersedia, coba lagi"
     }
   }
 }

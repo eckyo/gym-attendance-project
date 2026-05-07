@@ -13,6 +13,8 @@ import groupsRouter from './routes/groups.js';
 import memberRouter from './routes/member.js';
 import publicRouter from './routes/public.js';
 import { memberRouter as gamificationMemberRouter, adminRouter as gamificationAdminRouter } from './routes/gamification.js';
+import demoRouter from './routes/demo.js';
+import { ensureDemoGym } from './db/demo-seed.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -35,6 +37,7 @@ app.use('/api/member', memberRouter);
 app.use('/api/public', publicRouter);
 app.use('/api/member/gamification', gamificationMemberRouter);
 app.use('/api/admin/gamification', gamificationAdminRouter);
+app.use('/api/demo', demoRouter);
 
 app.use((err, req, res, next) => {
   console.error(err);
@@ -55,4 +58,7 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+  ensureDemoGym().catch(err => console.error('[demo] Init failed:', err.message));
+});
