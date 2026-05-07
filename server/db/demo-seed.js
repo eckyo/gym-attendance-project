@@ -64,7 +64,37 @@ export async function ensureDemoGym() {
       [gymId, STAFF_EMAIL, staffHash],
     );
 
-    // 4. Packages (idempotent by name+gym_id)
+    // 4. Packages — deduplicate first (no unique constraint on gym_id+name),
+    //    then select-or-insert to stay idempotent across restarts.
+    //    Must re-point members to the surviving package before deleting extras.
+    const keepPkgs = await client.query(
+      `SELECT DISTINCT ON (name) id, name
+       FROM membership_packages WHERE gym_id = $1 ORDER BY name, created_at ASC`,
+      [gymId],
+    );
+    for (const row of keepPkgs.rows) {
+      // Point any member referencing a duplicate to the surviving id
+      await client.query(
+        `UPDATE members SET package_id = $1
+         WHERE gym_id = $2 AND package_id IN (
+           SELECT id FROM membership_packages
+           WHERE gym_id = $2 AND name = $3 AND id <> $1
+         )`,
+        [row.id, gymId, row.name],
+      );
+    }
+    await client.query(
+      `DELETE FROM membership_packages
+       WHERE gym_id = $1
+         AND id NOT IN (
+           SELECT DISTINCT ON (name) id
+           FROM membership_packages
+           WHERE gym_id = $1
+           ORDER BY name, created_at ASC
+         )`,
+      [gymId],
+    );
+
     const packages = [
       { name: 'Bulanan',   days: 30,  price: 150000 },
       { name: 'Tri Bulan', days: 90,  price: 400000 },
@@ -72,21 +102,18 @@ export async function ensureDemoGym() {
     ];
     const pkgIds = {};
     for (const pkg of packages) {
-      const r = await client.query(
-        `INSERT INTO membership_packages (gym_id, name, duration_days, price)
-         VALUES ($1, $2, $3, $4)
-         ON CONFLICT DO NOTHING
-         RETURNING id`,
-        [gymId, pkg.name, pkg.days, pkg.price],
+      const existing = await client.query(
+        'SELECT id FROM membership_packages WHERE gym_id=$1 AND name=$2 LIMIT 1',
+        [gymId, pkg.name],
       );
-      if (r.rows.length > 0) {
-        pkgIds[pkg.name] = r.rows[0].id;
-      } else {
-        const existing = await client.query(
-          'SELECT id FROM membership_packages WHERE gym_id=$1 AND name=$2',
-          [gymId, pkg.name],
-        );
+      if (existing.rows.length > 0) {
         pkgIds[pkg.name] = existing.rows[0].id;
+      } else {
+        const r = await client.query(
+          'INSERT INTO membership_packages (gym_id, name, duration_days, price) VALUES ($1,$2,$3,$4) RETURNING id',
+          [gymId, pkg.name, pkg.days, pkg.price],
+        );
+        pkgIds[pkg.name] = r.rows[0].id;
       }
     }
 
@@ -226,36 +253,62 @@ export async function resetDemoData(gymId) {
       );
     }
 
-    // Seed demo member (DEMO-M): rank=regular, 45 visits, 1 pending spin
+    // Seed demo member (DEMO-M): veteran rank, 32 visits, 2 claimable spins,
+    //   active XP boost, and 60 days of attendance history.
     if (demoMember) {
       await client.query(
         `INSERT INTO member_gamification
            (gym_id, member_id, total_xp, rank, total_visits, pending_spins, last_visit_date)
-         VALUES ($1, $2, 1800, 'regular', 45, 1, NOW())`,
+         VALUES ($1, $2, 3200, 'veteran', 32, 2, NOW())`,
         [gymId, demoMember.id],
       );
 
-      // Pending gacha spin (visits milestone = 10)
-      const spinRes = await client.query(
+      // 2 pending gacha spins for visit milestones 10 and 30
+      for (const milestone of [10, 30]) {
+        const spinRes = await client.query(
+          `INSERT INTO member_gacha_spins
+             (gym_id, member_id, streak_type, milestone_value, status)
+           VALUES ($1, $2, 'visits', $3, 'pending')
+           RETURNING id`,
+          [gymId, demoMember.id, milestone],
+        );
+        await client.query(
+          `INSERT INTO member_streak_milestones
+             (gym_id, member_id, streak_type, milestone_value, spin_id)
+           VALUES ($1, $2, 'visits', $3, $4)
+           ON CONFLICT (gym_id, member_id, streak_type, milestone_value) DO NOTHING`,
+          [gymId, demoMember.id, milestone, spinRes.rows[0].id],
+        );
+      }
+
+      // Active XP boost (rare, 1.25×, expires in 5 days) from a completed spin
+      const completedSpin = await client.query(
         `INSERT INTO member_gacha_spins
-           (gym_id, member_id, streak_type, milestone_value, status)
-         VALUES ($1, $2, 'visits', 10, 'pending')
+           (gym_id, member_id, streak_type, milestone_value, status, spun_at,
+            rarity, reward_type, reward_detail)
+         VALUES ($1, $2, 'visits', 20, 'completed', NOW() - INTERVAL '2 days',
+                 'rare', 'xp_boost', '{"multiplier":1.25,"durationDays":7}')
          RETURNING id`,
         [gymId, demoMember.id],
       );
       await client.query(
-        `INSERT INTO member_streak_milestones
-           (gym_id, member_id, streak_type, milestone_value, spin_id)
-         VALUES ($1, $2, 'visits', 10, $3)
-         ON CONFLICT DO NOTHING`,
-        [gymId, demoMember.id, spinRes.rows[0].id],
+        `INSERT INTO member_xp_boosts
+           (gym_id, member_id, source_spin, rarity, multiplier, expires_at)
+         VALUES ($1, $2, $3, 'rare', 1.25, NOW() + INTERVAL '5 days')`,
+        [gymId, demoMember.id, completedSpin.rows[0].id],
       );
 
-      // Seed a few attendance logs for demo member
-      for (let daysAgo = 5; daysAgo >= 1; daysAgo--) {
+      // 60 days of attendance history — 3–4x/week, varied hours
+      const checkinHours = [7, 8, 9, 12, 17, 18, 19, 20];
+      for (let daysAgo = 60; daysAgo >= 1; daysAgo--) {
         const d = new Date(now);
         d.setDate(d.getDate() - daysAgo);
-        d.setHours(9, randomBetween(0, 59), 0, 0);
+        const dow = d.getDay();
+        // ~3-4x per week: skip ~30% of days randomly, always skip Sunday
+        if (dow === 0) continue;
+        if (Math.random() < 0.30) continue;
+        const hour = checkinHours[Math.floor(Math.random() * checkinHours.length)];
+        d.setHours(hour, randomBetween(0, 59), 0, 0);
         const out = new Date(d);
         out.setMinutes(out.getMinutes() + randomBetween(45, 90));
         await client.query(
