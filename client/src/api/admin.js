@@ -210,6 +210,15 @@ export const getDashboard = (token, { start, end } = {}) => {
   }).then(handleResponse);
 };
 
+export const getMemberEngagement = (token, { start, end } = {}) => {
+  const params = new URLSearchParams();
+  if (start) params.set('start', start);
+  if (end)   params.set('end', end);
+  return fetch(`${API_BASE}/api/admin/gamification/engagement?${params}`, {
+    headers: authHeaders(token),
+  }).then(handleResponse);
+};
+
 export const getGroups = (token) =>
   fetch(`${API_BASE}/api/groups`, {
     headers: authHeaders(token),

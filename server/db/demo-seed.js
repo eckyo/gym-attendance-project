@@ -319,6 +319,74 @@ export async function resetDemoData(gymId) {
       }
     }
 
+    // Seed transactions — 6 months of history for Business Dashboard metrics
+    const pkgRes = await client.query(
+      `SELECT id, name, price FROM membership_packages WHERE gym_id = $1`,
+      [gymId],
+    );
+    const pkgs = {};
+    for (const p of pkgRes.rows) pkgs[p.name] = { id: p.id, price: parseInt(p.price, 10) };
+    const txPkgNames = ['Bulanan', 'Tri Bulan'];
+
+    for (let mo = 5; mo >= 0; mo--) {
+      const mStart = new Date(now.getFullYear(), now.getMonth() - mo, 1);
+      const mLastDay = new Date(now.getFullYear(), now.getMonth() - mo + 1, 0).getDate();
+
+      // new_member: 2–3 per month
+      for (let i = 0; i < randomBetween(2, 3); i++) {
+        const d = new Date(mStart.getFullYear(), mStart.getMonth(), randomBetween(1, mLastDay), randomBetween(8, 20));
+        if (d > now) continue;
+        const pkgName = txPkgNames[randomBetween(0, 1)];
+        const m = regulars[randomBetween(0, regulars.length - 1)];
+        await client.query(
+          `INSERT INTO transactions (gym_id, member_id, type, amount, package_id, created_at)
+           VALUES ($1,$2,'new_member',$3,$4,$5)`,
+          [gymId, m.id, pkgs[pkgName].price, pkgs[pkgName].id, d.toISOString()],
+        );
+      }
+
+      // renewal: 3–5 per month
+      for (let i = 0; i < randomBetween(3, 5); i++) {
+        const d = new Date(mStart.getFullYear(), mStart.getMonth(), randomBetween(1, mLastDay), randomBetween(8, 20));
+        if (d > now) continue;
+        const pkgName = txPkgNames[randomBetween(0, 1)];
+        const m = regulars[randomBetween(0, regulars.length - 1)];
+        await client.query(
+          `INSERT INTO transactions (gym_id, member_id, type, amount, package_id, created_at)
+           VALUES ($1,$2,'renewal',$3,$4,$5)`,
+          [gymId, m.id, pkgs[pkgName].price, pkgs[pkgName].id, d.toISOString()],
+        );
+      }
+
+      // walk_in: 5–8 per month at Rp 30,000 each
+      for (let i = 0; i < randomBetween(5, 8); i++) {
+        const d = new Date(mStart.getFullYear(), mStart.getMonth(), randomBetween(1, mLastDay), randomBetween(8, 20));
+        if (d > now) continue;
+        await client.query(
+          `INSERT INTO transactions (gym_id, member_id, type, amount, created_at)
+           VALUES ($1,NULL,'walk_in',30000,$2)`,
+          [gymId, d.toISOString()],
+        );
+      }
+    }
+
+    // Ensure "Today" filter is never empty — seed 1 renewal + 2 walk-ins for today
+    const todayBase = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 9, 0, 0);
+    await client.query(
+      `INSERT INTO transactions (gym_id, member_id, type, amount, package_id, created_at)
+       VALUES ($1,$2,'renewal',$3,$4,$5)`,
+      [gymId, regulars[0].id, pkgs['Bulanan'].price, pkgs['Bulanan'].id, todayBase.toISOString()],
+    );
+    for (let i = 0; i < 2; i++) {
+      const wt = new Date(todayBase);
+      wt.setHours(11 + i * 3);
+      await client.query(
+        `INSERT INTO transactions (gym_id, member_id, type, amount, created_at)
+         VALUES ($1,NULL,'walk_in',30000,$2)`,
+        [gymId, wt.toISOString()],
+      );
+    }
+
     // Stamp reset time
     await client.query(
       'UPDATE gyms SET demo_reset_at = NOW() WHERE id = $1',

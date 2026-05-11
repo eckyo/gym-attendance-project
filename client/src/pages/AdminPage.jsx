@@ -15,13 +15,14 @@ import {
   deleteMember, changePin, exportMembers, downloadTemplate,
   previewImport, confirmImport, getStaff, addStaff, removeStaff, verifyPin, changeStaffPassword,
   getPackages, createPackage, updatePackage, deletePackage, setDefaultPackage,
-  addMemberWithPackage, getSettings, setVisitorPrice, setRegFeeRule, changeAdminPassword, getDashboard,
+  addMemberWithPackage, getSettings, setVisitorPrice, setRegFeeRule, changeAdminPassword, getDashboard, getMemberEngagement,
   getGroups, createGroup, updateGroup, deleteGroup, addGroupMember, removeGroupMember, renewGroup,
   setGymCode,
   setPackagePrefix,
 } from '../api/admin.js';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useTranslation, LanguageSwitcher } from '../i18n/LanguageContext.jsx';
+import { DollarSign, TrendingUp, Shield, Zap, Award, Trophy, Clock } from 'lucide-react';
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
@@ -3053,18 +3054,59 @@ function StatCard({ label, value, sub }) {
   );
 }
 
+const TIER_COLORS = {
+  legend:  '#BEFE00',
+  elite:   '#f59e0b',
+  veteran: '#3b82f6',
+  regular: '#8b5cf6',
+  rookie:  '#64748b',
+};
+const TIER_TEXT_COLORS = {
+  legend:  '#4a7c00',
+  elite:   '#92400e',
+  veteran: '#1e40af',
+  regular: '#5b21b6',
+  rookie:  '#475569',
+};
+const TIER_ORDER = ['legend', 'elite', 'veteran', 'regular', 'rookie'];
+
+function TierBar({ rank, count, pct, rankLabel }) {
+  const fillColor = TIER_COLORS[rank] || '#64748b';
+  const textColor = TIER_TEXT_COLORS[rank] || '#475569';
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+      <div style={{ width: 68, fontSize: 12, fontWeight: 700, color: textColor, flexShrink: 0 }}>{rankLabel}</div>
+      <div style={{ flex: 1, background: '#f1f5f9', borderRadius: 4, height: 12, overflow: 'hidden' }}>
+        <div style={{ width: `${pct}%`, height: '100%', background: fillColor, borderRadius: 4, transition: 'width 0.4s' }} />
+      </div>
+      <div style={{ width: 72, fontSize: 12, color: '#64748b', textAlign: 'right', flexShrink: 0 }}>
+        {count} <span style={{ opacity: 0.6 }}>({pct}%)</span>
+      </div>
+    </div>
+  );
+}
+
+function BizSectionTitle({ icon: Icon, children }) {
+  return (
+    <div style={{ fontSize: 16, fontWeight: 700, color: '#1e293b', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 7 }}>
+      <Icon size={16} strokeWidth={2} color="#94a3b8" />
+      {children}
+    </div>
+  );
+}
+
 function BusinessTab({ token }) {
   const today = new Date().toISOString().slice(0, 10);
   const [period, setPeriod] = useState('month');
   const [customStart, setCustomStart] = useState(today);
   const [customEnd, setCustomEnd] = useState(today);
   const [data, setData] = useState(null);
+  const [engData, setEngData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const { t } = useTranslation();
 
   const getRange = (p) => {
-    const now = new Date();
     if (p === 'today') return { start: today, end: today };
     if (p === 'week')  return { start: getMonday(today), end: today };
     if (p === 'month') return { start: `${today.slice(0, 7)}-01`, end: today };
@@ -3076,8 +3118,12 @@ function BusinessTab({ token }) {
     setError('');
     try {
       const range = getRange(p);
-      const result = await getDashboard(token, range);
-      setData(result);
+      const [dashRes, engRes] = await Promise.all([
+        getDashboard(token, range),
+        getMemberEngagement(token, range),
+      ]);
+      setData(dashRes);
+      setEngData(engRes);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -3095,6 +3141,16 @@ function BusinessTab({ token }) {
   }));
 
   const rp = (v) => `Rp ${Number(v).toLocaleString('id-ID')}`;
+
+  const periodLabel = period === 'today'  ? t('admin.business.periodToday')
+                    : period === 'week'   ? t('admin.business.periodWeek')
+                    : period === 'month'  ? t('admin.business.periodMonth')
+                    : `${customStart} – ${customEnd}`;
+
+  const peakHours = (engData?.peak_hours || []).map((r) => ({
+    ...r,
+    label: r.hour === 0 ? '12am' : r.hour < 12 ? `${r.hour}am` : r.hour === 12 ? '12pm' : `${r.hour - 12}pm`,
+  }));
 
   return (
     <div>
@@ -3126,7 +3182,7 @@ function BusinessTab({ token }) {
       {!loading && data && (
         <>
           {/* Revenue Snapshot */}
-          <div style={s.sectionTitle}>{t('admin.business.revenueSnapshot')}</div>
+          <BizSectionTitle icon={DollarSign}>{t('admin.business.revenueSnapshot')}</BizSectionTitle>
           <div style={s.cardRow}>
             <StatCard
               label={t('admin.business.totalRevenue')}
@@ -3145,15 +3201,15 @@ function BusinessTab({ token }) {
           </div>
 
           {/* Revenue Trend */}
-          <div style={s.sectionTitle}>{t('admin.business.trendTitle')}</div>
+          <BizSectionTitle icon={TrendingUp}>{t('admin.business.trendTitle')}</BizSectionTitle>
           <div style={s.chartCard}>
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={trend} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                 <XAxis dataKey="monthLabel" tick={{ fontSize: 12 }} />
                 <YAxis tickFormatter={(v) => v >= 1_000_000 ? `${(v/1_000_000).toFixed(1)}M` : v >= 1000 ? `${(v/1000).toFixed(0)}K` : v} tick={{ fontSize: 11 }} width={52} />
-                <Tooltip formatter={(v, name) => [rp(v), name]} />
+                <Tooltip formatter={(v, name) => [rp(v), name]} itemStyle={{ color: '#1e293b' }} />
                 <Legend />
-                <Bar dataKey="new_member" name="New Member" stackId="a" fill="#BEFE00" />
+                <Bar dataKey="new_member" name="New Member" stackId="a" fill="#65a30d" />
                 <Bar dataKey="renewal"    name="Renewal"    stackId="a" fill="#3b82f6" />
                 <Bar dataKey="walk_in"    name="Walk-in"    stackId="a" fill="#f59e0b" radius={[4,4,0,0]} />
               </BarChart>
@@ -3161,7 +3217,7 @@ function BusinessTab({ token }) {
           </div>
 
           {/* Retention Health */}
-          <div style={s.sectionTitle}>{t('admin.business.retentionTitle')}</div>
+          <BizSectionTitle icon={Shield}>{t('admin.business.retentionTitle')}</BizSectionTitle>
           <div style={s.cardRow}>
             <StatCard
               label={t('admin.business.churnRate')}
@@ -3184,6 +3240,142 @@ function BusinessTab({ token }) {
               sub={data.snapshot.avg_tenure_days != null ? t('admin.business.days') : undefined}
             />
           </div>
+
+          {engData && (
+            <>
+              {/* ── Member Engagement ── */}
+              <BizSectionTitle icon={Zap}>{t('admin.business.engagementTitle')}</BizSectionTitle>
+              <div style={s.cardRow}>
+                <StatCard
+                  label={t('admin.business.engagementRate')}
+                  value={`${engData.engagement.rate}%`}
+                  sub={t('admin.business.engagementRateSub', { visited: engData.engagement.visited_count, total: engData.engagement.active_total })}
+                />
+                <StatCard
+                  label={t('admin.business.atRisk')}
+                  value={engData.at_risk}
+                  sub={t('admin.business.atRiskSub')}
+                />
+              </div>
+
+              {/* ── Tier Distribution ── */}
+              <BizSectionTitle icon={Award}>{t('admin.business.tierTitle')}</BizSectionTitle>
+              <div style={{ ...s.chartCard, padding: '16px 20px' }}>
+                {TIER_ORDER.map((rank) => {
+                  const tier = engData.tiers.find((t2) => t2.rank === rank) || { count: 0, pct: 0 };
+                  return (
+                    <TierBar
+                      key={rank}
+                      rank={rank}
+                      count={tier.count}
+                      pct={tier.pct}
+                      rankLabel={t(`admin.business.rank${rank.charAt(0).toUpperCase() + rank.slice(1)}`)}
+                    />
+                  );
+                })}
+              </div>
+
+              {/* ── Visit Leaderboard ── */}
+              <BizSectionTitle icon={Trophy}>{t('admin.business.leaderboardTitle')}</BizSectionTitle>
+              {engData.leaderboard.length === 0 ? (
+                <div style={{ ...s.chartCard, color: '#64748b', fontSize: 13 }}>{t('admin.business.leaderboardEmpty')}</div>
+              ) : (() => {
+                const MEDAL = [
+                  { emoji: '👑', bg: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)', border: '#f59e0b', nameSz: 15 },
+                  { emoji: '🥈', bg: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)', border: '#94a3b8', nameSz: 14 },
+                  { emoji: '🥉', bg: 'linear-gradient(135deg, #fff7ed 0%, #fed7aa 100%)', border: '#c2874f', nameSz: 14 },
+                ];
+                const maxCheckins = engData.leaderboard[0]?.checkins || 1;
+                const rankLabel = (rank) => t(`admin.business.rank${rank.charAt(0).toUpperCase() + rank.slice(1)}`);
+                return (
+                  <div style={{ borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 6px rgba(0,0,0,0.07)', marginBottom: 24 }}>
+                    {engData.leaderboard.map((row, i) => {
+                      const barPct = Math.round((row.checkins / maxCheckins) * 100);
+                      if (i < 3) {
+                        const m = MEDAL[i];
+                        return (
+                          <div key={row.id} style={{ background: m.bg, borderLeft: `4px solid ${m.border}`, borderBottom: '1px solid rgba(0,0,0,0.06)', padding: i === 0 ? '18px 20px' : '13px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <div style={{ fontSize: i === 0 ? 26 : 20, width: 36, textAlign: 'center', flexShrink: 0 }}>{m.emoji}</div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: m.nameSz, fontWeight: 700, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.name}</div>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: TIER_TEXT_COLORS[row.rank] || '#475569', marginTop: 2 }}>{rankLabel(row.rank)}</div>
+                              <div style={{ marginTop: 6, background: 'rgba(0,0,0,0.08)', borderRadius: 3, height: 4, overflow: 'hidden' }}>
+                                <div style={{ width: `${barPct}%`, height: '100%', background: m.border, borderRadius: 3 }} />
+                              </div>
+                            </div>
+                            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                              <div style={{ fontSize: i === 0 ? 22 : 17, fontWeight: 800, color: '#1e293b' }}>{row.checkins}</div>
+                              <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 1 }}>{t('admin.business.checkins')}</div>
+                            </div>
+                          </div>
+                        );
+                      }
+                      if (i === 3) {
+                        return (
+                          <div key="divider-rest">
+                            <div style={{ background: '#f8fafc', padding: '6px 20px', fontSize: 11, fontWeight: 600, color: '#94a3b8', letterSpacing: '0.05em', textTransform: 'uppercase', borderBottom: '1px solid #e2e8f0' }}>
+                              Challengers
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', background: '#fff', borderBottom: '1px solid #f1f5f9' }}>
+                              <div style={{ width: 28, fontSize: 12, fontWeight: 700, color: '#94a3b8', textAlign: 'center' }}>{i + 1}</div>
+                              <div style={{ flex: 1, fontSize: 13, fontWeight: 500, color: '#1e293b' }}>{row.name}</div>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: TIER_TEXT_COLORS[row.rank] || '#475569' }}>{rankLabel(row.rank)}</div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <div style={{ width: 48, background: '#f1f5f9', borderRadius: 3, height: 4 }}>
+                                  <div style={{ width: `${barPct}%`, height: '100%', background: TIER_COLORS[row.rank] || '#64748b', borderRadius: 3 }} />
+                                </div>
+                                <span style={{ fontSize: 12, fontWeight: 600, minWidth: 20, textAlign: 'right', color: '#475569' }}>{row.checkins}</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return (
+                        <div key={row.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', background: i % 2 === 0 ? '#fff' : '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
+                          <div style={{ width: 28, fontSize: 12, fontWeight: 700, color: '#94a3b8', textAlign: 'center' }}>{i + 1}</div>
+                          <div style={{ flex: 1, fontSize: 13, fontWeight: 500, color: '#1e293b' }}>{row.name}</div>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: TIER_TEXT_COLORS[row.rank] || '#475569' }}>{rankLabel(row.rank)}</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <div style={{ width: 48, background: '#f1f5f9', borderRadius: 3, height: 4 }}>
+                              <div style={{ width: `${barPct}%`, height: '100%', background: TIER_COLORS[row.rank] || '#64748b', borderRadius: 3 }} />
+                            </div>
+                            <span style={{ fontSize: 12, fontWeight: 600, minWidth: 20, textAlign: 'right', color: '#475569' }}>{row.checkins}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+
+              {/* ── Peak Activity ── */}
+              <BizSectionTitle icon={Clock}>{t('admin.business.peakTitle')}</BizSectionTitle>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+                <div style={s.chartCard}>
+                  <div style={{ fontSize: 12, color: '#64748b', marginBottom: 12 }}>{t('admin.business.peakHoursLabel')}</div>
+                  <ResponsiveContainer width="100%" height={180}>
+                    <BarChart data={peakHours} margin={{ top: 0, right: 4, left: -20, bottom: 0 }}>
+                      <XAxis dataKey="label" tick={{ fontSize: 10 }} interval={1} />
+                      <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+                      <Tooltip formatter={(v) => [v, t('admin.business.checkins')]} itemStyle={{ color: '#1e293b' }} />
+                      <Bar dataKey="count" fill="#65a30d" radius={[2,2,0,0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                <div style={s.chartCard}>
+                  <div style={{ fontSize: 12, color: '#64748b', marginBottom: 12 }}>{t('admin.business.peakDaysLabel')}</div>
+                  <ResponsiveContainer width="100%" height={180}>
+                    <BarChart data={engData.peak_days} margin={{ top: 0, right: 4, left: -20, bottom: 0 }}>
+                      <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+                      <Tooltip formatter={(v) => [v, t('admin.business.checkins')]} itemStyle={{ color: '#1e293b' }} />
+                      <Bar dataKey="count" fill="#3b82f6" radius={[2,2,0,0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </>
+          )}
         </>
       )}
     </div>
@@ -3674,30 +3866,10 @@ export default function AdminPage({ token, role, gymName, onBack }) {
               )}
               {role === 'admin' && (
                 <button
-                  disabled
-                  style={{
-                    ...s.tab,
-                    opacity: 0.5,
-                    cursor: 'not-allowed',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                  }}
+                  onClick={() => setTab('business')}
+                  style={{ ...s.tab, ...(tab === 'business' ? s.tabActive : {}) }}
                 >
                   {t('admin.tabs.business')}
-                  <span style={{
-                    fontSize: 9,
-                    fontWeight: 700,
-                    background: '#BEFE00',
-                    color: '#000',
-                    borderRadius: 4,
-                    padding: '1px 5px',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.04em',
-                    lineHeight: 1.4,
-                  }}>
-                    {t('comingSoon')}
-                  </span>
                 </button>
               )}
             </div>
