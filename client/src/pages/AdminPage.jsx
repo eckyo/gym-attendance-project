@@ -2174,7 +2174,7 @@ function MembersTab({ token, gymSettings }) {
           </svg>
           {t('admin.members.export')}
         </button>
-        <div id="members-actions-toolbar" style={{ display: 'contents' }}>
+        <div id="members-actions-toolbar" style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <button style={s.outlineBtn} onClick={() => setShowImportModal(true)}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 5, verticalAlign: 'middle' }}>
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
