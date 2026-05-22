@@ -100,16 +100,17 @@ export function OnboardingProvider({ token, role, isDemo = false, children }) {
       if (!PAGE_TOURS[tourId]) return;
       if (toursSeen[tourId]) return;
       if (role === 'staff' && !STAFF_VISIBLE_TOURS.has(tourId)) return;
-      // Don't start tour while WelcomeModal is open (admin hasn't picked setup type yet)
+      // Don't start tour while WelcomeModal is open — mirrors WelcomeModal's visibility logic:
+      // modal shows when admin + no setupType + (demo bypasses skip flag OR skip flag not set)
       if (
         role === 'admin' &&
         setupType === null &&
-        !sessionStorage.getItem('onboarding_wizard_skipped')
+        (isDemo || !sessionStorage.getItem('onboarding_wizard_skipped'))
       )
         return;
       setActiveTour({ tourId, stepIndex: 0 });
     },
-    [toursSeen, role, setupType]
+    [toursSeen, role, setupType, isDemo]
   );
 
   const advanceTour = useCallback(() => {
