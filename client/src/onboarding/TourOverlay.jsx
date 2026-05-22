@@ -203,7 +203,7 @@ const s = {
     position: 'fixed',
     background: 'rgba(0,0,0,0.55)',
     zIndex: 9998,
-    pointerEvents: 'none',
+    pointerEvents: 'auto',
   },
   tooltip: {
     position: 'fixed',
