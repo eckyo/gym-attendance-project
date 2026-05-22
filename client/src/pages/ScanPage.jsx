@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useOnboarding } from '../onboarding/OnboardingContext.jsx';
 
 function useIsMobile() {
   const [mobile, setMobile] = useState(() => window.innerWidth < 640);
@@ -992,6 +993,7 @@ function ExtendMemberModal({ token, initialTarget, onSuccess, onClose }) {
 
 export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess }) {
   const isMobile = useIsMobile();
+  const { startTour } = useOnboarding();
   const [feedback, setFeedback] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [cameraError, setCameraError] = useState(false);
@@ -1022,6 +1024,12 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
   useEffect(() => {
     getGroups(token).then(setGroups).catch(() => {});
   }, [token]);
+
+  // Fire the scan page tour once the component mounts (delayed so elements render first)
+  useEffect(() => {
+    const timer = setTimeout(() => startTour('scan_page'), 600);
+    return () => clearTimeout(timer);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Countdown auto-close for success overlay — resets on each new check-in (not for extend-only)
   useEffect(() => {
@@ -1212,7 +1220,7 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
             <>
               <LanguageSwitcher variant="light" />
               {role === 'admin' && (
-                <button style={st.adminBtn} onClick={onAdminAccess}>
+                <button id="scan-admin-btn" style={st.adminBtn} onClick={onAdminAccess}>
                   {t('scan.adminDashboard')}
                 </button>
               )}
@@ -1225,7 +1233,7 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
       {/* ── Body ── */}
       <div style={st.body}>
         {/* Camera scanner */}
-        <div style={st.scannerCard}>
+        <div id="scan-scanner-area" style={st.scannerCard}>
           {cameraError && (
             <div style={st.cameraError}>
               <div>{t('scan.cameraError')}</div>
@@ -1278,7 +1286,7 @@ export default function ScanPage({ token, role, gymName, onLogout, onAdminAccess
         </button>
 
         {/* Manage Member dropdown — Register + Extend */}
-        <div style={{ position: 'relative', marginTop: 8 }}>
+        <div id="scan-register-btn" style={{ position: 'relative', marginTop: 8 }}>
           <button
             style={st.imageBtn}
             onClick={() => setManageMemberOpen((p) => !p)}
