@@ -169,7 +169,6 @@
       "remove": "Hapus",
       "qrCode": "Kode QR",
       "colPackage": "Paket",
-      "colPhone": "Telepon",
       "filters": "Filter",
       "filterStatus": "Status",
       "filterStatusAll": "Semua",
@@ -426,7 +425,7 @@
     "selectStatusActive": "Aktif",
     "selectStatusExpired": "Kadaluarsa",
     "selectExpiry": "Berlaku hingga {date}",
-"profile": "Beranda",
+    "profile": "Beranda",
     "package": "Paket",
     "expiry": "Kedaluwarsa",
     "noExpiry": "Tidak ada tanggal kadaluarsa",
@@ -528,11 +527,11 @@
       "legend": "Legenda"
     },
     "rankPerks": {
-      "rookie":  "Terus hadir — setiap sesi itu berarti.",
+      "rookie": "Terus hadir — setiap sesi itu berarti.",
       "regular": "Kamu mulai konsisten. Pertahankan!",
       "veteran": "Member sejati. Dedikasimu nyata.",
-      "elite":   "Komitmen level Elite. Kamu inspirasi orang lain.",
-      "legend":  "Kamu adalah Legenda. Gym adalah rumah keduamu."
+      "elite": "Komitmen level Elite. Kamu inspirasi orang lain.",
+      "legend": "Kamu adalah Legenda. Gym adalah rumah keduamu."
     },
     "xpToNextRank": "{xp} XP menuju {rank}",
     "atMaxRank": "Peringkat tertinggi tercapai",
@@ -580,7 +579,9 @@
     "admin": {}
   },
   "landing": {
-    "nav": { "cta": "Daftar Sekarang" },
+    "nav": {
+      "cta": "Daftar Sekarang"
+    },
     "hero": {
       "headline": "Absensi Gym, Kini Lebih Pintar & Efisien",
       "sub": "Kelola kehadiran member, paket membership, dan laporan — semua dalam satu platform digital.",
@@ -590,20 +591,56 @@
     "pain": {
       "title": "Masih pakai cara lama?",
       "items": [
-        { "icon": "📋", "title": "Absensi manual", "desc": "Buku absen mudah hilang, sulit dicari, dan rawan kesalahan tulis." },
-        { "icon": "⏰", "title": "Tidak ada kontrol expired", "desc": "Member yang sudah tidak bayar bisa masuk tanpa terdeteksi." },
-        { "icon": "🏢", "title": "Multi-lokasi jadi rumit", "desc": "Kelola beberapa cabang gym sekaligus tanpa data yang terintegrasi." }
+        {
+          "icon": "📋",
+          "title": "Absensi manual",
+          "desc": "Buku absen mudah hilang, sulit dicari, dan rawan kesalahan tulis."
+        },
+        {
+          "icon": "⏰",
+          "title": "Tidak ada kontrol expired",
+          "desc": "Member yang sudah tidak bayar bisa masuk tanpa terdeteksi."
+        },
+        {
+          "icon": "🏢",
+          "title": "Multi-lokasi jadi rumit",
+          "desc": "Kelola beberapa cabang gym sekaligus tanpa data yang terintegrasi."
+        }
       ]
     },
     "features": {
       "title": "Semua yang kamu butuhkan",
       "items": [
-        { "icon": "📷", "title": "Scan QR & Kamera", "desc": "Check-in otomatis lewat kamera smartphone atau scan QR cetak." },
-        { "icon": "📦", "title": "Paket Membership Fleksibel", "desc": "Buat paket dengan durasi dan harga kustom sesuai kebutuhan gym." },
-        { "icon": "👥", "title": "Multi-Role Staff", "desc": "Admin, staff, dan member — masing-masing punya akses yang tepat." },
-        { "icon": "📊", "title": "Dashboard Real-time", "desc": "Pantau kehadiran live, laporan harian, dan statistik member kapan saja." },
-        { "icon": "🏢", "title": "Multi-Tenant", "desc": "Satu platform untuk banyak cabang gym, data 100% terisolasi." },
-        { "icon": "🔌", "title": "Tanpa Hardware Khusus", "desc": "Cukup smartphone atau laptop biasa — tidak perlu beli alat mahal." }
+        {
+          "icon": "📷",
+          "title": "Scan QR & Kamera",
+          "desc": "Check-in otomatis lewat kamera smartphone atau scan QR cetak."
+        },
+        {
+          "icon": "📦",
+          "title": "Paket Membership Fleksibel",
+          "desc": "Buat paket dengan durasi dan harga kustom sesuai kebutuhan gym."
+        },
+        {
+          "icon": "👥",
+          "title": "Multi-Role Staff",
+          "desc": "Admin, staff, dan member — masing-masing punya akses yang tepat."
+        },
+        {
+          "icon": "📊",
+          "title": "Dashboard Real-time",
+          "desc": "Pantau kehadiran live, laporan harian, dan statistik member kapan saja."
+        },
+        {
+          "icon": "🏢",
+          "title": "Multi-Tenant",
+          "desc": "Satu platform untuk banyak cabang gym, data 100% terisolasi."
+        },
+        {
+          "icon": "🔌",
+          "title": "Tanpa Hardware Khusus",
+          "desc": "Cukup smartphone atau laptop biasa — tidak perlu beli alat mahal."
+        }
       ]
     },
     "variants": {
@@ -614,19 +651,31 @@
           "title": "Mobile + QR Cetak",
           "sub": "Solusi paling hemat",
           "desc": "Print QR code, tempel di dinding, dan anggota tinggal scan pakai kameranya sendiri. Tidak perlu perangkat tambahan.",
-          "tags": ["Tanpa Kamera Kiosk", "Biaya Paling Rendah", "Setup 5 Menit"]
+          "tags": [
+            "Tanpa Kamera Kiosk",
+            "Biaya Paling Rendah",
+            "Setup 5 Menit"
+          ]
         },
         {
           "title": "Tablet sebagai Kiosk",
           "sub": "Pengalaman premium",
           "desc": "Pasang tablet di meja resepsionis. Kamera tablet otomatis mendeteksi QR anggota saat mereka datang.",
-          "tags": ["Auto-Scan Kamera", "Hands-Free", "Tampilan Profesional"]
+          "tags": [
+            "Auto-Scan Kamera",
+            "Hands-Free",
+            "Tampilan Profesional"
+          ]
         },
         {
           "title": "PC / Laptop + Webcam",
           "sub": "Untuk workstation tetap",
           "desc": "Gunakan komputer yang sudah ada di front desk. Webcam standar sudah cukup untuk auto-scan QR anggota.",
-          "tags": ["Layar Besar", "Webcam Biasa", "Cocok untuk Front Desk"]
+          "tags": [
+            "Layar Besar",
+            "Webcam Biasa",
+            "Cocok untuk Front Desk"
+          ]
         }
       ]
     },
@@ -660,146 +709,146 @@
       "bannerEnd": "Keluar Demo",
       "loginBtn": "Coba Demo — tanpa daftar",
       "error": "Demo tidak tersedia, coba lagi"
+    }
+  },
+  "onboarding": {
+    "settings": {
+      "redoSetup": "Ulangi wizard setup perangkat"
     },
-    "onboarding": {
-      "settings": {
-        "redoSetup": "Ulangi wizard setup perangkat"
+    "welcome": {
+      "title": "Bagaimana cara Anda melakukan check-in?",
+      "subtitle": "Pilih setup perangkat Anda agar kami bisa membimbing Anda melalui langkah yang tepat.",
+      "qr_phone": {
+        "label": "QR Cetak & HP",
+        "desc": "Cetak QR code untuk member dan scan menggunakan HP di meja depan."
       },
-      "welcome": {
-        "title": "Bagaimana cara Anda melakukan check-in?",
-        "subtitle": "Pilih setup perangkat Anda agar kami bisa membimbing Anda melalui langkah yang tepat.",
-        "qr_phone": {
-          "label": "QR Cetak & HP",
-          "desc": "Cetak QR code untuk member dan scan menggunakan HP di meja depan."
-        },
-        "tablet_kiosk": {
-          "label": "Tablet Kiosk",
-          "desc": "Pasang tablet di pintu masuk agar member bisa check-in sendiri."
-        },
-        "pc_webcam": {
-          "label": "PC + Webcam",
-          "desc": "PC dioperasikan staf di meja, scan member via webcam atau barcode reader."
-        },
-        "skip": "Lewati dulu"
+      "tablet_kiosk": {
+        "label": "Tablet Kiosk",
+        "desc": "Pasang tablet di pintu masuk agar member bisa check-in sendiri."
       },
-      "checklist": {
-        "title": "Checklist Setup",
-        "progress": "{done}/{total} selesai",
-        "dismiss": "Tutup",
-        "confirmDismiss": "Tutup permanen?",
-        "yes": "Ya",
-        "no": "Tidak",
-        "goTo": "Pergi ke",
-        "markDone": "Tandai selesai",
-        "allDone": "Selesai! Gym siap digunakan."
+      "pc_webcam": {
+        "label": "PC + Webcam",
+        "desc": "PC dioperasikan staf di meja, scan member via webcam atau barcode reader."
       },
-      "step": {
-        "change_pin": {
-          "label": "Ganti PIN admin",
-          "desc": "PIN Anda saat ini adalah default. Ganti ke yang lebih aman."
+      "skip": "Lewati dulu"
+    },
+    "checklist": {
+      "title": "Checklist Setup",
+      "progress": "{done}/{total} selesai",
+      "dismiss": "Tutup",
+      "confirmDismiss": "Tutup permanen?",
+      "yes": "Ya",
+      "no": "Tidak",
+      "goTo": "Pergi ke",
+      "markDone": "Tandai selesai",
+      "allDone": "Selesai! Gym siap digunakan."
+    },
+    "step": {
+      "change_pin": {
+        "label": "Ganti PIN admin",
+        "desc": "PIN Anda saat ini adalah default. Ganti ke yang lebih aman."
+      },
+      "configure_packages": {
+        "label": "Atur paket keanggotaan",
+        "desc": "Tinjau atau sesuaikan paket harga untuk member Anda."
+      },
+      "add_members": {
+        "label": "Tambahkan member pertama",
+        "desc": "Import dari Excel atau tambahkan member satu per satu."
+      },
+      "generate_qr": {
+        "label": "Buat & cetak QR code",
+        "desc": "Ke tab Member → ikon QR untuk unduh dan cetak QR code member."
+      },
+      "test_scan": {
+        "label": "Uji scan check-in",
+        "desc": "Gunakan QR yang sudah dicetak untuk memastikan scanner berfungsi."
+      },
+      "set_gym_code": {
+        "label": "Atur kode URL gym",
+        "desc": "Buat slug URL pendek agar member mudah mengakses kiosk (misal /g/gymku)."
+      },
+      "test_kiosk": {
+        "label": "Uji URL kiosk",
+        "desc": "Buka link kiosk Anda di tablet dan coba check-in member."
+      },
+      "add_staff": {
+        "label": "Tambahkan akun staf",
+        "desc": "Buat akun untuk tim front desk agar mereka bisa menggunakan scanner."
+      }
+    },
+    "tour": {
+      "skip": "Lewati tur",
+      "next": "Lanjut →",
+      "gotIt": "Mengerti",
+      "scan_page": {
+        "0": {
+          "title": "Scanner",
+          "body": "Member mengarahkan QR code ke kamera di sini untuk check-in secara otomatis."
         },
-        "configure_packages": {
-          "label": "Atur paket keanggotaan",
-          "desc": "Tinjau atau sesuaikan paket harga untuk member Anda."
+        "1": {
+          "title": "Kelola Member",
+          "body": "Gunakan menu ini untuk mendaftarkan member baru atau memperpanjang keanggotaan yang ada."
         },
-        "add_members": {
-          "label": "Tambahkan member pertama",
-          "desc": "Import dari Excel atau tambahkan member satu per satu."
-        },
-        "generate_qr": {
-          "label": "Buat & cetak QR code",
-          "desc": "Ke tab Member → ikon QR untuk unduh dan cetak QR code member."
-        },
-        "test_scan": {
-          "label": "Uji scan check-in",
-          "desc": "Gunakan QR yang sudah dicetak untuk memastikan scanner berfungsi."
-        },
-        "set_gym_code": {
-          "label": "Atur kode URL gym",
-          "desc": "Buat slug URL pendek agar member mudah mengakses kiosk (misal /g/gymku)."
-        },
-        "test_kiosk": {
-          "label": "Uji URL kiosk",
-          "desc": "Buka link kiosk Anda di tablet dan coba check-in member."
-        },
-        "add_staff": {
-          "label": "Tambahkan akun staf",
-          "desc": "Buat akun untuk tim front desk agar mereka bisa menggunakan scanner."
+        "2": {
+          "title": "Dashboard Admin",
+          "body": "Ketuk di sini untuk mengakses dashboard lengkap — catatan kehadiran, manajemen member, dan lainnya."
         }
       },
-      "tour": {
-        "skip": "Lewati tur",
-        "next": "Lanjut →",
-        "gotIt": "Mengerti",
-        "scan_page": {
-          "0": {
-            "title": "Scanner",
-            "body": "Member mengarahkan QR code ke kamera di sini untuk check-in secara otomatis."
-          },
-          "1": {
-            "title": "Kelola Member",
-            "body": "Gunakan menu ini untuk mendaftarkan member baru atau memperpanjang keanggotaan yang ada."
-          },
-          "2": {
-            "title": "Dashboard Admin",
-            "body": "Ketuk di sini untuk mengakses dashboard lengkap — catatan kehadiran, manajemen member, dan lainnya."
-          }
+      "attendance_tab": {
+        "0": {
+          "title": "Check-in Hari Ini",
+          "body": "Daftar ini diperbarui setiap 10 detik. Menampilkan semua yang check-in hari ini."
         },
-        "attendance_tab": {
-          "0": {
-            "title": "Check-in Hari Ini",
-            "body": "Daftar ini diperbarui setiap 10 detik. Menampilkan semua yang check-in hari ini."
-          },
-          "1": {
-            "title": "Pemilih Tanggal",
-            "body": "Klik tanggal untuk melihat log kehadiran hari sebelumnya."
-          },
-          "2": {
-            "title": "Filter Member / Tamu",
-            "body": "Beralih antara semua check-in, hanya member, atau tamu walk-in."
-          }
+        "1": {
+          "title": "Pemilih Tanggal",
+          "body": "Klik tanggal untuk melihat log kehadiran hari sebelumnya."
         },
-        "members_tab": {
-          "0": {
-            "title": "Cari Member",
-            "body": "Cari berdasarkan nama atau ID gym untuk menemukan member dengan cepat."
-          },
-          "1": {
-            "title": "Import & Tambah",
-            "body": "Import member massal dari file Excel atau tambahkan satu per satu menggunakan tombol Tambah."
-          },
-          "2": {
-            "title": "QR & Aksi",
-            "body": "Kolom aksi memungkinkan Anda melihat QR code member, edit detail, perpanjang, atau hapus."
-          },
-          "3": {
-            "title": "Grup",
-            "body": "Gunakan grup untuk mengelola keanggotaan keluarga — satu tanggal kedaluwarsa untuk semua anggota grup."
-          }
+        "2": {
+          "title": "Filter Member / Tamu",
+          "body": "Beralih antara semua check-in, hanya member, atau tamu walk-in."
+        }
+      },
+      "members_tab": {
+        "0": {
+          "title": "Cari Member",
+          "body": "Cari berdasarkan nama atau ID gym untuk menemukan member dengan cepat."
         },
-        "packages_tab": {
-          "0": {
-            "title": "Paket Keanggotaan",
-            "body": "Setiap baris adalah paket harga — atur nama, durasi, dan harga keanggotaan."
-          },
-          "1": {
-            "title": "Paket Default",
-            "body": "Paket berbintang otomatis dipilih saat menambahkan member baru. Klik bintang untuk mengubahnya."
-          },
-          "2": {
-            "title": "Biaya Pendaftaran",
-            "body": "Aktifkan biaya daftar satu kali untuk paket. Kios Gym bisa menentukan masa tenggang sebelum dikenakan lagi saat perpanjangan."
-          }
+        "1": {
+          "title": "Import & Tambah",
+          "body": "Import member massal dari file Excel atau tambahkan satu per satu menggunakan tombol Tambah."
         },
-        "staff_tab": {
-          "0": {
-            "title": "Daftar Staf",
-            "body": "Akun staf bisa menggunakan scanner dan melihat kehadiran, tapi tidak bisa mengubah pengaturan atau melihat pendapatan."
-          },
-          "1": {
-            "title": "Tambah Staf",
-            "body": "Buat login untuk setiap anggota tim front desk. Mereka akan masuk menggunakan email dan password."
-          }
+        "2": {
+          "title": "QR & Aksi",
+          "body": "Kolom aksi memungkinkan Anda melihat QR code member, edit detail, perpanjang, atau hapus."
+        },
+        "3": {
+          "title": "Grup",
+          "body": "Gunakan grup untuk mengelola keanggotaan keluarga — satu tanggal kedaluwarsa untuk semua anggota grup."
+        }
+      },
+      "packages_tab": {
+        "0": {
+          "title": "Paket Keanggotaan",
+          "body": "Setiap baris adalah paket harga — atur nama, durasi, dan harga keanggotaan."
+        },
+        "1": {
+          "title": "Paket Default",
+          "body": "Paket berbintang otomatis dipilih saat menambahkan member baru. Klik bintang untuk mengubahnya."
+        },
+        "2": {
+          "title": "Biaya Pendaftaran",
+          "body": "Aktifkan biaya daftar satu kali untuk paket. Kios Gym bisa menentukan masa tenggang sebelum dikenakan lagi saat perpanjangan."
+        }
+      },
+      "staff_tab": {
+        "0": {
+          "title": "Daftar Staf",
+          "body": "Akun staf bisa menggunakan scanner dan melihat kehadiran, tapi tidak bisa mengubah pengaturan atau melihat pendapatan."
+        },
+        "1": {
+          "title": "Tambah Staf",
+          "body": "Buat login untuk setiap anggota tim front desk. Mereka akan masuk menggunakan email dan password."
         }
       }
     }
