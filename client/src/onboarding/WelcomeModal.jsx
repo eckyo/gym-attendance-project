@@ -25,9 +25,9 @@ const SETUP_OPTIONS = [
 
 export default function WelcomeModal() {
   const { t } = useTranslation();
-  const { role, setupType, selectSetupType, loading } = useOnboarding();
+  const { role, setupType, selectSetupType, loading, isDemo } = useOnboarding();
   const [skipped, setSkipped] = useState(
-    () => !!sessionStorage.getItem('onboarding_wizard_skipped')
+    () => !isDemo && !!sessionStorage.getItem('onboarding_wizard_skipped')
   );
 
   if (loading || role !== 'admin' || setupType !== null || skipped) return null;

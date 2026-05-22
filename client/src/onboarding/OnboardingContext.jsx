@@ -11,7 +11,7 @@ import { SETUP_STEPS, PAGE_TOURS, STAFF_VISIBLE_TOURS } from './tourSteps.js';
 
 const OnboardingContext = createContext(null);
 
-export function OnboardingProvider({ token, role, children }) {
+export function OnboardingProvider({ token, role, isDemo = false, children }) {
   const [loading, setLoading] = useState(true);
   const [setupType, setSetupType] = useState(null);
   const [completedSteps, setCompletedSteps] = useState([]);
@@ -171,6 +171,7 @@ export function OnboardingProvider({ token, role, children }) {
     checklistCollapsed,
     pendingTabNav,
     role,
+    isDemo,
     selectSetupType,
     completeStep,
     dismissChecklist,

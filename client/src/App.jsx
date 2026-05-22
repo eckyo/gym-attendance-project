@@ -942,7 +942,7 @@ export default function App() {
   }
 
   return (
-    <OnboardingProvider token={auth.token} role={auth.role}>
+    <OnboardingProvider token={auth.token} role={auth.role} isDemo={auth.isDemo}>
       {demoBanner}
       <div style={demoPaddingTop}>
         {page === 'scan' && (
