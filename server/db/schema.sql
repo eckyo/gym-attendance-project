@@ -328,3 +328,12 @@ INSERT INTO gamification_platform_config (id) VALUES (1) ON CONFLICT (id) DO NOT
 
 ALTER TABLE gyms ADD COLUMN IF NOT EXISTS is_demo       BOOLEAN     NOT NULL DEFAULT false;
 ALTER TABLE gyms ADD COLUMN IF NOT EXISTS demo_reset_at TIMESTAMPTZ;
+
+-- ── Onboarding columns ────────────────────────────────────────────────────────
+
+ALTER TABLE gyms ADD COLUMN IF NOT EXISTS onboarding_setup_type TEXT
+  CHECK (onboarding_setup_type IN ('qr_phone', 'tablet_kiosk', 'pc_webcam'));
+ALTER TABLE gyms ADD COLUMN IF NOT EXISTS onboarding_completed_steps    JSONB   NOT NULL DEFAULT '[]';
+ALTER TABLE gyms ADD COLUMN IF NOT EXISTS onboarding_checklist_dismissed BOOLEAN NOT NULL DEFAULT false;
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_tours_seen JSONB NOT NULL DEFAULT '{}';

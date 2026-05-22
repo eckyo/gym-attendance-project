@@ -14,6 +14,7 @@ import memberRouter from './routes/member.js';
 import publicRouter from './routes/public.js';
 import { memberRouter as gamificationMemberRouter, adminRouter as gamificationAdminRouter } from './routes/gamification.js';
 import demoRouter from './routes/demo.js';
+import onboardingRouter from './routes/onboarding.js';
 import { ensureDemoGym } from './db/demo-seed.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -38,6 +39,7 @@ app.use('/api/public', publicRouter);
 app.use('/api/member/gamification', gamificationMemberRouter);
 app.use('/api/admin/gamification', gamificationAdminRouter);
 app.use('/api/demo', demoRouter);
+app.use('/api/onboarding', onboardingRouter);
 
 app.use((err, req, res, next) => {
   console.error(err);

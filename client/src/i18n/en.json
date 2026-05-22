@@ -660,6 +660,148 @@
       "bannerEnd": "End Demo",
       "loginBtn": "Try Demo — no signup needed",
       "error": "Demo unavailable, please try again"
+    },
+    "onboarding": {
+      "settings": {
+        "redoSetup": "Redo hardware setup wizard"
+      },
+      "welcome": {
+        "title": "How will you run check-ins?",
+        "subtitle": "Choose your hardware setup so we can guide you through the right steps.",
+        "qr_phone": {
+          "label": "Printed QRs & Phone",
+          "desc": "Print QR codes for members and scan them with your phone at the front desk."
+        },
+        "tablet_kiosk": {
+          "label": "Tablet Kiosk",
+          "desc": "Set up a dedicated tablet at the entrance so members can self check-in."
+        },
+        "pc_webcam": {
+          "label": "PC + Webcam",
+          "desc": "Staff-operated PC at the desk, scanning members via webcam or barcode reader."
+        },
+        "skip": "Skip for now"
+      },
+      "checklist": {
+        "title": "Setup Checklist",
+        "progress": "{done}/{total} done",
+        "dismiss": "Dismiss",
+        "confirmDismiss": "Dismiss permanently?",
+        "yes": "Yes",
+        "no": "No",
+        "goTo": "Go to",
+        "markDone": "Mark done",
+        "allDone": "You're all set! Gym is ready to go."
+      },
+      "step": {
+        "change_pin": {
+          "label": "Change admin PIN",
+          "desc": "Your PIN is currently the default. Change it to something secure."
+        },
+        "configure_packages": {
+          "label": "Set up membership packages",
+          "desc": "Review or customize the pricing tiers for your members."
+        },
+        "add_members": {
+          "label": "Add your first members",
+          "desc": "Import from Excel or add members one by one."
+        },
+        "generate_qr": {
+          "label": "Generate & print QR codes",
+          "desc": "Go to Members → QR icon to download and print member QR codes."
+        },
+        "test_scan": {
+          "label": "Test a check-in scan",
+          "desc": "Use a printed QR to verify the scanner works correctly."
+        },
+        "set_gym_code": {
+          "label": "Set your gym URL code",
+          "desc": "Create a short URL slug so members can access the kiosk easily (e.g. /g/mygym)."
+        },
+        "test_kiosk": {
+          "label": "Test the kiosk URL",
+          "desc": "Open your kiosk link on a tablet and test member check-in."
+        },
+        "add_staff": {
+          "label": "Add staff accounts",
+          "desc": "Create accounts for your front desk team so they can use the scanner."
+        }
+      },
+      "tour": {
+        "skip": "Skip tour",
+        "next": "Next →",
+        "gotIt": "Got it",
+        "scan_page": {
+          "0": {
+            "title": "Scanner",
+            "body": "Members hold their QR code up to the camera here to check in automatically."
+          },
+          "1": {
+            "title": "Manage Members",
+            "body": "Use this menu to register a new member or extend an existing membership on the spot."
+          },
+          "2": {
+            "title": "Admin Dashboard",
+            "body": "Tap here to access the full dashboard — attendance records, member management, and more."
+          }
+        },
+        "attendance_tab": {
+          "0": {
+            "title": "Today's Check-ins",
+            "body": "This list updates every 10 seconds. It shows everyone who checked in today."
+          },
+          "1": {
+            "title": "Date Picker",
+            "body": "Click a date to view the attendance log for any past day."
+          },
+          "2": {
+            "title": "Member / Visitor Filter",
+            "body": "Switch between all check-ins, members only, or walk-in visitors."
+          }
+        },
+        "members_tab": {
+          "0": {
+            "title": "Member Search",
+            "body": "Search by name or gym ID to quickly find any member in your list."
+          },
+          "1": {
+            "title": "Import & Add",
+            "body": "Bulk-import members from an Excel file or add them one at a time using the Add button."
+          },
+          "2": {
+            "title": "QR & Actions",
+            "body": "The actions column lets you view a member's QR code, edit details, extend membership, or remove them."
+          },
+          "3": {
+            "title": "Groups",
+            "body": "Use groups to manage family or shared memberships — set one expiry date for all group members."
+          }
+        },
+        "packages_tab": {
+          "0": {
+            "title": "Membership Packages",
+            "body": "Each row is a pricing tier — set the name, duration, and price for your memberships."
+          },
+          "1": {
+            "title": "Default Package",
+            "body": "The starred package is auto-selected when you add a new member. Click the star to change it."
+          },
+          "2": {
+            "title": "Registration Fee",
+            "body": "Enable a one-time sign-up fee for a package. Kios Gym can enforce a grace period before charging it again on renewal."
+          }
+        },
+        "staff_tab": {
+          "0": {
+            "title": "Staff List",
+            "body": "Staff accounts can use the scanner and view attendance, but cannot change settings or view revenue."
+          },
+          "1": {
+            "title": "Add Staff",
+            "body": "Create a login for each front desk team member. They'll use their email and password to sign in."
+          }
+        }
+      }
     }
   }
 }
