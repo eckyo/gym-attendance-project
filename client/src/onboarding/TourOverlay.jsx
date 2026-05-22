@@ -150,6 +150,20 @@ export default function TourOverlay() {
         }}
       />
 
+      {/* Transparent blocker over the spotlight hole — prevents interacting with the target */}
+      <div
+        style={{
+          position: 'fixed',
+          top: spot.top,
+          left: spot.left,
+          width: spot.width,
+          height: spot.height,
+          zIndex: 9998,
+          pointerEvents: 'auto',
+          cursor: 'default',
+        }}
+      />
+
       {/* Spotlight border ring */}
       <div
         style={{
