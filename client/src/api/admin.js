@@ -264,3 +264,43 @@ export const renewGroup = (token, groupId, packageId) =>
     headers: authHeaders(token),
     body: JSON.stringify({ packageId }),
   }).then(handleResponse);
+
+// ── Onboarding ────────────────────────────────────────────────────────────────
+
+export const getOnboardingState = (token) =>
+  fetch(`${API_BASE}/api/onboarding/state`, {
+    headers: authHeaders(token),
+  }).then(handleResponse);
+
+export const setOnboardingSetupType = (token, setupType) =>
+  fetch(`${API_BASE}/api/onboarding/setup-type`, {
+    method: 'PATCH',
+    headers: authHeaders(token),
+    body: JSON.stringify({ setupType }),
+  }).then(handleResponse);
+
+export const completeOnboardingStep = (token, stepId) =>
+  fetch(`${API_BASE}/api/onboarding/complete-step`, {
+    method: 'PATCH',
+    headers: authHeaders(token),
+    body: JSON.stringify({ stepId }),
+  }).then(handleResponse);
+
+export const dismissOnboardingChecklist = (token) =>
+  fetch(`${API_BASE}/api/onboarding/dismiss-checklist`, {
+    method: 'PATCH',
+    headers: authHeaders(token),
+  }).then(handleResponse);
+
+export const markOnboardingTourSeen = (token, tourId) =>
+  fetch(`${API_BASE}/api/onboarding/mark-tour-seen`, {
+    method: 'PATCH',
+    headers: authHeaders(token),
+    body: JSON.stringify({ tourId }),
+  }).then(handleResponse);
+
+export const resetOnboardingSetup = (token) =>
+  fetch(`${API_BASE}/api/onboarding/reset`, {
+    method: 'PATCH',
+    headers: authHeaders(token),
+  }).then(handleResponse);

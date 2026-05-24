@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useOnboarding } from '../onboarding/OnboardingContext.jsx';
 
 function useIsMobile() {
   const [mobile, setMobile] = useState(() => window.innerWidth < 640);
@@ -159,13 +160,16 @@ const s = {
   overlay: {
     position: 'fixed', inset: 0,
     background: 'rgba(0,0,0,0.5)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+    padding: '16px',
+    overflowY: 'auto',
     zIndex: 200,
   },
   modal: {
     background: '#fff', borderRadius: 16, padding: '32px 28px',
     width: '100%', maxWidth: 360,
     boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+    margin: 'auto',
   },
   modalTitle: { fontSize: 18, fontWeight: 700, color: '#1a1a2e', marginBottom: 20 },
   modalLabel: { display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 },
@@ -644,6 +648,7 @@ function ChangePinModal({ token, onClose }) {
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const { t } = useTranslation();
+  const { completeStep } = useOnboarding();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -654,6 +659,7 @@ function ChangePinModal({ token, onClose }) {
     try {
       await changePin(token, currentPin, newPin);
       setSuccess(t('admin.changepin.success'));
+      completeStep('change_pin');
       setTimeout(onClose, 1500);
     } catch (err) {
       setError(err.message);
@@ -1237,14 +1243,18 @@ function StaffTab({ token }) {
   const [kebabPos, setKebabPos] = useState(null);
   const isMobile = useIsMobile();
   const { lang, t } = useTranslation();
+  const { completeStep } = useOnboarding();
 
   useEffect(() => {
     setLoading(true);
     getStaff(token)
-      .then(setStaff)
+      .then((data) => {
+        setStaff(data);
+        if (data.length > 0) completeStep('add_staff');
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [token]);
+  }, [token, completeStep]);
 
   const handleAdded = (member) => {
     setStaff((prev) => [...prev, member]);
@@ -1263,14 +1273,14 @@ function StaffTab({ token }) {
   return (
     <div>
       <div style={{ ...s.toolbar, justifyContent: 'flex-end' }}>
-        <button style={s.addBtn} onClick={() => setShowAddModal(true)}>
+        <button id="staff-add-btn" style={s.addBtn} onClick={() => setShowAddModal(true)}>
           {t('admin.staff.addStaff')}
         </button>
       </div>
 
       {error && <div style={s.error}>{error}</div>}
 
-      <div style={{ ...s.tableWrap }}>
+      <div id="staff-list" style={{ ...s.tableWrap }}>
       <table style={{ ...s.table, minWidth: 480 }}>
         <thead>
           <tr>
@@ -1395,6 +1405,7 @@ function AttendanceTab({ token }) {
     <div>
       <div style={s.toolbar}>
         <input
+          id="attendance-date-picker"
           style={s.dateInput}
           type="date"
           value={date}
@@ -1443,7 +1454,7 @@ function AttendanceTab({ token }) {
       </div>
 
       {/* Filter toggle */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 14 }}>
+      <div id="attendance-filter-toggle" style={{ display: 'flex', gap: 4, marginBottom: 14 }}>
         {['all', 'members', 'visitors'].map((f) => (
           <button
             key={f}
@@ -1464,7 +1475,7 @@ function AttendanceTab({ token }) {
 
       {error && <div style={s.error}>{error}</div>}
 
-      <div style={{ ...s.tableWrap }}>
+      <div id="attendance-list" style={{ ...s.tableWrap }}>
       <table style={{ ...s.table, minWidth: 500 }}>
         <thead>
           <tr>
@@ -1807,8 +1818,8 @@ function RenewGroupModal({ token, group, groupPackages, onRenewed, onClose }) {
 function ConfirmModal({ title, body, confirmLabel, onConfirm, onClose }) {
   const { t } = useTranslation();
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '0 16px' }}>
-      <div style={{ background: '#fff', borderRadius: 14, padding: '28px 24px', width: '100%', maxWidth: 420 }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 1000, padding: '16px', overflowY: 'auto' }}>
+      <div style={{ background: '#fff', borderRadius: 14, padding: '28px 24px', width: '100%', maxWidth: 420, margin: 'auto' }}>
         <h3 style={{ margin: '0 0 10px', fontSize: 16, fontWeight: 700, color: '#1e293b' }}>{title}</h3>
         <p style={{ margin: '0 0 22px', fontSize: 14, color: '#475569', lineHeight: 1.55 }}>{body}</p>
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
@@ -1827,8 +1838,8 @@ function ConfirmModal({ title, body, confirmLabel, onConfirm, onClose }) {
 function GroupMemberWarningModal({ member, action, onConfirm, onClose }) {
   const { t } = useTranslation();
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '0 16px' }}>
-      <div style={{ background: '#fff', borderRadius: 14, padding: '28px 24px', width: '100%', maxWidth: 420 }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 1000, padding: '16px', overflowY: 'auto' }}>
+      <div style={{ background: '#fff', borderRadius: 14, padding: '28px 24px', width: '100%', maxWidth: 420, margin: 'auto' }}>
         <h3 style={{ margin: '0 0 10px', fontSize: 16, fontWeight: 700, color: '#1e293b' }}>
           {t('admin.groups.memberWarningTitle')}
         </h3>
@@ -1868,6 +1879,7 @@ function MembersTab({ token, gymSettings }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [editingMember, setEditingMember] = useState(null);
+  const { completeStep } = useOnboarding();
   const [revealedPhoneId, setRevealedPhoneId] = useState(null);
   const [pendingRevealId, setPendingRevealId] = useState(null);
   const [sortBy, setSortBy]           = useState('scan_token');
@@ -1922,12 +1934,13 @@ function MembersTab({ token, gymSettings }) {
       setTotal(data.total);
       setOffset(data.members.length);
       setHasMore(data.members.length < data.total);
+      if (data.total > 0) completeStep('add_members');
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [token, search, sortBy, sortOrder, filterStatusesKey, filterPackageIdsKey, filterNewOnly]);
+  }, [token, search, sortBy, sortOrder, filterStatusesKey, filterPackageIdsKey, filterNewOnly, completeStep]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
@@ -2039,7 +2052,7 @@ function MembersTab({ token, gymSettings }) {
   return (
     <div>
       {/* ── Groups section — only shown when group packages exist or groups already exist ── */}
-      {(groupPackages.length > 0 || groups.length > 0) && <div style={{ background: '#fff', borderRadius: 12, padding: '18px 20px', marginBottom: 20, boxShadow: '0 1px 6px rgba(0,0,0,0.07)' }}>
+      {(groupPackages.length > 0 || groups.length > 0) && <div id="members-groups-section" style={{ background: '#fff', borderRadius: 12, padding: '18px 20px', marginBottom: 20, boxShadow: '0 1px 6px rgba(0,0,0,0.07)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <div style={{ fontWeight: 700, fontSize: 15, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 8 }}>
             {t('admin.groups.sectionTitle')}
@@ -2131,6 +2144,7 @@ function MembersTab({ token, gymSettings }) {
 
       <div style={s.toolbar}>
         <input
+          id="members-search"
           style={s.searchInput}
           type="text"
           placeholder={t('admin.members.searchPlaceholder')}
@@ -2160,15 +2174,17 @@ function MembersTab({ token, gymSettings }) {
           </svg>
           {t('admin.members.export')}
         </button>
-        <button style={s.outlineBtn} onClick={() => setShowImportModal(true)}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 5, verticalAlign: 'middle' }}>
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-            <polyline points="7 10 12 15 17 10"/>
-            <line x1="12" y1="15" x2="12" y2="3"/>
-          </svg>
-          {t('admin.members.import')}
-        </button>
-        <button style={s.addBtn} onClick={() => setShowAddModal(true)}>{t('admin.members.addMember')}</button>
+        <div id="members-actions-toolbar" style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <button style={s.outlineBtn} onClick={() => setShowImportModal(true)}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 5, verticalAlign: 'middle' }}>
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            {t('admin.members.import')}
+          </button>
+          <button style={s.addBtn} onClick={() => setShowAddModal(true)}>{t('admin.members.addMember')}</button>
+        </div>
       </div>
 
       {showFilters && (
@@ -2269,7 +2285,7 @@ function MembersTab({ token, gymSettings }) {
                 </th>
               );
             })}
-            <th style={{ ...s.th, position: 'sticky', right: 0, zIndex: 2, background: '#f8fafc', width: 96, whiteSpace: 'nowrap', boxShadow: '-2px 0 6px rgba(0,0,0,0.06)' }}>{t('admin.members.colActions')}</th>
+            <th id="members-qr-col" style={{ ...s.th, position: 'sticky', right: 0, zIndex: 2, background: '#f8fafc', width: 96, whiteSpace: 'nowrap', boxShadow: '-2px 0 6px rgba(0,0,0,0.06)' }}>{t('admin.members.colActions')}</th>
           </tr>
         </thead>
         <tbody>
@@ -2670,6 +2686,7 @@ function PackagesTab({ token }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [editingId, setEditingId] = useState(null);
+  const { completeStep } = useOnboarding();
   const [editName, setEditName] = useState('');
   const [editDuration, setEditDuration] = useState('');
   const [editPrice, setEditPrice] = useState('');
@@ -2704,6 +2721,7 @@ function PackagesTab({ token }) {
         setPackages(pkgs);
         setVisitorPriceInput(String(settings.visitorPrice));
         setVisitorPriceLoaded(true);
+        if (pkgs.length > 0) completeStep('configure_packages');
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -2835,17 +2853,17 @@ function PackagesTab({ token }) {
         </form>
       </div>
 
-      <div style={{ ...s.tableWrap }}>
+      <div id="packages-list" style={{ ...s.tableWrap }}>
       <table style={{ ...s.table, minWidth: 760 }}>
         <thead>
           <tr>
             <th style={s.th}>{t('admin.packages.colName')}</th>
             <th style={s.th}>{t('admin.packages.colDuration')}</th>
             <th style={s.th}>{t('admin.packages.colPrice')}</th>
-            <th style={s.th}>{t('admin.packages.colRegFee')}</th>
+            <th id="packages-reg-fee-toggle" style={s.th}>{t('admin.packages.colRegFee')}</th>
             <th style={s.th}>{t('admin.packages.colGroup')}</th>
             <th style={s.th}>{t('admin.packages.codeLabel')}</th>
-            <th style={s.th}>{t('admin.packages.colDefault')}</th>
+            <th id="packages-default-star" style={s.th}>{t('admin.packages.colDefault')}</th>
             <th style={{ ...s.th, position: 'sticky', right: 0, zIndex: 2, background: '#f8fafc', whiteSpace: 'nowrap', boxShadow: '-2px 0 6px rgba(0,0,0,0.06)' }}>{t('admin.packages.colActions')}</th>
           </tr>
         </thead>
@@ -3538,6 +3556,7 @@ function GymCodeModal({ token, gymSettings, onSaved, onClose }) {
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
   const { t } = useTranslation();
+  const { completeStep } = useOnboarding();
 
   const handleCopyUrl = () => {
     navigator.clipboard.writeText(urlPreview).then(() => {
@@ -3560,6 +3579,7 @@ function GymCodeModal({ token, gymSettings, onSaved, onClose }) {
     try {
       const updated = await setGymCode(token, code || null);
       onSaved({ ...gymSettings, gymCode: updated.gymCode });
+      if (updated.gymCode) completeStep('set_gym_code');
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (err) {
@@ -3724,6 +3744,7 @@ function PackagePrefixModal({ token, gymSettings, onSaved, onClose }) {
 function SettingsModal({ token, gymSettings, onSaved, onClose }) {
   const [activeSection, setActiveSection] = useState(null);
   const { t } = useTranslation();
+  const { resetOnboarding } = useOnboarding();
 
   const menuRow = (label, section) => (
     <button style={s.settingsMenuRow} onClick={() => setActiveSection(section)}>
@@ -3731,6 +3752,12 @@ function SettingsModal({ token, gymSettings, onSaved, onClose }) {
       <span style={{ color: '#94a3b8', fontSize: 18 }}>›</span>
     </button>
   );
+
+  const handleRedoSetup = () => {
+    resetOnboarding();
+    sessionStorage.removeItem('onboarding_wizard_skipped');
+    onClose();
+  };
 
   return (
     <>
@@ -3742,6 +3769,13 @@ function SettingsModal({ token, gymSettings, onSaved, onClose }) {
           {menuRow(t('admin.settings.regFeeMenuLabel'), 'regfee')}
           {menuRow(t('admin.settings.gymCodeMenuLabel'), 'gymcode')}
           {menuRow(t('admin.settings.packagePrefixMenuLabel'), 'packageprefix')}
+          <button
+            style={{ ...s.settingsMenuRow, color: '#64748b', fontSize: 13, borderTop: '1px solid #f1f5f9', marginTop: 8 }}
+            onClick={handleRedoSetup}
+          >
+            <span>🔁 {t('onboarding.settings.redoSetup')}</span>
+            <span style={{ color: '#94a3b8', fontSize: 18 }}>›</span>
+          </button>
           <button
             style={{ ...s.modalBtn, background: '#e2e8f0', color: '#475569', marginTop: 16 }}
             onClick={onClose}
@@ -3794,12 +3828,38 @@ export default function AdminPage({ token, role, gymName, onBack }) {
   const [kebabOpen, setKebabOpen] = useState(false);
   const isMobile = useIsMobile();
   const { t } = useTranslation();
+  const { startTour, pendingTabNav, clearPendingTabNav } = useOnboarding();
 
   useEffect(() => {
     if (role === 'admin') {
       getSettings(token).then(setGymSettings).catch(() => {});
     }
   }, [token, role]);
+
+  // Fire page tour when tab changes (delayed so tab content renders first)
+  useEffect(() => {
+    const tourMap = {
+      attendance: 'attendance_tab',
+      members: 'members_tab',
+      packages: 'packages_tab',
+      staff: 'staff_tab',
+    };
+    const tourId = tourMap[tab];
+    if (!tourId) return;
+    const timer = setTimeout(() => startTour(tourId), 400);
+    return () => clearTimeout(timer);
+  }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Handle tab navigation requests from SetupChecklist action links
+  useEffect(() => {
+    if (!pendingTabNav) return;
+    if (pendingTabNav === 'settings') {
+      setShowSettings(true);
+    } else {
+      setTab(pendingTabNav);
+    }
+    clearPendingTabNav();
+  }, [pendingTabNav, clearPendingTabNav]);
 
   return (
     <div style={s.page}>

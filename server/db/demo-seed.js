@@ -387,9 +387,20 @@ export async function resetDemoData(gymId) {
       );
     }
 
-    // Stamp reset time
+    // Stamp reset time + reset onboarding so each demo starts at the wizard
     await client.query(
-      'UPDATE gyms SET demo_reset_at = NOW() WHERE id = $1',
+      `UPDATE gyms
+       SET demo_reset_at = NOW(),
+           onboarding_setup_type = NULL,
+           onboarding_completed_steps = '[]',
+           onboarding_checklist_dismissed = false
+       WHERE id = $1`,
+      [gymId],
+    );
+
+    // Reset tour state for all users in the demo gym
+    await client.query(
+      `UPDATE users SET onboarding_tours_seen = '{}' WHERE gym_id = $1`,
       [gymId],
     );
 

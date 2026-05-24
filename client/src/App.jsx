@@ -14,6 +14,10 @@ const checkinCodeFromUrl = (() => {
 })();
 import ScanPage from './pages/ScanPage.jsx';
 import AdminPage from './pages/AdminPage.jsx';
+import { OnboardingProvider } from './onboarding/OnboardingContext.jsx';
+import WelcomeModal from './onboarding/WelcomeModal.jsx';
+import SetupChecklist from './onboarding/SetupChecklist.jsx';
+import TourOverlay from './onboarding/TourOverlay.jsx';
 import SuperadminPage from './pages/SuperadminPage.jsx';
 import MemberPage from './pages/MemberPage.jsx';
 import LandingPage from './pages/LandingPage.jsx';
@@ -938,7 +942,7 @@ export default function App() {
   }
 
   return (
-    <>
+    <OnboardingProvider token={auth.token} role={auth.role} isDemo={auth.isDemo}>
       {demoBanner}
       <div style={demoPaddingTop}>
         {page === 'scan' && (
@@ -976,6 +980,9 @@ export default function App() {
           onCancel={() => setShowPinModal(false)}
         />
       )}
-    </>
+      <WelcomeModal />
+      <SetupChecklist />
+      <TourOverlay />
+    </OnboardingProvider>
   );
 }

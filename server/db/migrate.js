@@ -32,7 +32,8 @@ const migrate = async () => {
     for (const gym of gymsResult.rows) {
       const membersResult = await client.query(
         `SELECT id FROM members
-         WHERE gym_id = $1 AND deleted_at IS NULL AND scan_token LIKE '%-%'
+         WHERE gym_id = $1 AND deleted_at IS NULL
+           AND scan_token ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
          ORDER BY created_at ASC`,
         [gym.id]
       );
